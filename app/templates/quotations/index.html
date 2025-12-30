@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Quotations - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-file-invoice text-primary"></i> Quotations
+            </h2>
+            <p class="text-muted mb-0">Manage quotations and estimates</p>
+        </div>
+        <a href="{{ url_for('quotations.create') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> New Quotation
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Quote #</th>
+                        <th>Customer</th>
+                        <th>Date</th>
+                        <th>Valid Until</th>
+                        <th class="text-end">Amount</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for quote in quotations %}
+                    <tr>
+                        <td><code>{{ quote.quote_number }}</code></td>
+                        <td>
+                            {% if quote.customer %}
+                            {{ quote.customer.name }}
+                            {% else %}
+                            <span class="text-muted">Walk-in</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ quote.created_at.strftime('%d %b %Y') }}</td>
+                        <td>{{ quote.valid_until.strftime('%d %b %Y') }}</td>
+                        <td class="text-end fw-bold">Rs. {{ "{:,.0f}".format(quote.total_amount) }}</td>
+                        <td>
+                            {% if quote.status == 'pending' %}
+                            <span class="badge bg-warning">Pending</span>
+                            {% elif quote.status == 'accepted' %}
+                            <span class="badge bg-success">Accepted</span>
+                            {% elif quote.status == 'rejected' %}
+                            <span class="badge bg-danger">Rejected</span>
+                            {% elif quote.status == 'expired' %}
+                            <span class="badge bg-secondary">Expired</span>
+                            {% elif quote.status == 'converted' %}
+                            <span class="badge bg-info">Converted to Sale</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('quotations.view', quotation_id=quote.id) }}"
+                                   class="btn btn-outline-primary" title="View">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if quote.status == 'pending' %}
+                                <a href="{{ url_for('quotations.edit', quotation_id=quote.id) }}"
+                                   class="btn btn-outline-secondary" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button class="btn btn-outline-success" onclick="convertToSale({{ quote.id }})" title="Convert to Sale">
+                                    <i class="fas fa-shopping-cart"></i>
+                                </button>
+                                {% endif %}
+                                <a href="{{ url_for('quotations.print_quote', quotation_id=quote.id) }}"
+                                   class="btn btn-outline-dark" title="Print" target="_blank">
+                                    <i class="fas fa-print"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5">
+                            <i class="fas fa-file-invoice fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No quotations found</p>
+                            <a href="{{ url_for('quotations.create') }}" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Create First Quotation
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function convertToSale(id) {
+    if (confirm('Convert this quotation to a sale?')) {
+        window.location.href = '/quotations/' + id + '/convert';
+    }
+}
+</script>
+{% endblock %}

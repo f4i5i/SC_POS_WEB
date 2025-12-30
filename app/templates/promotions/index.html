@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Promotions - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-percent text-primary"></i> Promotions & Offers
+            </h2>
+            <p class="text-muted mb-0">Manage discounts and promotional campaigns</p>
+        </div>
+        <div>
+            <a href="{{ url_for('promotions.vouchers') }}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-gift"></i> Gift Vouchers
+            </a>
+            <a href="{{ url_for('promotions.add') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Create Promotion
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Discount</th>
+                        <th>Valid Period</th>
+                        <th>Status</th>
+                        <th>Usage</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for promo in promotions %}
+                    <tr>
+                        <td>
+                            <strong>{{ promo.name }}</strong>
+                            {% if promo.code %}
+                            <br><small class="text-muted">Code: <code>{{ promo.code }}</code></small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ promo.discount_type|title }}</span>
+                        </td>
+                        <td>
+                            {% if promo.discount_type == 'percentage' %}
+                            {{ promo.discount_value }}%
+                            {% else %}
+                            Rs. {{ "{:,.0f}".format(promo.discount_value) }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ promo.start_date.strftime('%d %b') }} - {{ promo.end_date.strftime('%d %b %Y') }}
+                        </td>
+                        <td>
+                            {% if promo.is_active %}
+                            <span class="badge bg-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ promo.times_used }}{% if promo.max_uses %}/{{ promo.max_uses }}{% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('promotions.edit', promotion_id=promo.id) }}" class="btn btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button class="btn btn-outline-danger" onclick="deletePromotion({{ promo.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5">
+                            <i class="fas fa-percent fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No promotions found</p>
+                            <a href="{{ url_for('promotions.add') }}" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Create First Promotion
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function deletePromotion(id) {
+    if (confirm('Are you sure you want to delete this promotion?')) {
+        window.location.href = '/promotions/delete/' + id;
+    }
+}
+</script>
+{% endblock %}

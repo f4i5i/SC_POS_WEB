@@ -1,0 +1,640 @@
+{% extends "base.html" %}
+
+{% block title %}Add Product - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Page Header */
+    .page-header {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        animation: slideInDown 0.6s ease;
+    }
+
+    @keyframes slideInDown {
+        from {
+            opacity: 0;
+            transform: translateY(-30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .page-header h2 {
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin: 0;
+        font-weight: 800;
+    }
+
+    /* Glassmorphism Form Card */
+    .form-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        animation: slideInUp 0.6s ease;
+        overflow: hidden;
+    }
+
+    @keyframes slideInUp {
+        from {
+            transform: translateY(30px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    /* Glassmorphic Form Sections */
+    .form-section {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05));
+        backdrop-filter: blur(10px);
+        border-left: 4px solid transparent;
+        border-image: linear-gradient(135deg, #3B82F6, #8B5CF6) 1;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border-radius: 16px;
+        animation: fadeIn 0.8s ease forwards;
+        opacity: 0;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .form-section h5 {
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
+
+    /* Modern Form Labels */
+    .form-label {
+        font-weight: 600;
+        color: #1F2937;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Glassmorphic Form Controls */
+    .form-control, .form-select {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        border-radius: 12px;
+        border: 2px solid rgba(59, 130, 246, 0.2);
+        padding: 0.75rem 1rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .form-control:focus, .form-select:focus {
+        background: white;
+        border-color: #3B82F6;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        transform: translateY(-2px);
+    }
+
+    .required-field::after {
+        content: "*";
+        color: #EF4444;
+        margin-left: 4px;
+    }
+
+    /* Glassmorphic Image Preview */
+    .image-preview {
+        width: 200px;
+        height: 200px;
+        border: 3px dashed rgba(59, 130, 246, 0.3);
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(10px);
+        cursor: pointer;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .image-preview:hover {
+        border-color: #3B82F6;
+        background: rgba(59, 130, 246, 0.1);
+        transform: scale(1.05);
+        box-shadow: 0 8px 32px rgba(59, 130, 246, 0.2);
+    }
+
+    .image-preview img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: cover;
+    }
+
+    .image-placeholder {
+        text-align: center;
+        color: #6B7280;
+    }
+
+    /* Gradient Save Button with Ripple */
+    .btn-save {
+        background: linear-gradient(135deg, #10B981, #059669);
+        border: none;
+        padding: 1rem 2.5rem;
+        font-weight: 700;
+        border-radius: 12px;
+        color: white;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-save::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        transform: translate(-50%, -50%);
+        transition: width 0.6s, height 0.6s;
+    }
+
+    .btn-save:hover::before {
+        width: 300px;
+        height: 300px;
+    }
+
+    .btn-save:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
+    }
+
+    /* Glassmorphic Cancel Button */
+    .btn-cancel {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        padding: 1rem 2.5rem;
+        font-weight: 600;
+        border-radius: 12px;
+        border: 2px solid rgba(107, 114, 128, 0.3);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn-cancel:hover {
+        background: rgba(107, 114, 128, 0.1);
+        border-color: #6B7280;
+        transform: translateY(-2px);
+    }
+
+    /* Barcode Generate Link */
+    .barcode-generate {
+        cursor: pointer;
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s;
+    }
+
+    .barcode-generate:hover {
+        text-decoration: underline;
+        transform: translateX(3px);
+    }
+
+    /* Glassmorphic Input Group */
+    .input-group-text {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+        backdrop-filter: blur(10px);
+        border: 2px solid rgba(59, 130, 246, 0.2);
+        border-right: none;
+        border-radius: 12px 0 0 12px;
+        color: #3B82F6;
+        font-weight: 600;
+    }
+
+    .input-group .form-control {
+        border-left: none;
+        border-radius: 0 12px 12px 0;
+    }
+
+    .help-text {
+        font-size: 0.85rem;
+        color: #6B7280;
+        margin-top: 0.25rem;
+        font-weight: 500;
+    }
+
+    /* Profit Display */
+    #profit_display {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1));
+        backdrop-filter: blur(10px);
+        border: 2px solid rgba(16, 185, 129, 0.3);
+        font-weight: 700;
+        color: #059669;
+    }
+
+    /* Form Switch */
+    .form-check-input:checked {
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        border-color: #3B82F6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="page-header d-flex justify-content-between align-items-center">
+            <h2><i class="fas fa-plus-circle"></i> Add New Product</h2>
+            <a href="{{ url_for('inventory.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Inventory
+            </a>
+        </div>
+
+        <form method="POST" action="{{ url_for('inventory.add_product') }}" enctype="multipart/form-data" id="productForm">
+            <div class="card form-card">
+                <div class="card-body p-4">
+                    <!-- Basic Information -->
+                    <div class="form-section" style="animation-delay: 0.1s;">
+                        <h5><i class="fas fa-info-circle"></i> Basic Information</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label required-field">Product Name</label>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="name"
+                                           name="name"
+                                           required
+                                           placeholder="Enter product name">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="code" class="form-label required-field">Product Code</label>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="code"
+                                           name="code"
+                                           required
+                                           placeholder="e.g., PRD001">
+                                    <small class="help-text">Unique product identifier</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="barcode" class="form-label">Barcode</label>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="barcode"
+                                           name="barcode"
+                                           placeholder="Scan or enter barcode">
+                                    <a href="#" class="barcode-generate" onclick="generateBarcode(); return false;">
+                                        <i class="fas fa-sync"></i> Auto-generate
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="category_id" class="form-label">Category</label>
+                                    <select class="form-select" id="category_id" name="category_id">
+                                        <option value="">Select Category</option>
+                                        {% for category in categories %}
+                                        <option value="{{ category.id }}">{{ category.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="brand" class="form-label">Brand</label>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="brand"
+                                           name="brand"
+                                           placeholder="e.g., Dior, Chanel">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="size" class="form-label">Size / Volume</label>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="size"
+                                           name="size"
+                                           placeholder="e.g., 100ml, 50g">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control"
+                                      id="description"
+                                      name="description"
+                                      rows="3"
+                                      placeholder="Enter product description (optional)"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Pricing -->
+                    <div class="form-section" style="animation-delay: 0.2s;">
+                        <h5><i class="fas fa-tags"></i> Pricing</h5>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="cost_price" class="form-label required-field">Cost Price</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">Rs.</span>
+                                        <input type="number"
+                                               class="form-control"
+                                               id="cost_price"
+                                               name="cost_price"
+                                               step="0.01"
+                                               min="0"
+                                               required
+                                               placeholder="0.00"
+                                               onchange="calculateProfit()">
+                                    </div>
+                                    <small class="help-text">Price you paid for the product</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="selling_price" class="form-label required-field">Selling Price</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">Rs.</span>
+                                        <input type="number"
+                                               class="form-control"
+                                               id="selling_price"
+                                               name="selling_price"
+                                               step="0.01"
+                                               min="0"
+                                               required
+                                               placeholder="0.00"
+                                               onchange="calculateProfit()">
+                                    </div>
+                                    <small class="help-text">Price customers will pay</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Profit Margin</label>
+                                    <div class="form-control bg-light" id="profit_display" style="font-weight: 600; color: #059669;">
+                                        Rs. 0.00 (0%)
+                                    </div>
+                                    <small class="help-text">Automatically calculated</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="tax_rate" class="form-label">Tax Rate (%)</label>
+                                    <input type="number"
+                                           class="form-control"
+                                           id="tax_rate"
+                                           name="tax_rate"
+                                           step="0.01"
+                                           min="0"
+                                           max="100"
+                                           value="0"
+                                           placeholder="0.00">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Inventory -->
+                    <div class="form-section" style="animation-delay: 0.3s;">
+                        <h5><i class="fas fa-warehouse"></i> Inventory</h5>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="quantity" class="form-label required-field">Initial Quantity</label>
+                                    <input type="number"
+                                           class="form-control"
+                                           id="quantity"
+                                           name="quantity"
+                                           min="0"
+                                           required
+                                           value="0"
+                                           placeholder="0">
+                                    <small class="help-text">Current stock quantity</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="reorder_level" class="form-label">Reorder Level</label>
+                                    <input type="number"
+                                           class="form-control"
+                                           id="reorder_level"
+                                           name="reorder_level"
+                                           min="0"
+                                           value="10"
+                                           placeholder="10">
+                                    <small class="help-text">Alert when stock reaches this level</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="expiry_date" class="form-label">
+                                        <i class="fas fa-calendar-times text-danger"></i> Expiry Date
+                                    </label>
+                                    <input type="date"
+                                           class="form-control"
+                                           id="expiry_date"
+                                           name="expiry_date"
+                                           placeholder="YYYY-MM-DD">
+                                    <small class="help-text">Optional - for perishable products</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="supplier_id" class="form-label">Supplier</label>
+                                    <select class="form-select" id="supplier_id" name="supplier_id">
+                                        <option value="">Select Supplier</option>
+                                        {% for supplier in suppliers %}
+                                        <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Product Image -->
+                    <div class="form-section" style="animation-delay: 0.4s;">
+                        <h5><i class="fas fa-image"></i> Product Image</h5>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label class="form-label">Image Preview</label>
+                                <div class="image-preview" onclick="$('#image').click()">
+                                    <div class="image-placeholder" id="imagePlaceholder">
+                                        <i class="fas fa-cloud-upload-alt fa-3x mb-2"></i>
+                                        <p>Click to upload image</p>
+                                        <small>JPG, PNG (Max 5MB)</small>
+                                    </div>
+                                    <img id="imagePreview" style="display: none;">
+                                </div>
+                                <input type="file"
+                                       id="image"
+                                       name="image"
+                                       accept="image/*"
+                                       style="display: none;"
+                                       onchange="previewImage(this)">
+                            </div>
+                            <div class="col-md-9">
+                                <label class="form-label">Or Image URL</label>
+                                <input type="url"
+                                       class="form-control"
+                                       id="image_url"
+                                       name="image_url"
+                                       placeholder="https://example.com/product-image.jpg">
+                                <small class="help-text">Alternatively, provide a direct URL to the product image</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Settings -->
+                    <div class="form-section" style="animation-delay: 0.5s;">
+                        <h5><i class="fas fa-cog"></i> Additional Settings</h5>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   id="is_active"
+                                   name="is_active"
+                                   checked>
+                            <label class="form-check-label" for="is_active">
+                                <strong>Active Product</strong>
+                                <small class="d-block text-muted">Inactive products won't appear in POS</small>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <a href="{{ url_for('inventory.index') }}" class="btn btn-secondary btn-cancel">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary btn-save">
+                            <i class="fas fa-save"></i> Save Product
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function previewImage(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            $('#imagePreview').attr('src', e.target.result).show();
+            $('#imagePlaceholder').hide();
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function generateBarcode() {
+    // Generate a random 13-digit barcode (EAN-13 format)
+    const barcode = '2' + Math.floor(Math.random() * 1000000000000).toString().padStart(12, '0');
+    $('#barcode').val(barcode);
+
+    // Show a nice animation
+    $('#barcode').addClass('bg-success text-white');
+    setTimeout(() => {
+        $('#barcode').removeClass('bg-success text-white');
+    }, 500);
+}
+
+function calculateProfit() {
+    const costPrice = parseFloat($('#cost_price').val()) || 0;
+    const sellingPrice = parseFloat($('#selling_price').val()) || 0;
+
+    const profit = sellingPrice - costPrice;
+    const profitPercentage = costPrice > 0 ? ((profit / costPrice) * 100) : 0;
+
+    const profitColor = profit >= 0 ? '#059669' : '#EF4444';
+    $('#profit_display')
+        .html(`Rs. ${profit.toFixed(2)} (${profitPercentage.toFixed(1)}%)`)
+        .css('color', profitColor);
+}
+
+// Form validation
+$('#productForm').on('submit', function(e) {
+    const code = $('#code').val().trim();
+    const name = $('#name').val().trim();
+    const costPrice = parseFloat($('#cost_price').val());
+    const sellingPrice = parseFloat($('#selling_price').val());
+
+    if (!code || !name) {
+        e.preventDefault();
+        alert('Please fill in all required fields');
+        return false;
+    }
+
+    if (costPrice < 0 || sellingPrice < 0) {
+        e.preventDefault();
+        alert('Prices cannot be negative');
+        return false;
+    }
+
+    if (sellingPrice < costPrice) {
+        if (!confirm('Warning: Selling price is lower than cost price. This will result in a loss. Continue?')) {
+            e.preventDefault();
+            return false;
+        }
+    }
+});
+
+// Auto-focus on product name
+$(document).ready(function() {
+    $('#name').focus();
+
+    // Calculate profit on page load if values exist
+    calculateProfit();
+});
+
+// Keyboard shortcuts
+$(document).on('keydown', function(e) {
+    // Ctrl+S - Save form
+    if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        $('#productForm').submit();
+    }
+});
+</script>
+{% endblock %}

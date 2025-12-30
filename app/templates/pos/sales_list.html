@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Sales List - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .sale-card {
+        transition: all 0.3s;
+        border-radius: 10px;
+        border-left: 4px solid #3B82F6;
+        margin-bottom: 1rem;
+    }
+
+    .sale-card:hover {
+        transform: translateX(5px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .badge-paid { background: #10B981; }
+    .badge-partial { background: #F59E0B; }
+    .badge-pending { background: #EF4444; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-receipt"></i> Sales History</h2>
+    <a href="{{ url_for('pos.index') }}" class="btn btn-primary">
+        <i class="fas fa-cash-register"></i> New Sale
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('pos.sales_list') }}">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <input type="date" class="form-control" name="from_date" value="{{ request.args.get('from_date', '') }}">
+                </div>
+                <div class="col-md-4">
+                    <input type="date" class="form-control" name="to_date" value="{{ request.args.get('to_date', '') }}">
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i> Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Sales List -->
+{% if sales.items %}
+    {% for sale in sales.items %}
+    <div class="card sale-card">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <h6><i class="fas fa-file-invoice"></i> {{ sale.sale_number }}</h6>
+                    <small class="text-muted">{{ sale.sale_date.strftime('%b %d, %Y %I:%M %p') }}</small>
+                </div>
+                <div class="col-md-2">
+                    {% if sale.customer %}
+                        <i class="fas fa-user"></i> {{ sale.customer.name }}
+                    {% else %}
+                        <span class="text-muted">Walk-in Customer</span>
+                    {% endif %}
+                </div>
+                <div class="col-md-2">
+                    <strong>Rs. {{ "{:,.2f}".format(sale.total) }}</strong>
+                </div>
+                <div class="col-md-2">
+                    <span class="badge badge-{{ sale.payment_status }}">
+                        {{ sale.payment_status|title }}
+                    </span>
+                </div>
+                <div class="col-md-3 text-end">
+                    <a href="{{ url_for('pos.sale_details', sale_id=sale.id) }}" class="btn btn-sm btn-info text-white">
+                        <i class="fas fa-eye"></i> View
+                    </a>
+                    <button class="btn btn-sm btn-warning" onclick="printReceipt({{ sale.id }})">
+                        <i class="fas fa-print"></i> Print
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Pagination -->
+    {% if sales.pages > 1 %}
+    <nav>
+        <ul class="pagination justify-content-center">
+            <li class="page-item {% if not sales.has_prev %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('pos.sales_list', page=sales.prev_num, **request.args) }}">Previous</a>
+            </li>
+            {% for page_num in sales.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                {% if page_num %}
+                    <li class="page-item {% if page_num == sales.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('pos.sales_list', page=page_num, **request.args) }}">{{ page_num }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+            {% endfor %}
+            <li class="page-item {% if not sales.has_next %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('pos.sales_list', page=sales.next_num, **request.args) }}">Next</a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+{% else %}
+    <div class="text-center py-5">
+        <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+        <h4>No Sales Found</h4>
+        <a href="{{ url_for('pos.index') }}" class="btn btn-primary">Make First Sale</a>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function printReceipt(saleId) {
+    window.open(`/pos/print-receipt/${saleId}`, '_blank');
+}
+</script>
+{% endblock %}

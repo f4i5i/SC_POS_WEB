@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory Valuation - Sunnat Collection{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-boxes text-primary"></i>
+                Inventory Valuation Report
+            </h2>
+            <p class="text-muted mb-0">Current stock value and potential profit analysis</p>
+        </div>
+        <div>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Reports
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="rounded-circle bg-warning bg-opacity-10 p-3">
+                                <i class="fas fa-dollar-sign fa-2x text-warning"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted mb-1">Total Cost Value</h6>
+                            <h3 class="mb-0">Rs. {{ "{:,.2f}".format(total_cost_value) }}</h3>
+                            <small class="text-muted">Investment in stock</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="rounded-circle bg-success bg-opacity-10 p-3">
+                                <i class="fas fa-tags fa-2x text-success"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted mb-1">Total Selling Value</h6>
+                            <h3 class="mb-0">Rs. {{ "{:,.2f}".format(total_selling_value) }}</h3>
+                            <small class="text-muted">If all stock sold</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="rounded-circle bg-primary bg-opacity-10 p-3">
+                                <i class="fas fa-chart-line fa-2x text-primary"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted mb-1">Potential Profit</h6>
+                            <h3 class="mb-0 text-primary">Rs. {{ "{:,.2f}".format(potential_profit) }}</h3>
+                            <small class="text-muted">
+                                {{ "{:.1f}".format((potential_profit / total_cost_value * 100) if total_cost_value > 0 else 0) }}% margin
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inventory Details -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-list text-primary"></i>
+                    Stock Details
+                </h5>
+                <div class="input-group" style="max-width: 300px;">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" id="searchInput" placeholder="Search products...">
+                </div>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="inventoryTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Code</th>
+                            <th>Product Name</th>
+                            <th class="text-end">Quantity</th>
+                            <th class="text-end">Cost Price</th>
+                            <th class="text-end">Selling Price</th>
+                            <th class="text-end">Cost Value</th>
+                            <th class="text-end">Selling Value</th>
+                            <th class="text-end">Profit Margin</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in products %}
+                        <tr>
+                            <td><code>{{ product.code }}</code></td>
+                            <td>{{ product.name }}</td>
+                            <td class="text-end">
+                                {% if product.quantity <= product.reorder_level %}
+                                <span class="badge bg-warning">{{ product.quantity }}</span>
+                                {% else %}
+                                {{ product.quantity }}
+                                {% endif %}
+                            </td>
+                            <td class="text-end">Rs. {{ "{:,.2f}".format(product.cost_price) }}</td>
+                            <td class="text-end">Rs. {{ "{:,.2f}".format(product.selling_price) }}</td>
+                            <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(product.cost_price * product.quantity) }}</td>
+                            <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(product.selling_price * product.quantity) }}</td>
+                            <td class="text-end">
+                                {% set margin = ((product.selling_price - product.cost_price) / product.cost_price * 100) if product.cost_price > 0 else 0 %}
+                                <span class="badge bg-{{ 'success' if margin >= 50 else 'primary' if margin >= 25 else 'secondary' }}">
+                                    {{ "{:.1f}".format(margin) }}%
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not products %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">
+                                <i class="fas fa-inbox fa-2x mb-2"></i>
+                                <p class="mb-0">No products in inventory</p>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Search functionality
+document.getElementById('searchInput').addEventListener('keyup', function() {
+    const searchTerm = this.value.toLowerCase();
+    const rows = document.querySelectorAll('#inventoryTable tbody tr');
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(searchTerm) ? '' : 'none';
+    });
+});
+</script>
+{% endblock %}

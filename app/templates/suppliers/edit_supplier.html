@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Supplier - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        animation: slideInUp 0.4s ease-out;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    @keyframes slideInUp {
+        from { transform: translateY(30px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    .form-section {
+        background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%);
+        border-left: 4px solid #10B981;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border-radius: 8px;
+    }
+
+    .form-section h5 {
+        color: #065F46;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 2px solid #E5E7EB;
+        padding: 0.6rem 1rem;
+        transition: all 0.3s;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #10B981;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+
+    .required-field::after {
+        content: "*";
+        color: #EF4444;
+        margin-left: 4px;
+    }
+
+    .input-group-text {
+        background-color: #F3F4F6;
+        border: 2px solid #E5E7EB;
+        border-right: none;
+    }
+
+    .input-group .form-control {
+        border-left: none;
+    }
+
+    .btn-save {
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+        border: none;
+        padding: 0.8rem 2rem;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s;
+        color: white;
+    }
+
+    .btn-save:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        color: white;
+    }
+
+    .help-text {
+        font-size: 0.85rem;
+        color: #6B7280;
+        margin-top: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-truck-loading"></i> Edit Supplier</h2>
+            <a href="{{ url_for('suppliers.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Suppliers
+            </a>
+        </div>
+
+        <form method="POST" action="{{ url_for('suppliers.edit_supplier', supplier_id=supplier.id) }}" id="supplierForm">
+            <div class="card form-card">
+                <div class="card-body p-4">
+                    <!-- Basic Information -->
+                    <div class="form-section">
+                        <h5><i class="fas fa-building"></i> Company Information</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label required-field">Company Name</label>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="name"
+                                           name="name"
+                                           value="{{ supplier.name }}"
+                                           required
+                                           placeholder="Enter supplier company name"
+                                           autofocus>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="contact_person" class="form-label required-field">Contact Person</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                        <input type="text"
+                                               class="form-control"
+                                               id="contact_person"
+                                               name="contact_person"
+                                               value="{{ supplier.contact_person }}"
+                                               required
+                                               placeholder="Primary contact name">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="phone" class="form-label required-field">Phone Number</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                                        <input type="tel"
+                                               class="form-control"
+                                               id="phone"
+                                               name="phone"
+                                               value="{{ supplier.phone }}"
+                                               required
+                                               placeholder="03XX-XXXXXXX">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="email" class="form-label">Email Address</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                        <input type="email"
+                                               class="form-control"
+                                               id="email"
+                                               name="email"
+                                               value="{{ supplier.email or '' }}"
+                                               placeholder="supplier@example.com">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Address</label>
+                            <textarea class="form-control"
+                                      id="address"
+                                      name="address"
+                                      rows="2"
+                                      placeholder="Enter supplier address">{{ supplier.address or '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <!-- Payment Terms -->
+                    <div class="form-section">
+                        <h5><i class="fas fa-money-check-alt"></i> Payment Terms</h5>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="payment_terms" class="form-label">Payment Terms</label>
+                                    <textarea class="form-control"
+                                              id="payment_terms"
+                                              name="payment_terms"
+                                              rows="3"
+                                              placeholder="e.g., Net 30 days, 2/10 Net 30, COD">{{ supplier.payment_terms or '' }}</textarea>
+                                    <small class="help-text">Specify payment terms and conditions</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Notes -->
+                    <div class="form-section">
+                        <h5><i class="fas fa-sticky-note"></i> Additional Notes</h5>
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Notes</label>
+                            <textarea class="form-control"
+                                      id="notes"
+                                      name="notes"
+                                      rows="3"
+                                      placeholder="Additional notes about the supplier...">{{ supplier.notes or '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <a href="{{ url_for('suppliers.index') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-success btn-save">
+                            <i class="fas fa-save"></i> Update Supplier
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Form validation
+$('#supplierForm').on('submit', function(e) {
+    const name = $('#name').val().trim();
+    const contact = $('#contact_person').val().trim();
+    const phone = $('#phone').val().trim();
+
+    if (!name || !contact || !phone) {
+        e.preventDefault();
+        alert('Please fill in all required fields');
+        return false;
+    }
+});
+
+// Keyboard shortcuts
+$(document).on('keydown', function(e) {
+    // Ctrl+S - Save form
+    if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        $('#supplierForm').submit();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+
+{% block title %}Feature Management - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .feature-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s;
+        overflow: hidden;
+    }
+
+    .feature-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    }
+
+    .feature-header {
+        padding: 1.25rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .feature-body {
+        padding: 1.25rem;
+    }
+
+    .feature-toggle .toggle-btn {
+        min-width: 75px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .feature-toggle .toggle-btn:hover:not(:disabled) {
+        transform: scale(1.05);
+    }
+
+    .feature-toggle .toggle-btn.btn-success {
+        background: linear-gradient(135deg, #10B981, #059669);
+        border: none;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+    }
+
+    .feature-toggle .toggle-btn.btn-outline-danger {
+        border: 2px solid #dc3545;
+        color: #dc3545;
+    }
+
+    .feature-toggle .toggle-btn.btn-outline-danger:hover {
+        background: #dc3545;
+        color: white;
+    }
+
+    .category-badge {
+        font-size: 0.7rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+
+    .category-notifications { background: linear-gradient(135deg, #3B82F6, #1D4ED8); color: white; }
+    .category-sales { background: linear-gradient(135deg, #10B981, #059669); color: white; }
+    .category-inventory { background: linear-gradient(135deg, #F59E0B, #D97706); color: white; }
+    .category-finance { background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: white; }
+    .category-customers { background: linear-gradient(135deg, #EC4899, #BE185D); color: white; }
+    .category-general { background: linear-gradient(135deg, #6B7280, #4B5563); color: white; }
+
+    .status-enabled {
+        color: #10B981;
+    }
+
+    .status-disabled {
+        color: #6B7280;
+    }
+
+    .status-needs-config {
+        color: #F59E0B;
+    }
+
+    .summary-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .summary-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .category-section {
+        margin-bottom: 2rem;
+    }
+
+    .category-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #E5E7EB;
+    }
+
+    .config-required {
+        font-size: 0.8rem;
+        color: #F59E0B;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-toggle-on text-primary"></i>
+                Feature Management
+            </h2>
+            <p class="text-muted mb-0">Enable or disable features for your POS system</p>
+        </div>
+        <form action="{{ url_for('features.initialize_flags') }}" method="POST" style="display: inline;">
+            <button type="submit" class="btn btn-outline-primary">
+                <i class="fas fa-sync"></i> Reset to Defaults
+            </button>
+        </form>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="summary-card">
+                <div class="summary-value">{{ summary.total }}</div>
+                <div class="text-muted">Total Features</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="summary-card">
+                <div class="summary-value text-success">{{ summary.enabled }}</div>
+                <div class="text-muted">Enabled</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="summary-card">
+                <div class="summary-value text-secondary">{{ summary.disabled }}</div>
+                <div class="text-muted">Disabled</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="summary-card">
+                <div class="summary-value text-warning">{{ summary.needs_config }}</div>
+                <div class="text-muted">Needs Configuration</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features by Category -->
+    {% for category, features_list in categories.items() %}
+    <div class="category-section">
+        <h4 class="category-title">
+            <span class="category-badge category-{{ category }}">{{ category }}</span>
+            {{ category|title }} Features
+        </h4>
+        <div class="row">
+            {% for feature in features_list %}
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="feature-card">
+                    <div class="feature-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1">{{ feature.display_name }}</h5>
+                            <span class="category-badge category-{{ feature.category }}">
+                                {{ feature.category }}
+                            </span>
+                        </div>
+                        <div class="feature-toggle">
+                            {% if feature.requires_config and not feature.is_configured %}
+                            <button class="btn btn-sm btn-secondary" disabled title="Configure this feature first">
+                                <i class="fas fa-lock"></i>
+                            </button>
+                            {% else %}
+                            <button class="btn btn-sm toggle-btn {{ 'btn-success' if feature.is_enabled else 'btn-outline-danger' }}"
+                                    onclick="toggleFeature({{ feature.id }}, {{ 'false' if feature.is_enabled else 'true' }})"
+                                    id="toggle_btn_{{ feature.id }}"
+                                    title="{{ 'Click to disable' if feature.is_enabled else 'Click to enable' }}">
+                                <i class="fas {{ 'fa-toggle-on' if feature.is_enabled else 'fa-toggle-off' }}"></i>
+                                {{ 'ON' if feature.is_enabled else 'OFF' }}
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="feature-body">
+                        <p class="text-muted small mb-2">{{ feature.description }}</p>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                {% if feature.is_enabled and (not feature.requires_config or feature.is_configured) %}
+                                    <span class="status-enabled">
+                                        <i class="fas fa-check-circle"></i> Enabled
+                                    </span>
+                                {% elif feature.requires_config and not feature.is_configured %}
+                                    <span class="status-needs-config">
+                                        <i class="fas fa-exclamation-triangle"></i> Needs Config
+                                    </span>
+                                {% else %}
+                                    <span class="status-disabled">
+                                        <i class="fas fa-minus-circle"></i> Disabled
+                                    </span>
+                                {% endif %}
+                            </div>
+
+                            {% if feature.requires_config %}
+                            <a href="{{ url_for('features.configure_feature', feature_id=feature.id) }}"
+                               class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-cog"></i> Configure
+                            </a>
+                            {% endif %}
+                        </div>
+
+                        {% if feature.requires_config and not feature.is_configured %}
+                        <div class="config-required mt-2">
+                            <i class="fas fa-info-circle"></i>
+                            This feature requires API configuration before it can be enabled.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleFeature(featureId, enable) {
+    console.log('toggleFeature called:', featureId, 'enable:', enable);
+
+    // Show loading state
+    var btn = $('#toggle_btn_' + featureId);
+    var originalHtml = btn.html();
+    btn.prop('disabled', true);
+    btn.html('<i class="fas fa-spinner fa-spin"></i>');
+
+    $.ajax({
+        url: '/features/toggle/' + featureId,
+        method: 'POST',
+        contentType: 'application/json',
+        success: function(response) {
+            console.log('Toggle response:', response);
+            if (response.success) {
+                showToast(response.message, 'success');
+                // Reload page to reflect changes
+                setTimeout(function() {
+                    location.reload();
+                }, 800);
+            } else {
+                showToast(response.error || 'Error toggling feature', 'danger');
+                btn.prop('disabled', false);
+                btn.html(originalHtml);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Toggle error:', status, error, xhr.responseText);
+            var errorMsg = 'Error toggling feature';
+            try {
+                var resp = JSON.parse(xhr.responseText);
+                errorMsg = resp.error || errorMsg;
+            } catch(e) {}
+            showToast(errorMsg, 'danger');
+            btn.prop('disabled', false);
+            btn.html(originalHtml);
+        }
+    });
+}
+
+function showToast(message, type) {
+    // Create toast notification
+    var toastHtml = '<div class="position-fixed top-0 end-0 p-3" style="z-index: 9999">' +
+        '<div class="toast show align-items-center text-white bg-' + (type === 'success' ? 'success' : 'danger') + ' border-0" role="alert">' +
+        '<div class="d-flex">' +
+        '<div class="toast-body">' +
+        '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-circle') + ' me-2"></i>' +
+        message +
+        '</div>' +
+        '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>' +
+        '</div></div></div>';
+
+    // Remove existing toasts
+    $('.position-fixed .toast').parent().remove();
+
+    // Add new toast
+    $('body').append(toastHtml);
+
+    // Auto-hide after 3 seconds
+    setTimeout(function() {
+        $('.position-fixed .toast').parent().fadeOut(function() {
+            $(this).remove();
+        });
+    }, 3000);
+}
+</script>
+{% endblock %}

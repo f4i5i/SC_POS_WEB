@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Quotation {{ quotation.quote_number }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-invoice text-primary"></i>
+                        Quotation {{ quotation.quote_number }}
+                    </h5>
+                    <div>
+                        {% if quotation.status == 'pending' %}
+                        <button class="btn btn-success btn-sm" onclick="convertToSale()">
+                            <i class="fas fa-shopping-cart"></i> Convert to Sale
+                        </button>
+                        <a href="{{ url_for('quotations.edit', quotation_id=quotation.id) }}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('quotations.print_quote', quotation_id=quotation.id) }}" class="btn btn-dark btn-sm" target="_blank">
+                            <i class="fas fa-print"></i> Print
+                        </a>
+                        <a href="{{ url_for('quotations.index') }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Customer</h6>
+                            {% if quotation.customer %}
+                            <p class="mb-1"><strong>{{ quotation.customer.name }}</strong></p>
+                            <p class="mb-1">{{ quotation.customer.phone }}</p>
+                            {% if quotation.customer.email %}
+                            <p class="mb-0">{{ quotation.customer.email }}</p>
+                            {% endif %}
+                            {% else %}
+                            <p class="text-muted">Walk-in Customer</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <p class="mb-1">
+                                <strong>Status:</strong>
+                                {% if quotation.status == 'pending' %}
+                                <span class="badge bg-warning">Pending</span>
+                                {% elif quotation.status == 'accepted' %}
+                                <span class="badge bg-success">Accepted</span>
+                                {% elif quotation.status == 'rejected' %}
+                                <span class="badge bg-danger">Rejected</span>
+                                {% elif quotation.status == 'expired' %}
+                                <span class="badge bg-secondary">Expired</span>
+                                {% elif quotation.status == 'converted' %}
+                                <span class="badge bg-info">Converted</span>
+                                {% endif %}
+                            </p>
+                            <p class="mb-1"><strong>Created:</strong> {{ quotation.created_at.strftime('%d %b %Y') }}</p>
+                            <p class="mb-0"><strong>Valid Until:</strong> {{ quotation.valid_until.strftime('%d %b %Y') }}</p>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Product</th>
+                                    <th class="text-center">Quantity</th>
+                                    <th class="text-end">Unit Price</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+                                <tr>
+                                    <td>{{ item.product.name if item.product else 'Unknown Product' }}</td>
+                                    <td class="text-center">{{ item.quantity }}</td>
+                                    <td class="text-end">Rs. {{ "{:,.2f}".format(item.unit_price) }}</td>
+                                    <td class="text-end">Rs. {{ "{:,.2f}".format(item.total_price) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>Subtotal:</strong></td>
+                                    <td class="text-end"><strong>Rs. {{ "{:,.2f}".format(quotation.subtotal) }}</strong></td>
+                                </tr>
+                                {% if quotation.discount_amount > 0 %}
+                                <tr>
+                                    <td colspan="3" class="text-end text-danger">Discount:</td>
+                                    <td class="text-end text-danger">-Rs. {{ "{:,.2f}".format(quotation.discount_amount) }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr class="table-primary">
+                                    <td colspan="3" class="text-end"><strong>Grand Total:</strong></td>
+                                    <td class="text-end"><strong>Rs. {{ "{:,.2f}".format(quotation.total_amount) }}</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    {% if quotation.notes %}
+                    <div class="mt-3">
+                        <strong>Notes:</strong>
+                        <p class="mb-0">{{ quotation.notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function convertToSale() {
+    if (confirm('Convert this quotation to a sale? This will redirect you to POS.')) {
+        window.location.href = '/quotations/{{ quotation.id }}/convert';
+    }
+}
+</script>
+{% endblock %}

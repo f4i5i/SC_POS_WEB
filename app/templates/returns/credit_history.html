@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Credit History - {{ customer.name }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-history text-primary"></i> Credit History
+            </h2>
+            <p class="text-muted mb-0">{{ customer.name }} ({{ customer.phone }})</p>
+        </div>
+        <a href="{{ url_for('returns.customer_credits') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Credits
+        </a>
+    </div>
+
+    <!-- Current Balance -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3>Rs. {{ "{:,.0f}".format(current_balance) }}</h3>
+                    <p class="mb-0">Current Balance</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transaction History -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Transaction History</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Reference</th>
+                        <th class="text-end">Amount</th>
+                        <th class="text-end">Balance After</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for txn in transactions %}
+                    <tr>
+                        <td>{{ txn.created_at.strftime('%d %b %Y %H:%M') }}</td>
+                        <td>
+                            {% if txn.transaction_type == 'credit' %}
+                            <span class="badge bg-success">Credit Added</span>
+                            {% elif txn.transaction_type == 'debit' %}
+                            <span class="badge bg-danger">Credit Used</span>
+                            {% else %}
+                            <span class="badge bg-info">{{ txn.transaction_type|title }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if txn.return_id %}
+                            Return #{{ txn.return_id }}
+                            {% elif txn.sale_id %}
+                            Sale #{{ txn.sale_id }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if txn.transaction_type == 'credit' %}
+                            <span class="text-success">+Rs. {{ "{:,.0f}".format(txn.amount) }}</span>
+                            {% else %}
+                            <span class="text-danger">-Rs. {{ "{:,.0f}".format(txn.amount) }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end fw-bold">Rs. {{ "{:,.0f}".format(txn.balance_after) }}</td>
+                        <td>{{ txn.notes or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5">
+                            <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No transactions found</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

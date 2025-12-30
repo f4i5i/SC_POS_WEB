@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Profit & Loss Statement - Sunnat Collection{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-file-invoice-dollar text-primary"></i>
+                Profit & Loss Statement
+            </h2>
+            <p class="text-muted mb-0">{{ start_date.strftime('%B %d, %Y') }} - {{ end_date.strftime('%B %d, %Y') }}</p>
+        </div>
+        <div>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Reports
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- P&L Statement -->
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calculator text-primary"></i>
+                        Income Statement
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <tbody>
+                            <!-- Revenue Section -->
+                            <tr class="table-light">
+                                <td colspan="2"><strong>REVENUE</strong></td>
+                            </tr>
+                            <tr>
+                                <td>Gross Sales</td>
+                                <td class="text-end">Rs. {{ "{:,.2f}".format(gross_revenue) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="ps-4">Less: Discounts</td>
+                                <td class="text-end text-danger">(Rs. {{ "{:,.2f}".format(total_discounts) }})</td>
+                            </tr>
+                            <tr class="table-light">
+                                <td><strong>Net Revenue</strong></td>
+                                <td class="text-end"><strong>Rs. {{ "{:,.2f}".format(net_revenue) }}</strong></td>
+                            </tr>
+
+                            <!-- Cost Section -->
+                            <tr class="table-light">
+                                <td colspan="2" class="pt-3"><strong>COST OF GOODS SOLD</strong></td>
+                            </tr>
+                            <tr>
+                                <td>Cost of Goods Sold (COGS)</td>
+                                <td class="text-end text-danger">(Rs. {{ "{:,.2f}".format(cogs) }})</td>
+                            </tr>
+
+                            <!-- Gross Profit -->
+                            <tr class="table-success">
+                                <td><strong>Gross Profit</strong></td>
+                                <td class="text-end"><strong>Rs. {{ "{:,.2f}".format(gross_profit) }}</strong></td>
+                            </tr>
+                            <tr>
+                                <td>Gross Margin</td>
+                                <td class="text-end">
+                                    <span class="badge bg-{{ 'success' if gross_margin >= 40 else 'primary' if gross_margin >= 25 else 'warning' }}">
+                                        {{ "{:.1f}".format(gross_margin) }}%
+                                    </span>
+                                </td>
+                            </tr>
+
+                            <!-- Summary -->
+                            <tr class="table-light">
+                                <td colspan="2" class="pt-3"><strong>SUMMARY</strong></td>
+                            </tr>
+                            <tr>
+                                <td>Total Transactions</td>
+                                <td class="text-end">{{ total_transactions }}</td>
+                            </tr>
+                            <tr>
+                                <td>Average Transaction Value</td>
+                                <td class="text-end">Rs. {{ "{:,.2f}".format(net_revenue / total_transactions if total_transactions > 0 else 0) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Metrics -->
+        <div class="col-md-4">
+            <!-- Profit Indicator -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body text-center">
+                    <div class="mb-2">
+                        <i class="fas fa-chart-line fa-3x text-{{ 'success' if gross_profit > 0 else 'danger' }}"></i>
+                    </div>
+                    <h6 class="text-muted mb-1">Net Profit</h6>
+                    <h2 class="mb-0 text-{{ 'success' if gross_profit > 0 else 'danger' }}">
+                        Rs. {{ "{:,.2f}".format(gross_profit) }}
+                    </h2>
+                    <small class="text-muted">{{ "{:.1f}".format(gross_margin) }}% margin</small>
+                </div>
+            </div>
+
+            <!-- Payment Breakdown -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0">
+                        <i class="fas fa-credit-card text-primary"></i>
+                        Payment Methods
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="paymentBreakdownChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const paymentData = {{ payment_breakdown | tojson }};
+const paymentLabels = Object.keys(paymentData);
+const paymentValues = Object.values(paymentData);
+
+new Chart(document.getElementById('paymentBreakdownChart'), {
+    type: 'pie',
+    data: {
+        labels: paymentLabels,
+        datasets: [{
+            data: paymentValues,
+            backgroundColor: [
+                'rgba(99, 102, 241, 0.8)',
+                'rgba(16, 185, 129, 0.8)',
+                'rgba(245, 158, 11, 0.8)',
+                'rgba(239, 68, 68, 0.8)'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            },
+            tooltip: {
+                callbacks: {
+                    label: context => 'Rs. ' + context.parsed.toLocaleString('en-PK', {minimumFractionDigits: 2})
+                }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

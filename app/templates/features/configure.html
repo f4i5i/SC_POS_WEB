@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}Configure {{ feature.display_name }} - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .config-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+
+    .config-header {
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 16px 16px 0 0;
+    }
+
+    .config-body {
+        padding: 2rem;
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .form-text {
+        font-size: 0.85rem;
+    }
+
+    .config-section {
+        background: #F9FAFB;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .config-section-title {
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: #1F2937;
+    }
+
+    .password-toggle {
+        cursor: pointer;
+        color: #6B7280;
+    }
+
+    .password-toggle:hover {
+        color: #3B82F6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="config-card">
+                <div class="config-header">
+                    <a href="{{ url_for('features.index') }}" class="text-white text-decoration-none mb-2 d-inline-block">
+                        <i class="fas fa-arrow-left"></i> Back to Features
+                    </a>
+                    <h3 class="mb-1">
+                        <i class="fas fa-cog"></i> Configure {{ feature.display_name }}
+                    </h3>
+                    <p class="mb-0 opacity-75">{{ feature.description }}</p>
+                </div>
+
+                <div class="config-body">
+                    <form method="POST" action="{{ url_for('features.configure_feature', feature_id=feature.id) }}">
+                        {% if feature.name == 'sms_notifications' %}
+                        <!-- SMS Configuration -->
+                        <div class="config-section">
+                            <h5 class="config-section-title">
+                                <i class="fas fa-sms text-primary"></i> SMS Provider Settings
+                            </h5>
+
+                            <div class="mb-3">
+                                <label class="form-label">SMS Provider</label>
+                                <select class="form-select" name="config_provider">
+                                    <option value="">Select Provider</option>
+                                    <option value="twilio" {% if feature.config.provider == 'twilio' %}selected{% endif %}>Twilio</option>
+                                    <option value="messagebird" {% if feature.config.provider == 'messagebird' %}selected{% endif %}>MessageBird</option>
+                                    <option value="jazz" {% if feature.config.provider == 'jazz' %}selected{% endif %}>Jazz SMS (Pakistan)</option>
+                                    <option value="telenor" {% if feature.config.provider == 'telenor' %}selected{% endif %}>Telenor SMS (Pakistan)</option>
+                                    <option value="custom" {% if feature.config.provider == 'custom' %}selected{% endif %}>Custom API</option>
+                                </select>
+                                <div class="form-text">Choose your SMS service provider</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">API Key / Account SID</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" name="config_api_key"
+                                           value="{{ feature.config.api_key or '' }}" id="apiKey">
+                                    <span class="input-group-text password-toggle" onclick="togglePassword('apiKey')">
+                                        <i class="fas fa-eye"></i>
+                                    </span>
+                                </div>
+                                <div class="form-text">Your provider's API key or account identifier</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">API Secret / Auth Token</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" name="config_api_secret"
+                                           value="{{ feature.config.api_secret or '' }}" id="apiSecret">
+                                    <span class="input-group-text password-toggle" onclick="togglePassword('apiSecret')">
+                                        <i class="fas fa-eye"></i>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Sender ID / Phone Number</label>
+                                <input type="text" class="form-control" name="config_sender_id"
+                                       value="{{ feature.config.sender_id or '' }}"
+                                       placeholder="e.g., SUNNAT or +923001234567">
+                                <div class="form-text">The sender name or number that will appear on SMS</div>
+                            </div>
+                        </div>
+
+                        {% elif feature.name == 'whatsapp_notifications' %}
+                        <!-- WhatsApp Configuration -->
+                        <div class="config-section">
+                            <h5 class="config-section-title">
+                                <i class="fab fa-whatsapp text-success"></i> WhatsApp Business API Settings
+                            </h5>
+
+                            <div class="mb-3">
+                                <label class="form-label">API Provider</label>
+                                <select class="form-select" name="config_provider">
+                                    <option value="">Select Provider</option>
+                                    <option value="meta" {% if feature.config.provider == 'meta' %}selected{% endif %}>Meta Business API (Official)</option>
+                                    <option value="twilio" {% if feature.config.provider == 'twilio' %}selected{% endif %}>Twilio for WhatsApp</option>
+                                    <option value="messagebird" {% if feature.config.provider == 'messagebird' %}selected{% endif %}>MessageBird</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">API Key / Access Token</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" name="config_api_key"
+                                           value="{{ feature.config.api_key or '' }}" id="waApiKey">
+                                    <span class="input-group-text password-toggle" onclick="togglePassword('waApiKey')">
+                                        <i class="fas fa-eye"></i>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Phone Number ID</label>
+                                <input type="text" class="form-control" name="config_phone_number_id"
+                                       value="{{ feature.config.phone_number_id or '' }}">
+                                <div class="form-text">Your WhatsApp Business phone number ID</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Business Account ID</label>
+                                <input type="text" class="form-control" name="config_business_id"
+                                       value="{{ feature.config.business_id or '' }}">
+                            </div>
+                        </div>
+
+                        {% elif feature.name == 'email_notifications' %}
+                        <!-- Email Configuration -->
+                        <div class="config-section">
+                            <h5 class="config-section-title">
+                                <i class="fas fa-envelope text-info"></i> Email Server Settings
+                            </h5>
+
+                            <div class="row">
+                                <div class="col-md-8 mb-3">
+                                    <label class="form-label">SMTP Server</label>
+                                    <input type="text" class="form-control" name="config_smtp_server"
+                                           value="{{ feature.config.smtp_server or '' }}"
+                                           placeholder="e.g., smtp.gmail.com">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Port</label>
+                                    <input type="number" class="form-control" name="config_smtp_port"
+                                           value="{{ feature.config.smtp_port or 587 }}">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Email Username</label>
+                                <input type="email" class="form-control" name="config_username"
+                                       value="{{ feature.config.username or '' }}"
+                                       placeholder="your-email@gmail.com">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Email Password / App Password</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" name="config_password"
+                                           value="{{ feature.config.password or '' }}" id="emailPassword">
+                                    <span class="input-group-text password-toggle" onclick="togglePassword('emailPassword')">
+                                        <i class="fas fa-eye"></i>
+                                    </span>
+                                </div>
+                                <div class="form-text">For Gmail, use an App Password instead of your account password</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">From Name</label>
+                                <input type="text" class="form-control" name="config_from_name"
+                                       value="{{ feature.config.from_name or 'Sunnat Collection' }}">
+                            </div>
+
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="config_use_tls"
+                                       {% if feature.config.use_tls != false %}checked{% endif %}>
+                                <label class="form-check-label">Use TLS Encryption</label>
+                            </div>
+                        </div>
+
+                        {% else %}
+                        <!-- Generic Configuration -->
+                        <div class="config-section">
+                            <h5 class="config-section-title">
+                                <i class="fas fa-sliders-h text-primary"></i> Feature Settings
+                            </h5>
+
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i>
+                                This feature has no additional configuration options.
+                                You can enable it directly from the features page.
+                            </div>
+
+                            {% if feature.config %}
+                            <div class="mb-3">
+                                <label class="form-label">Current Configuration</label>
+                                <pre class="bg-light p-3 rounded"><code>{{ feature.config | tojson(indent=2) }}</code></pre>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('features.index') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Save Configuration
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function togglePassword(inputId) {
+    const input = document.getElementById(inputId);
+    const icon = input.nextElementSibling.querySelector('i');
+
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Process Return - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-undo text-primary"></i> Process Return for Sale #{{ sale.invoice_number }}
+            </h5>
+            <a href="{{ url_for('pos.sale_details', sale_id=sale.id) }}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Back to Sale
+            </a>
+        </div>
+        <div class="card-body">
+            <!-- Sale Info -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <p><strong>Customer:</strong> {{ sale.customer.name if sale.customer else 'Walk-in Customer' }}</p>
+                    <p><strong>Sale Date:</strong> {{ sale.created_at.strftime('%d %b %Y %H:%M') }}</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p><strong>Original Total:</strong> Rs. {{ "{:,.2f}".format(sale.total_amount) }}</p>
+                    <p><strong>Payment:</strong> {{ sale.payment_method|title }}</p>
+                </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('returns.process_return', sale_id=sale.id) }}">
+                <h6 class="mb-3">Select Items to Return:</h6>
+                <table class="table">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="50">
+                                <input type="checkbox" id="selectAll" onclick="toggleAll(this)">
+                            </th>
+                            <th>Product</th>
+                            <th width="100">Sold Qty</th>
+                            <th width="120">Return Qty</th>
+                            <th width="120">Unit Price</th>
+                            <th width="120">Refund</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in sale.items %}
+                        <tr>
+                            <td>
+                                <input type="checkbox" name="items" value="{{ item.id }}" class="item-check"
+                                       onchange="updateTotal()">
+                            </td>
+                            <td>{{ item.product.name if item.product else 'Unknown' }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>
+                                <input type="number" class="form-control form-control-sm return-qty"
+                                       name="qty_{{ item.id }}" min="1" max="{{ item.quantity }}" value="1"
+                                       data-price="{{ item.unit_price }}" onchange="updateTotal()">
+                            </td>
+                            <td>Rs. {{ "{:,.2f}".format(item.unit_price) }}</td>
+                            <td class="refund-amount">Rs. 0</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <td colspan="5" class="text-end fw-bold">Total Refund:</td>
+                            <td class="fw-bold" id="totalRefund">Rs. 0</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Refund Type <span class="text-danger">*</span></label>
+                        <select class="form-select" name="refund_type" required>
+                            <option value="cash">Cash Refund</option>
+                            <option value="store_credit">Store Credit</option>
+                            <option value="exchange">Exchange</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Reason <span class="text-danger">*</span></label>
+                        <select class="form-select" name="reason" required>
+                            <option value="defective">Defective Product</option>
+                            <option value="wrong_item">Wrong Item</option>
+                            <option value="not_satisfied">Customer Not Satisfied</option>
+                            <option value="damaged">Damaged in Transit</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Notes</label>
+                    <textarea class="form-control" name="notes" rows="2" placeholder="Additional notes..."></textarea>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('pos.sale_details', sale_id=sale.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-warning" id="submitBtn" disabled>
+                        <i class="fas fa-undo"></i> Process Return
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAll(checkbox) {
+    $('.item-check').prop('checked', checkbox.checked);
+    updateTotal();
+}
+
+function updateTotal() {
+    let total = 0;
+    $('.item-check:checked').each(function() {
+        let row = $(this).closest('tr');
+        let qty = parseInt(row.find('.return-qty').val()) || 0;
+        let price = parseFloat(row.find('.return-qty').data('price')) || 0;
+        let refund = qty * price;
+        row.find('.refund-amount').text('Rs. ' + refund.toLocaleString());
+        total += refund;
+    });
+
+    $('.item-check:not(:checked)').each(function() {
+        $(this).closest('tr').find('.refund-amount').text('Rs. 0');
+    });
+
+    $('#totalRefund').text('Rs. ' + total.toLocaleString());
+    $('#submitBtn').prop('disabled', total === 0);
+}
+</script>
+{% endblock %}

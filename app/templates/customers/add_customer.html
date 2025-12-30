@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block title %}Add Customer - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    @keyframes slideInUp {
+        from {
+            transform: translateY(30px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .form-card {
+        animation: slideInUp 0.4s ease-out;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    .form-section {
+        background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+        border-left: 4px solid #3B82F6;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border-radius: 8px;
+    }
+
+    .form-section h5 {
+        color: #1E40AF;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    .form-label {
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 2px solid #E5E7EB;
+        padding: 0.6rem 1rem;
+        transition: all 0.3s;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #3B82F6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .required-field::after {
+        content: "*";
+        color: #EF4444;
+        margin-left: 4px;
+    }
+
+    .input-group-text {
+        background-color: #F3F4F6;
+        border: 2px solid #E5E7EB;
+        border-right: none;
+        color: #6B7280;
+    }
+
+    .input-group .form-control {
+        border-left: none;
+    }
+
+    .btn-save {
+        background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+        border: none;
+        padding: 0.8rem 2rem;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s;
+        color: white;
+    }
+
+    .btn-save:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        color: white;
+    }
+
+    .help-text {
+        font-size: 0.85rem;
+        color: #6B7280;
+        margin-top: 0.25rem;
+    }
+
+    .loyalty-preview {
+        background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+        color: #1F2937;
+        padding: 1rem;
+        border-radius: 10px;
+        text-align: center;
+        font-weight: 600;
+    }
+
+    .quick-fill {
+        cursor: pointer;
+        color: #3B82F6;
+        font-size: 0.85rem;
+        text-decoration: none;
+        margin-left: 0.5rem;
+    }
+
+    .quick-fill:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-user-plus"></i> Add New Customer</h2>
+            <a href="{{ url_for('customers.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Customers
+            </a>
+        </div>
+
+        <form method="POST" action="{{ url_for('customers.add_customer') }}" id="customerForm">
+            <div class="card form-card">
+                <div class="card-body p-4">
+                    <!-- Basic Information -->
+                    <div class="form-section">
+                        <h5><i class="fas fa-user"></i> Basic Information</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label required-field">Full Name</label>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="name"
+                                           name="name"
+                                           required
+                                           placeholder="Enter customer full name"
+                                           autofocus>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="phone" class="form-label required-field">Phone Number</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                                        <input type="tel"
+                                               class="form-control"
+                                               id="phone"
+                                               name="phone"
+                                               required
+                                               placeholder="03XX-XXXXXXX"
+                                               pattern="[0-9]{4}-[0-9]{7}"
+                                               onkeyup="formatPhone(this)">
+                                    </div>
+                                    <small class="help-text">Format: 03XX-XXXXXXX</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="email" class="form-label">Email Address</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                        <input type="email"
+                                               class="form-control"
+                                               id="email"
+                                               name="email"
+                                               placeholder="customer@example.com">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="cnic" class="form-label">CNIC</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-id-card"></i></span>
+                                        <input type="text"
+                                               class="form-control"
+                                               id="cnic"
+                                               name="cnic"
+                                               placeholder="XXXXX-XXXXXXX-X"
+                                               pattern="[0-9]{5}-[0-9]{7}-[0-9]{1}"
+                                               onkeyup="formatCNIC(this)">
+                                    </div>
+                                    <small class="help-text">Format: XXXXX-XXXXXXX-X</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Address</label>
+                            <textarea class="form-control"
+                                      id="address"
+                                      name="address"
+                                      rows="2"
+                                      placeholder="Enter customer address (optional)"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Loyalty & Preferences -->
+                    <div class="form-section">
+                        <h5><i class="fas fa-star"></i> Loyalty & Preferences</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="loyalty_points" class="form-label">Initial Loyalty Points</label>
+                                    <input type="number"
+                                           class="form-control"
+                                           id="loyalty_points"
+                                           name="loyalty_points"
+                                           min="0"
+                                           value="0"
+                                           onchange="updateLoyaltyPreview()">
+                                    <small class="help-text">Optional: Award points for joining</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Loyalty Status</label>
+                                    <div class="loyalty-preview" id="loyaltyPreview">
+                                        <i class="fas fa-user"></i> Regular Customer
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Notes / Preferences</label>
+                            <textarea class="form-control"
+                                      id="notes"
+                                      name="notes"
+                                      rows="2"
+                                      placeholder="Any special notes, preferences, or allergies..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Additional Settings -->
+                    <div class="form-section">
+                        <h5><i class="fas fa-cog"></i> Settings</h5>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   id="is_active"
+                                   name="is_active"
+                                   checked>
+                            <label class="form-check-label" for="is_active">
+                                <strong>Active Customer</strong>
+                                <small class="d-block text-muted">Inactive customers won't appear in quick select</small>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <a href="{{ url_for('customers.index') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary btn-save">
+                            <i class="fas fa-save"></i> Save Customer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <!-- Quick Tips -->
+        <div class="alert alert-info mt-3">
+            <h6><i class="fas fa-lightbulb"></i> Quick Tips:</h6>
+            <ul class="mb-0">
+                <li>Phone number is required for customer identification</li>
+                <li>Email is optional but useful for sending receipts</li>
+                <li>Loyalty points can be awarded for purchases</li>
+                <li>Use notes to remember customer preferences</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function formatPhone(input) {
+    let value = input.value.replace(/\D/g, '');
+    if (value.length > 4) {
+        value = value.slice(0, 4) + '-' + value.slice(4, 11);
+    }
+    input.value = value;
+}
+
+function formatCNIC(input) {
+    let value = input.value.replace(/\D/g, '');
+    if (value.length > 5 && value.length <= 12) {
+        value = value.slice(0, 5) + '-' + value.slice(5, 12);
+    } else if (value.length > 12) {
+        value = value.slice(0, 5) + '-' + value.slice(5, 12) + '-' + value.slice(12, 13);
+    }
+    input.value = value;
+}
+
+function updateLoyaltyPreview() {
+    const points = parseInt($('#loyalty_points').val()) || 0;
+    let status = '<i class="fas fa-user"></i> Regular Customer';
+
+    if (points >= 500) {
+        status = '<i class="fas fa-crown"></i> Platinum Member';
+    } else if (points >= 200) {
+        status = '<i class="fas fa-gem"></i> Gold Member';
+    } else if (points >= 100) {
+        status = '<i class="fas fa-star"></i> VIP Customer';
+    }
+
+    $('#loyaltyPreview').html(status);
+}
+
+// Form validation
+$('#customerForm').on('submit', function(e) {
+    const name = $('#name').val().trim();
+    const phone = $('#phone').val().trim();
+
+    if (!name || !phone) {
+        e.preventDefault();
+        alert('Please fill in all required fields');
+        return false;
+    }
+
+    // Validate phone format
+    const phoneRegex = /^[0-9]{4}-[0-9]{7}$/;
+    if (!phoneRegex.test(phone)) {
+        e.preventDefault();
+        alert('Please enter a valid phone number in format: 03XX-XXXXXXX');
+        return false;
+    }
+
+    // Validate CNIC if provided
+    const cnic = $('#cnic').val().trim();
+    if (cnic) {
+        const cnicRegex = /^[0-9]{5}-[0-9]{7}-[0-9]{1}$/;
+        if (!cnicRegex.test(cnic)) {
+            e.preventDefault();
+            alert('Please enter a valid CNIC in format: XXXXX-XXXXXXX-X');
+            return false;
+        }
+    }
+});
+
+$(document).ready(function() {
+    // Initialize loyalty preview
+    updateLoyaltyPreview();
+
+    // Focus on name field
+    $('#name').focus();
+});
+
+// Keyboard shortcuts
+$(document).on('keydown', function(e) {
+    // Ctrl+S - Save form
+    if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        $('#customerForm').submit();
+    }
+});
+</script>
+{% endblock %}

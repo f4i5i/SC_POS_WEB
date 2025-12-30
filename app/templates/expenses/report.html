@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Expense Report - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-chart-pie text-primary"></i> Expense Report
+            </h2>
+            <p class="text-muted mb-0">{{ start_date.strftime('%d %b %Y') }} - {{ end_date.strftime('%d %b %Y') }}</p>
+        </div>
+        <a href="{{ url_for('expenses.index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Expenses
+        </a>
+    </div>
+
+    <!-- Date Filter -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" class="form-control" name="start_date"
+                           value="{{ start_date.strftime('%Y-%m-%d') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">End Date</label>
+                    <input type="date" class="form-control" name="end_date"
+                           value="{{ end_date.strftime('%Y-%m-%d') }}">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter"></i> Generate Report
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3 class="mb-1">Rs. {{ "{:,.0f}".format(total_amount) }}</h3>
+                    <p class="mb-0">Total Expenses</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3 class="mb-1">{{ total_count }}</h3>
+                    <p class="mb-0">Total Transactions</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h3 class="mb-1">Rs. {{ "{:,.0f}".format(total_amount / total_count if total_count > 0 else 0) }}</h3>
+                    <p class="mb-0">Average Expense</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Breakdown -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Expenses by Category</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th class="text-end">Amount</th>
+                            <th class="text-end">Count</th>
+                            <th class="text-end">% of Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in by_category %}
+                        <tr>
+                            <td>
+                                <span class="badge" style="background: {{ item.color }}">
+                                    <i class="fas fa-{{ item.icon }}"></i>
+                                </span>
+                                {{ item.name }}
+                            </td>
+                            <td class="text-end">Rs. {{ "{:,.2f}".format(item.amount) }}</td>
+                            <td class="text-end">{{ item.count }}</td>
+                            <td class="text-end">{{ "{:.1f}".format(item.amount / total_amount * 100 if total_amount > 0 else 0) }}%</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">No expenses in this period</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <th>Total</th>
+                            <th class="text-end">Rs. {{ "{:,.2f}".format(total_amount) }}</th>
+                            <th class="text-end">{{ total_count }}</th>
+                            <th class="text-end">100%</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

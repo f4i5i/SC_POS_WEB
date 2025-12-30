@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .user-card {
+        border-radius: 10px;
+        transition: all 0.3s;
+        margin-bottom: 1rem;
+    }
+
+    .user-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .user-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+
+    .role-badge {
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .role-admin { background: #FEE2E2; color: #991B1B; }
+    .role-manager { background: #DBEAFE; color: #1E40AF; }
+    .role-cashier { background: #D1FAE5; color: #065F46; }
+    .role-stock_manager { background: #FEF3C7; color: #92400E; }
+    .role-accountant { background: #EDE9FE; color: #5B21B6; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-users"></i> User Management</h2>
+    <a href="{{ url_for('settings.add_user') }}" class="btn btn-primary">
+        <i class="fas fa-user-plus"></i> Add New User
+    </a>
+</div>
+
+{% if users %}
+    {% for user in users %}
+    <div class="card user-card">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-auto">
+                    <div class="user-avatar">{{ user.full_name[0].upper() }}</div>
+                </div>
+                <div class="col">
+                    <h5 class="mb-1">{{ user.full_name }}</h5>
+                    <div class="text-muted mb-2">{{ user.username }} • {{ user.email or 'No email' }}</div>
+                    <span class="role-badge role-{{ user.role }}">{{ user.role|replace('_', ' ') }}</span>
+                </div>
+                <div class="col-auto">
+                    <div class="text-muted mb-2">
+                        <small>Last login: {{ user.last_login.strftime('%b %d, %Y') if user.last_login else 'Never' }}</small>
+                    </div>
+                    <div class="btn-group btn-group-sm">
+                        <a href="{{ url_for('settings.edit_user', user_id=user.id) }}" class="btn btn-outline-primary">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        {% if user.id != current_user.id %}
+                        <button class="btn btn-outline-danger" onclick="deleteUser({{ user.id }}, '{{ user.full_name }}')">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="text-center py-5">
+        <i class="fas fa-users fa-4x text-muted mb-3"></i>
+        <h4>No Users Found</h4>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function deleteUser(userId, userName) {
+    if (confirm(`Are you sure you want to delete user "${userName}"?`)) {
+        $.ajax({
+            url: `/settings/users/delete/${userId}`,
+            method: 'POST',
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + response.error);
+                }
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

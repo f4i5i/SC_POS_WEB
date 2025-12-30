@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-card {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 1.5rem;
+        transition: all 0.3s;
+    }
+
+    .settings-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    }
+
+    .settings-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        margin-bottom: 1rem;
+    }
+
+    .settings-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .settings-description {
+        color: #6B7280;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h2><i class="fas fa-cog"></i> Settings</h2>
+    <p class="text-muted">Manage your system settings and configuration</p>
+</div>
+
+<div class="row">
+    <!-- User Management -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="settings-card">
+            <div class="settings-icon" style="background: #EFF6FF; color: #3B82F6;">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="settings-title">User Management</div>
+            <p class="settings-description">Manage user accounts and permissions</p>
+            <a href="{{ url_for('settings.users') }}" class="btn btn-primary w-100">
+                <i class="fas fa-arrow-right"></i> Manage Users
+            </a>
+        </div>
+    </div>
+
+    <!-- Business Settings -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="settings-card">
+            <div class="settings-icon" style="background: #D1FAE5; color: #10B981;">
+                <i class="fas fa-building"></i>
+            </div>
+            <div class="settings-title">Business Settings</div>
+            <p class="settings-description">Configure business information</p>
+            <a href="{{ url_for('settings.business_settings') }}" class="btn btn-success w-100">
+                <i class="fas fa-arrow-right"></i> Business Info
+            </a>
+        </div>
+    </div>
+
+    <!-- Categories -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="settings-card">
+            <div class="settings-icon" style="background: #FEF3C7; color: #F59E0B;">
+                <i class="fas fa-tags"></i>
+            </div>
+            <div class="settings-title">Categories</div>
+            <p class="settings-description">Manage product categories</p>
+            <a href="{{ url_for('settings.categories') }}" class="btn btn-warning w-100">
+                <i class="fas fa-arrow-right"></i> Manage Categories
+            </a>
+        </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="settings-card">
+            <div class="settings-icon" style="background: #EDE9FE; color: #8B5CF6;">
+                <i class="fas fa-history"></i>
+            </div>
+            <div class="settings-title">Activity Log</div>
+            <p class="settings-description">View system activity and changes</p>
+            <a href="{{ url_for('settings.activity_log') }}" class="btn btn-outline-primary w-100">
+                <i class="fas fa-arrow-right"></i> View Logs
+            </a>
+        </div>
+    </div>
+
+    <!-- Sync Status -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="settings-card">
+            <div class="settings-icon" style="background: #FCE7F3; color: #EC4899;">
+                <i class="fas fa-sync"></i>
+            </div>
+            <div class="settings-title">Sync Status</div>
+            <p class="settings-description">Monitor cloud synchronization</p>
+            <a href="{{ url_for('settings.sync_status') }}" class="btn btn-outline-primary w-100">
+                <i class="fas fa-arrow-right"></i> Sync Status
+            </a>
+        </div>
+    </div>
+
+    <!-- System Info -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="settings-card">
+            <div class="settings-icon" style="background: #FEE2E2; color: #EF4444;">
+                <i class="fas fa-info-circle"></i>
+            </div>
+            <div class="settings-title">System Information</div>
+            <p class="settings-description">View system details and version</p>
+            <button class="btn btn-outline-primary w-100" onclick="showSystemInfo()">
+                <i class="fas fa-arrow-right"></i> System Info
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- System Info Modal -->
+<div class="modal fade" id="systemInfoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-info-circle"></i> System Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <table class="table">
+                    <tr>
+                        <td><strong>Application:</strong></td>
+                        <td>POS & Inventory System</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Version:</strong></td>
+                        <td>1.0.0</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Database:</strong></td>
+                        <td>SQLite (Offline-first)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Framework:</strong></td>
+                        <td>Flask 3.0</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showSystemInfo() {
+    new bootstrap.Modal(document.getElementById('systemInfoModal')).show();
+}
+</script>
+{% endblock %}

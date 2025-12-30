@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Send Bulk SMS - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-paper-plane text-primary"></i> Send Bulk SMS</h5>
+                    <a href="{{ url_for('notifications.sms_index') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('notifications.send_bulk_sms') }}">
+                        <div class="mb-3">
+                            <label class="form-label">Select Template</label>
+                            <select class="form-select" name="template_id" id="templateSelect" onchange="loadTemplate()">
+                                <option value="">-- Custom Message --</option>
+                                {% for template in templates %}
+                                <option value="{{ template.id }}" data-content="{{ template.content }}">
+                                    {{ template.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Message <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="message" id="messageContent" rows="4" required></textarea>
+                            <div class="form-text">
+                                <span id="charCount">0</span>/160 characters
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Recipients <span class="text-danger">*</span></label>
+                            <select class="form-select" name="recipient_type">
+                                <option value="all">All Customers</option>
+                                <option value="birthday_today">Today's Birthdays</option>
+                                <option value="birthday_week">This Week's Birthdays</option>
+                                <option value="dues">Customers with Dues</option>
+                                <option value="vip">VIP Customers (Top spenders)</option>
+                                <option value="inactive">Inactive Customers (30+ days)</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Or Enter Phone Numbers</label>
+                            <textarea class="form-control" name="phone_numbers" rows="3"
+                                      placeholder="Enter phone numbers, one per line"></textarea>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>Note:</strong> SMS charges will apply based on your provider's rates.
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{{ url_for('notifications.sms_index') }}" class="btn btn-outline-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane"></i> Send SMS
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function loadTemplate() {
+    var select = document.getElementById('templateSelect');
+    var option = select.options[select.selectedIndex];
+    var content = option.getAttribute('data-content') || '';
+    document.getElementById('messageContent').value = content;
+    updateCharCount();
+}
+
+function updateCharCount() {
+    var content = document.getElementById('messageContent').value;
+    document.getElementById('charCount').textContent = content.length;
+}
+
+document.getElementById('messageContent').addEventListener('input', updateCharCount);
+</script>
+{% endblock %}

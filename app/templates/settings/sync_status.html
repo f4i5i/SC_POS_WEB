@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Sync Status - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .status-card {
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .status-pending {
+        background: #FEF3C7;
+        border-left: 4px solid #F59E0B;
+    }
+
+    .status-synced {
+        background: #D1FAE5;
+        border-left: 4px solid #10B981;
+    }
+
+    .status-failed {
+        background: #FEE2E2;
+        border-left: 4px solid #EF4444;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-sync"></i> Sync Status</h2>
+    <a href="{{ url_for('settings.index') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back
+    </a>
+</div>
+
+<!-- Sync Summary -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card status-card status-pending">
+            <h3 class="text-warning">{{ pending }}</h3>
+            <p class="mb-0">Pending Sync</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card status-card status-synced">
+            <h3 class="text-success">{{ synced }}</h3>
+            <p class="mb-0">Synced</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card status-card status-failed">
+            <h3 class="text-danger">{{ failed }}</h3>
+            <p class="mb-0">Failed</p>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Syncs -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Recent Sync Operations</h5>
+    </div>
+    <div class="card-body">
+        {% if recent_syncs %}
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Table</th>
+                            <th>Operation</th>
+                            <th>Record ID</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Synced</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sync in recent_syncs %}
+                        <tr>
+                            <td>{{ sync.table_name }}</td>
+                            <td><span class="badge bg-secondary">{{ sync.operation }}</span></td>
+                            <td>{{ sync.record_id }}</td>
+                            <td>
+                                <span class="badge bg-{% if sync.status == 'synced' %}success{% elif sync.status == 'failed' %}danger{% else %}warning{% endif %}">
+                                    {{ sync.status }}
+                                </span>
+                            </td>
+                            <td>{{ sync.created_at.strftime('%b %d, %I:%M %p') }}</td>
+                            <td>{{ sync.synced_at.strftime('%b %d, %I:%M %p') if sync.synced_at else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-sync fa-3x text-muted mb-3"></i>
+                <p class="text-muted">No sync operations yet</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

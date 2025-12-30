@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Create Quotation - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .product-row { transition: all 0.3s; }
+    .product-row:hover { background: #f8f9fa; }
+    .remove-row { cursor: pointer; color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-file-invoice text-primary"></i> Create Quotation</h5>
+            <a href="{{ url_for('quotations.index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('quotations.create') }}" id="quoteForm">
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label">Customer</label>
+                        <select class="form-select" name="customer_id">
+                            <option value="">Walk-in Customer</option>
+                            {% for customer in customers %}
+                            <option value="{{ customer.id }}">{{ customer.name }} ({{ customer.phone }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Valid Until <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" name="valid_until" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Notes</label>
+                        <input type="text" class="form-control" name="notes" placeholder="Any notes...">
+                    </div>
+                </div>
+
+                <!-- Product Search -->
+                <div class="mb-3">
+                    <label class="form-label">Search Products</label>
+                    <input type="text" class="form-control" id="productSearch"
+                           placeholder="Type to search products...">
+                    <div id="searchResults" class="list-group position-absolute" style="z-index: 1000; width: calc(100% - 3rem);"></div>
+                </div>
+
+                <!-- Items Table -->
+                <table class="table" id="itemsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Product</th>
+                            <th width="120">Quantity</th>
+                            <th width="150">Unit Price</th>
+                            <th width="150">Total</th>
+                            <th width="50"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsBody">
+                        <tr id="noItems">
+                            <td colspan="5" class="text-center text-muted py-4">
+                                Search and add products above
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <td colspan="3" class="text-end fw-bold">Total:</td>
+                            <td class="fw-bold" id="grandTotal">Rs. 0</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <input type="hidden" name="items" id="itemsData">
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('quotations.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+                        <i class="fas fa-save"></i> Create Quotation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let items = [];
+
+$('#productSearch').on('input', function() {
+    let query = $(this).val();
+    if (query.length < 2) {
+        $('#searchResults').html('');
+        return;
+    }
+
+    $.get('/pos/search-products?q=' + encodeURIComponent(query), function(products) {
+        let html = '';
+        products.forEach(function(p) {
+            html += `<a href="#" class="list-group-item list-group-item-action" onclick="addProduct(${p.id}, '${p.name}', ${p.selling_price}); return false;">
+                ${p.name} - Rs. ${p.selling_price.toLocaleString()}
+            </a>`;
+        });
+        $('#searchResults').html(html);
+    });
+});
+
+function addProduct(id, name, price) {
+    $('#searchResults').html('');
+    $('#productSearch').val('');
+    $('#noItems').hide();
+
+    // Check if already exists
+    let existing = items.find(i => i.product_id === id);
+    if (existing) {
+        existing.quantity++;
+        updateTable();
+        return;
+    }
+
+    items.push({
+        product_id: id,
+        name: name,
+        quantity: 1,
+        price: price
+    });
+    updateTable();
+}
+
+function updateTable() {
+    let html = '';
+    let total = 0;
+
+    items.forEach(function(item, index) {
+        let lineTotal = item.quantity * item.price;
+        total += lineTotal;
+        html += `<tr class="product-row">
+            <td>${item.name}</td>
+            <td><input type="number" class="form-control form-control-sm" value="${item.quantity}" min="1" onchange="updateQty(${index}, this.value)"></td>
+            <td><input type="number" class="form-control form-control-sm" value="${item.price}" step="0.01" onchange="updatePrice(${index}, this.value)"></td>
+            <td>Rs. ${lineTotal.toLocaleString()}</td>
+            <td><i class="fas fa-times remove-row" onclick="removeItem(${index})"></i></td>
+        </tr>`;
+    });
+
+    $('#itemsBody').html(html || '<tr id="noItems"><td colspan="5" class="text-center text-muted py-4">Search and add products above</td></tr>');
+    $('#grandTotal').text('Rs. ' + total.toLocaleString());
+    $('#itemsData').val(JSON.stringify(items));
+    $('#submitBtn').prop('disabled', items.length === 0);
+}
+
+function updateQty(index, qty) {
+    items[index].quantity = parseInt(qty) || 1;
+    updateTable();
+}
+
+function updatePrice(index, price) {
+    items[index].price = parseFloat(price) || 0;
+    updateTable();
+}
+
+function removeItem(index) {
+    items.splice(index, 1);
+    updateTable();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Customer - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    @keyframes slideInUp {
+        from {
+            transform: translateY(30px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .form-card {
+        animation: slideInUp 0.4s ease-out;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    .form-section {
+        background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+        border-left: 4px solid #3B82F6;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border-radius: 8px;
+    }
+
+    .form-section h5 {
+        color: #1E40AF;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    .form-label {
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 2px solid #E5E7EB;
+        padding: 0.6rem 1rem;
+        transition: all 0.3s;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #3B82F6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .required-field::after {
+        content: "*";
+        color: #EF4444;
+        margin-left: 4px;
+    }
+
+    .input-group-text {
+        background-color: #F3F4F6;
+        border: 2px solid #E5E7EB;
+        border-right: none;
+        color: #6B7280;
+    }
+
+    .input-group .form-control {
+        border-left: none;
+    }
+
+    .btn-save {
+        background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+        border: none;
+        padding: 0.8rem 2rem;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s;
+        color: white;
+    }
+
+    .btn-save:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        color: white;
+    }
+
+    .help-text {
+        font-size: 0.85rem;
+        color: #6B7280;
+        margin-top: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-user-edit"></i> Edit Customer</h2>
+            <a href="{{ url_for('customers.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Customers
+            </a>
+        </div>
+
+        <form method="POST" action="{{ url_for('customers.edit_customer', customer_id=customer.id) }}" id="customerForm">
+            <div class="card form-card">
+                <div class="card-body p-4">
+                    <!-- Basic Information -->
+                    <div class="form-section">
+                        <h5><i class="fas fa-user"></i> Basic Information</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label required-field">Full Name</label>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="name"
+                                           name="name"
+                                           value="{{ customer.name }}"
+                                           required
+                                           placeholder="Enter customer full name"
+                                           autofocus>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="phone" class="form-label required-field">Phone Number</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                                        <input type="tel"
+                                               class="form-control"
+                                               id="phone"
+                                               name="phone"
+                                               value="{{ customer.phone }}"
+                                               required
+                                               placeholder="03XX-XXXXXXX">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="email" class="form-label">Email Address</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                        <input type="email"
+                                               class="form-control"
+                                               id="email"
+                                               name="email"
+                                               value="{{ customer.email or '' }}"
+                                               placeholder="customer@example.com">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="birthday" class="form-label">Birthday</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-birthday-cake"></i></span>
+                                        <input type="date"
+                                               class="form-control"
+                                               id="birthday"
+                                               name="birthday"
+                                               value="{{ customer.birthday.strftime('%Y-%m-%d') if customer.birthday else '' }}">
+                                    </div>
+                                    <small class="help-text">For birthday promotions</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="address" class="form-label">Address</label>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="address"
+                                           name="address"
+                                           value="{{ customer.address or '' }}"
+                                           placeholder="Street address">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="city" class="form-label">City</label>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="city"
+                                           name="city"
+                                           value="{{ customer.city or '' }}"
+                                           placeholder="City">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="postal_code" class="form-label">Postal Code</label>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="postal_code"
+                                           name="postal_code"
+                                           value="{{ customer.postal_code or '' }}"
+                                           placeholder="Postal code">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Loyalty Info -->
+                    <div class="form-section">
+                        <h5><i class="fas fa-star"></i> Loyalty Information</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Current Loyalty Points</label>
+                                    <div class="alert alert-info mb-0">
+                                        <h4 class="mb-0">{{ customer.loyalty_points }} Points</h4>
+                                        <small>Tier: {{ customer.loyalty_tier }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="customer_type" class="form-label">Customer Type</label>
+                                    <select class="form-select" id="customer_type" name="customer_type">
+                                        <option value="regular" {% if customer.customer_type == 'regular' %}selected{% endif %}>Regular</option>
+                                        <option value="wholesale" {% if customer.customer_type == 'wholesale' %}selected{% endif %}>Wholesale</option>
+                                        <option value="vip" {% if customer.customer_type == 'vip' %}selected{% endif %}>VIP</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="form-section">
+                        <h5><i class="fas fa-sticky-note"></i> Notes</h5>
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Additional Notes</label>
+                            <textarea class="form-control"
+                                      id="notes"
+                                      name="notes"
+                                      rows="3"
+                                      placeholder="Any special notes about this customer...">{{ customer.notes or '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <a href="{{ url_for('customers.index') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary btn-save">
+                            <i class="fas fa-save"></i> Update Customer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$('#customerForm').on('submit', function(e) {
+    const name = $('#name').val().trim();
+    const phone = $('#phone').val().trim();
+
+    if (!name || !phone) {
+        e.preventDefault();
+        alert('Please fill in all required fields');
+        return false;
+    }
+});
+
+// Keyboard shortcuts
+$(document).on('keydown', function(e) {
+    if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        $('#customerForm').submit();
+    }
+});
+</script>
+{% endblock %}

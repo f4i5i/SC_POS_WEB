@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block title %}Login - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+    body {
+        font-family: 'Inter', sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-attachment: fixed;
+        overflow-x: hidden;
+    }
+
+    body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background:
+            radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(236, 72, 153, 0.3), transparent 50%),
+            radial-gradient(circle at 40% 20%, rgba(59, 130, 246, 0.3), transparent 50%);
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    .login-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        z-index: 1;
+        padding: 2rem;
+    }
+
+    .login-card {
+        width: 100%;
+        max-width: 480px;
+        padding: 3rem 2.5rem;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 24px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        animation: slideInUp 0.6s ease;
+    }
+
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .login-header {
+        text-align: center;
+        margin-bottom: 2.5rem;
+        position: relative;
+    }
+
+    .login-logo {
+        max-width: 250px;
+        height: auto;
+        margin-bottom: 1.5rem;
+        filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.1));
+        animation: fadeIn 0.8s ease;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .login-header h2 {
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+        font-size: 1.8rem;
+    }
+
+    .login-header p {
+        color: #6B7280;
+        margin: 0;
+        font-weight: 500;
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: #1F2937;
+        margin-bottom: 0.5rem;
+    }
+
+    .input-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .input-group-text {
+        background: rgba(59, 130, 246, 0.1);
+        border: 2px solid rgba(59, 130, 246, 0.2);
+        border-right: none;
+        border-radius: 12px 0 0 12px;
+        color: #3B82F6;
+        padding: 0.75rem 1rem;
+    }
+
+    .form-control {
+        border: 2px solid rgba(59, 130, 246, 0.2);
+        border-left: none;
+        border-radius: 0 12px 12px 0;
+        padding: 0.75rem 1rem;
+        transition: all 0.3s ease;
+        background: rgba(255, 255, 255, 0.9);
+    }
+
+    .form-control:focus {
+        border-color: #3B82F6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        background: white;
+    }
+
+    .form-check {
+        margin: 1.5rem 0;
+    }
+
+    .form-check-label {
+        color: #4B5563;
+        font-weight: 500;
+    }
+
+    .btn-login {
+        width: 100%;
+        padding: 1rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #3B82F6, #2563EB);
+        border: none;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        position: relative;
+        overflow: hidden;
+        font-size: 1.05rem;
+    }
+
+    .btn-login::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        transform: translate(-50%, -50%);
+        transition: width 0.6s, height 0.6s;
+    }
+
+    .btn-login:hover::before {
+        width: 300px;
+        height: 300px;
+    }
+
+    .btn-login:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(59, 130, 246, 0.5);
+    }
+
+    .login-footer {
+        text-align: center;
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 2px solid rgba(59, 130, 246, 0.1);
+    }
+
+    .login-footer hr {
+        display: none;
+    }
+
+    .login-footer p {
+        color: #6B7280;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+    }
+
+    .login-footer small {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        display: inline-block;
+        font-weight: 600;
+        border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+    kbd {
+        background: linear-gradient(135deg, #1F2937, #374151);
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-weight: 600;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <img src="{{ url_for('static', filename='images/SC - Main.png') }}" alt="{{ business_name }}" class="login-logo">
+            <p>Point of Sale System</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('auth.login') }}">
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-user"></i>
+                    </span>
+                    <input type="text"
+                           class="form-control"
+                           id="username"
+                           name="username"
+                           placeholder="Enter username"
+                           required
+                           autofocus>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-lock"></i>
+                    </span>
+                    <input type="password"
+                           class="form-control"
+                           id="password"
+                           name="password"
+                           placeholder="Enter password"
+                           required>
+                </div>
+            </div>
+
+            <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="remember" name="remember">
+                <label class="form-check-label" for="remember">
+                    Remember me
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-login">
+                <i class="fas fa-sign-in-alt"></i> Login
+            </button>
+        </form>
+
+        <div class="login-footer">
+            <hr class="my-4">
+            <p class="mb-0">Default credentials:</p>
+            <small><strong>Username:</strong> admin | <strong>Password:</strong> admin123</small>
+            <p class="mt-3 mb-0">
+                <i class="fas fa-info-circle"></i> Change password after first login
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

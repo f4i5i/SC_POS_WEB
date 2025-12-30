@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+
+{% block title %}Sale #{{ sale.sale_number }} - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .sale-header {
+        background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .info-card {
+        border-left: 4px solid #3B82F6;
+        background: #F9FAFB;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+
+    .status-badge {
+        font-size: 1rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+    }
+
+    .item-row:hover {
+        background-color: #F3F4F6;
+    }
+
+    .total-section {
+        background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%);
+        border-radius: 10px;
+        padding: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-receipt text-primary"></i>
+                Sale Details
+            </h2>
+            <p class="text-muted mb-0">Transaction #{{ sale.sale_number }}</p>
+        </div>
+        <div>
+            <a href="{{ url_for('pos.sales_list') }}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left"></i> Back to Sales
+            </a>
+            <a href="{{ url_for('pos.print_receipt', sale_id=sale.id) }}" class="btn btn-primary" target="_blank">
+                <i class="fas fa-print"></i> Print Receipt
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Left Column -->
+        <div class="col-md-8">
+            <!-- Sale Info -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-card">
+                                <h6 class="text-muted mb-1">Sale Number</h6>
+                                <h4 class="mb-0"><code>{{ sale.sale_number }}</code></h4>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-card">
+                                <h6 class="text-muted mb-1">Sale Date</h6>
+                                <h5 class="mb-0">{{ sale.sale_date.strftime('%B %d, %Y at %I:%M %p') }}</h5>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-card">
+                                <h6 class="text-muted mb-1">Cashier</h6>
+                                <h5 class="mb-0">{{ sale.user.full_name if sale.user else 'N/A' }}</h5>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-card">
+                                <h6 class="text-muted mb-1">Customer</h6>
+                                <h5 class="mb-0">
+                                    {% if sale.customer %}
+                                    <a href="{{ url_for('customers.view_customer', customer_id=sale.customer_id) }}">
+                                        {{ sale.customer.name }}
+                                    </a>
+                                    {% else %}
+                                    Walk-in Customer
+                                    {% endif %}
+                                </h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sale Items -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-shopping-bag text-primary"></i>
+                        Items ({{ sale.items.count() }})
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Product</th>
+                                    <th class="text-center">Qty</th>
+                                    <th class="text-end">Unit Price</th>
+                                    <th class="text-end">Discount</th>
+                                    <th class="text-end">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in sale.items %}
+                                <tr class="item-row">
+                                    <td>{{ loop.index }}</td>
+                                    <td>
+                                        <div class="fw-bold">{{ item.product.name }}</div>
+                                        <small class="text-muted">
+                                            <code>{{ item.product.code }}</code>
+                                            {% if item.product.brand %} | {{ item.product.brand }}{% endif %}
+                                        </small>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-primary">{{ item.quantity }}</span>
+                                    </td>
+                                    <td class="text-end">Rs. {{ "{:,.2f}".format(item.unit_price) }}</td>
+                                    <td class="text-end">
+                                        {% if item.discount > 0 %}
+                                        <span class="text-danger">-Rs. {{ "{:,.2f}".format(item.discount) }}</span>
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(item.subtotal) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="col-md-4">
+            <!-- Status -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body text-center">
+                    <h6 class="text-muted mb-2">Sale Status</h6>
+                    <span class="status-badge
+                        {% if sale.status == 'completed' %}bg-success{%
+                        elif sale.status == 'pending' %}bg-warning{%
+                        elif sale.status == 'refunded' %}bg-danger{%
+                        else %}bg-secondary{% endif %}">
+                        {% if sale.status == 'completed' %}
+                        <i class="fas fa-check-circle"></i> Completed
+                        {% elif sale.status == 'pending' %}
+                        <i class="fas fa-clock"></i> Pending
+                        {% elif sale.status == 'refunded' %}
+                        <i class="fas fa-undo"></i> Refunded
+                        {% else %}
+                        {{ sale.status|title }}
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Payment Info -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="mb-3">
+                        <i class="fas fa-credit-card text-primary"></i>
+                        Payment Details
+                    </h6>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Method:</span>
+                        <strong class="text-uppercase">{{ sale.payment_method }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Status:</span>
+                        <span class="badge
+                            {% if sale.payment_status == 'paid' %}bg-success{%
+                            elif sale.payment_status == 'partial' %}bg-warning{%
+                            else %}bg-danger{% endif %}">
+                            {{ sale.payment_status|title }}
+                        </span>
+                    </div>
+                    {% if sale.payment_status != 'paid' %}
+                    <hr>
+                    <div class="d-flex justify-content-between text-danger">
+                        <span>Amount Due:</span>
+                        <strong>Rs. {{ "{:,.2f}".format(sale.amount_due) }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Total Breakdown -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-body total-section">
+                    <h6 class="mb-3">
+                        <i class="fas fa-calculator text-primary"></i>
+                        Total Breakdown
+                    </h6>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal:</span>
+                        <span>Rs. {{ "{:,.2f}".format(sale.subtotal) }}</span>
+                    </div>
+                    {% if sale.discount > 0 %}
+                    <div class="d-flex justify-content-between mb-2 text-danger">
+                        <span>Discount
+                            {% if sale.discount_type == 'percentage' %}({{ sale.discount }}%){% endif %}:
+                        </span>
+                        <span>-Rs. {{ "{:,.2f}".format(sale.discount if sale.discount_type == 'amount' else (sale.subtotal * sale.discount / 100)) }}</span>
+                    </div>
+                    {% endif %}
+                    {% if sale.tax > 0 %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Tax:</span>
+                        <span>Rs. {{ "{:,.2f}".format(sale.tax) }}</span>
+                    </div>
+                    {% endif %}
+                    <hr>
+                    <div class="d-flex justify-content-between mb-3">
+                        <strong class="fs-5">Total:</strong>
+                        <strong class="fs-5 text-primary">Rs. {{ "{:,.2f}".format(sale.total) }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Amount Paid:</span>
+                        <span>Rs. {{ "{:,.2f}".format(sale.amount_paid) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Change:</span>
+                        <span class="text-success">Rs. {{ "{:,.2f}".format(sale.amount_paid - sale.total if sale.amount_paid > sale.total else 0) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            {% if sale.status == 'completed' %}
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-body">
+                    <h6 class="mb-3">Actions</h6>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-danger" onclick="refundSale()">
+                            <i class="fas fa-undo"></i> Process Refund
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Notes -->
+            {% if sale.notes %}
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-body">
+                    <h6 class="mb-2">
+                        <i class="fas fa-sticky-note text-warning"></i>
+                        Notes
+                    </h6>
+                    <p class="text-muted mb-0">{{ sale.notes }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function refundSale() {
+    if (!confirm('Are you sure you want to refund this sale?\n\nThis will restore the stock and mark the sale as refunded.')) {
+        return;
+    }
+
+    $.ajax({
+        url: '/pos/refund-sale/{{ sale.id }}',
+        method: 'POST',
+        success: function(response) {
+            alert('Sale refunded successfully');
+            location.reload();
+        },
+        error: function(xhr) {
+            alert('Error: ' + (xhr.responseJSON?.error || 'Failed to refund sale'));
+        }
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Return {{ return_obj.return_number }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-undo text-primary"></i>
+                        Return {{ return_obj.return_number }}
+                    </h5>
+                    <div>
+                        {% if return_obj.status == 'pending' and current_user.role in ['admin', 'manager'] %}
+                        <button class="btn btn-success btn-sm" onclick="approveReturn()">
+                            <i class="fas fa-check"></i> Approve
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="rejectReturn()">
+                            <i class="fas fa-times"></i> Reject
+                        </button>
+                        {% endif %}
+                        <a href="{{ url_for('returns.index') }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Customer</h6>
+                            {% if return_obj.customer %}
+                            <p class="mb-1"><strong>{{ return_obj.customer.name }}</strong></p>
+                            <p class="mb-0">{{ return_obj.customer.phone }}</p>
+                            {% else %}
+                            <p class="text-muted">Walk-in Customer</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <p class="mb-1">
+                                <strong>Status:</strong>
+                                {% if return_obj.status == 'pending' %}
+                                <span class="badge bg-warning">Pending</span>
+                                {% elif return_obj.status == 'approved' %}
+                                <span class="badge bg-info">Approved</span>
+                                {% elif return_obj.status == 'completed' %}
+                                <span class="badge bg-success">Completed</span>
+                                {% else %}
+                                <span class="badge bg-danger">Rejected</span>
+                                {% endif %}
+                            </p>
+                            <p class="mb-1"><strong>Date:</strong> {{ return_obj.created_at.strftime('%d %b %Y %H:%M') }}</p>
+                            <p class="mb-0">
+                                <strong>Refund Type:</strong>
+                                {% if return_obj.refund_type == 'cash' %}
+                                Cash Refund
+                                {% elif return_obj.refund_type == 'store_credit' %}
+                                Store Credit
+                                {% else %}
+                                Exchange
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+
+                    {% if return_obj.sale %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        Original Sale:
+                        <a href="{{ url_for('pos.sale_details', sale_id=return_obj.sale_id) }}">
+                            {{ return_obj.sale.invoice_number }}
+                        </a>
+                        ({{ return_obj.sale.created_at.strftime('%d %b %Y') }})
+                    </div>
+                    {% endif %}
+
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Product</th>
+                                    <th class="text-center">Quantity</th>
+                                    <th class="text-end">Unit Price</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+                                <tr>
+                                    <td>{{ item.product.name if item.product else 'Unknown' }}</td>
+                                    <td class="text-center">{{ item.quantity }}</td>
+                                    <td class="text-end">Rs. {{ "{:,.2f}".format(item.unit_price) }}</td>
+                                    <td class="text-end">Rs. {{ "{:,.2f}".format(item.total_price) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr class="table-primary">
+                                    <td colspan="3" class="text-end"><strong>Total Refund:</strong></td>
+                                    <td class="text-end"><strong>Rs. {{ "{:,.2f}".format(return_obj.total_amount) }}</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <p><strong>Reason:</strong> {{ return_obj.reason|title if return_obj.reason else 'Not specified' }}</p>
+                        </div>
+                        {% if return_obj.notes %}
+                        <div class="col-md-6">
+                            <p><strong>Notes:</strong> {{ return_obj.notes }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function approveReturn() {
+    if (confirm('Approve this return?')) {
+        $.post('/returns/{{ return_obj.id }}/approve', function(response) {
+            if (response.success) location.reload();
+            else alert(response.error || 'Error approving return');
+        });
+    }
+}
+
+function rejectReturn() {
+    if (confirm('Reject this return?')) {
+        $.post('/returns/{{ return_obj.id }}/reject', function(response) {
+            if (response.success) location.reload();
+            else alert(response.error || 'Error rejecting return');
+        });
+    }
+}
+</script>
+{% endblock %}

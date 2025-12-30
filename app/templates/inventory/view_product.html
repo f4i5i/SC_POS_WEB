@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.name }} - Product Details{% endblock %}
+
+{% block extra_css %}
+<style>
+    .product-image {
+        max-width: 300px;
+        max-height: 300px;
+        object-fit: contain;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .product-placeholder {
+        width: 300px;
+        height: 300px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .product-placeholder i {
+        font-size: 5rem;
+        color: rgba(255,255,255,0.5);
+    }
+
+    .detail-label {
+        font-weight: 600;
+        color: #6B7280;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .detail-value {
+        font-size: 1.1rem;
+        color: #1F2937;
+        margin-bottom: 1rem;
+    }
+
+    .price-display {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #10B981;
+    }
+
+    .cost-display {
+        font-size: 1.2rem;
+        color: #6B7280;
+    }
+
+    .stock-display {
+        font-size: 2.5rem;
+        font-weight: 800;
+    }
+
+    .stock-good { color: #10B981; }
+    .stock-low { color: #F59E0B; }
+    .stock-out { color: #EF4444; }
+
+    .info-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        height: 100%;
+    }
+
+    .movement-item {
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #E5E7EB;
+    }
+
+    .movement-item:last-child {
+        border-bottom: none;
+    }
+
+    .movement-in { color: #10B981; }
+    .movement-out { color: #EF4444; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('inventory.index') }}">Inventory</a></li>
+                    <li class="breadcrumb-item active">{{ product.name }}</li>
+                </ol>
+            </nav>
+            <h2 class="mb-0">{{ product.name }}</h2>
+            {% if product.sku %}
+            <p class="text-muted mb-0">SKU: {{ product.sku }}</p>
+            {% endif %}
+        </div>
+        <div>
+            <a href="{{ url_for('inventory.index') }}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+            <a href="{{ url_for('inventory.edit_product', product_id=product.id) }}" class="btn btn-primary">
+                <i class="fas fa-edit"></i> Edit Product
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Product Image & Quick Info -->
+        <div class="col-lg-4 mb-4">
+            <div class="info-card text-center">
+                {% if product.image_url %}
+                <img src="{{ product.image_url }}" alt="{{ product.name }}" class="product-image mb-4">
+                {% else %}
+                <div class="product-placeholder mx-auto mb-4">
+                    <i class="fas fa-box"></i>
+                </div>
+                {% endif %}
+
+                <div class="price-display mb-2">Rs. {{ "{:,.2f}".format(product.selling_price) }}</div>
+                <div class="cost-display mb-3">Cost: Rs. {{ "{:,.2f}".format(product.cost_price) }}</div>
+
+                {% set margin = ((product.selling_price - product.cost_price) / product.cost_price * 100) if product.cost_price > 0 else 0 %}
+                <span class="badge bg-info fs-6">{{ "{:.1f}".format(margin) }}% Margin</span>
+
+                <hr class="my-4">
+
+                <div class="stock-display {% if product.current_stock <= 0 %}stock-out{% elif product.is_low_stock %}stock-low{% else %}stock-good{% endif %}">
+                    {{ product.current_stock }}
+                </div>
+                <p class="text-muted mb-0">Units in Stock</p>
+
+                {% if product.current_stock <= 0 %}
+                <span class="badge bg-danger mt-2">Out of Stock</span>
+                {% elif product.is_low_stock %}
+                <span class="badge bg-warning mt-2">Low Stock (Min: {{ product.min_stock_level }})</span>
+                {% else %}
+                <span class="badge bg-success mt-2">In Stock</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Product Details -->
+        <div class="col-lg-8">
+            <div class="row">
+                <!-- Basic Info -->
+                <div class="col-md-6 mb-4">
+                    <div class="info-card">
+                        <h5 class="mb-4"><i class="fas fa-info-circle text-primary me-2"></i>Basic Information</h5>
+
+                        <div class="detail-label">Barcode</div>
+                        <div class="detail-value">{{ product.barcode or 'Not set' }}</div>
+
+                        <div class="detail-label">Category</div>
+                        <div class="detail-value">{{ product.category.name if product.category else 'Uncategorized' }}</div>
+
+                        <div class="detail-label">Supplier</div>
+                        <div class="detail-value">{{ product.supplier.name if product.supplier else 'Not assigned' }}</div>
+
+                        <div class="detail-label">Unit</div>
+                        <div class="detail-value">{{ product.unit or 'Piece' }}</div>
+
+                        {% if product.expiry_date %}
+                        <div class="detail-label">Expiry Date</div>
+                        <div class="detail-value">
+                            {{ product.expiry_date.strftime('%d %b %Y') }}
+                            {% if product.expiry_date < now %}
+                            <span class="badge bg-danger">Expired</span>
+                            {% elif (product.expiry_date - now).days < 30 %}
+                            <span class="badge bg-warning">Expiring Soon</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Stock Info -->
+                <div class="col-md-6 mb-4">
+                    <div class="info-card">
+                        <h5 class="mb-4"><i class="fas fa-boxes text-success me-2"></i>Stock Information</h5>
+
+                        <div class="detail-label">Current Stock</div>
+                        <div class="detail-value">{{ product.current_stock }} {{ product.unit or 'units' }}</div>
+
+                        <div class="detail-label">Minimum Stock Level</div>
+                        <div class="detail-value">{{ product.min_stock_level }} {{ product.unit or 'units' }}</div>
+
+                        <div class="detail-label">Stock Value</div>
+                        <div class="detail-value">Rs. {{ "{:,.2f}".format(product.current_stock * product.cost_price) }}</div>
+
+                        <div class="detail-label">Potential Revenue</div>
+                        <div class="detail-value">Rs. {{ "{:,.2f}".format(product.current_stock * product.selling_price) }}</div>
+
+                        <div class="detail-label">Status</div>
+                        <div class="detail-value">
+                            {% if product.is_active %}
+                            <span class="badge bg-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                {% if product.description %}
+                <div class="col-12 mb-4">
+                    <div class="info-card">
+                        <h5 class="mb-3"><i class="fas fa-align-left text-info me-2"></i>Description</h5>
+                        <p class="mb-0">{{ product.description }}</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Recent Stock Movements -->
+                <div class="col-md-6 mb-4">
+                    <div class="info-card">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0"><i class="fas fa-exchange-alt text-warning me-2"></i>Stock Movements</h5>
+                            <a href="{{ url_for('inventory.stock_movements', product_id=product.id) }}" class="btn btn-sm btn-outline-primary">View All</a>
+                        </div>
+
+                        {% if stock_movements %}
+                        {% for movement in stock_movements %}
+                        <div class="movement-item">
+                            <div class="d-flex justify-content-between">
+                                <span class="{% if movement.movement_type == 'in' %}movement-in{% else %}movement-out{% endif %}">
+                                    <i class="fas fa-{% if movement.movement_type == 'in' %}arrow-up{% else %}arrow-down{% endif %}"></i>
+                                    {{ '+' if movement.movement_type == 'in' else '-' }}{{ movement.quantity }}
+                                </span>
+                                <small class="text-muted">{{ movement.timestamp.strftime('%d %b %H:%M') }}</small>
+                            </div>
+                            <small class="text-muted">{{ movement.notes or movement.movement_type|title }}</small>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <p class="text-muted text-center mb-0">No stock movements yet</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Recent Sales -->
+                <div class="col-md-6 mb-4">
+                    <div class="info-card">
+                        <h5 class="mb-3"><i class="fas fa-shopping-cart text-danger me-2"></i>Recent Sales</h5>
+
+                        {% if recent_sales %}
+                        {% for item in recent_sales %}
+                        <div class="movement-item">
+                            <div class="d-flex justify-content-between">
+                                <span>{{ item.quantity }} x Rs. {{ "{:,.0f}".format(item.unit_price) }}</span>
+                                <strong>Rs. {{ "{:,.0f}".format(item.total) }}</strong>
+                            </div>
+                            <small class="text-muted">
+                                {{ item.sale.created_at.strftime('%d %b %Y %H:%M') if item.sale else '' }}
+                            </small>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <p class="text-muted text-center mb-0">No sales recorded yet</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Calculate days until expiry
+{% if product.expiry_date %}
+const expiryDate = new Date('{{ product.expiry_date.isoformat() }}');
+const today = new Date();
+const diffDays = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+if (diffDays < 0) {
+    console.log('Product expired ' + Math.abs(diffDays) + ' days ago');
+} else if (diffDays < 30) {
+    console.log('Product expires in ' + diffDays + ' days');
+}
+{% endif %}
+</script>
+{% endblock %}

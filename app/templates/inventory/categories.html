@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}Categories - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .category-card {
+        transition: all 0.3s;
+        border-radius: 12px;
+        cursor: pointer;
+    }
+
+    .category-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    }
+
+    .category-icon {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .category-count {
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: #3B82F6;
+    }
+
+    .add-category-btn {
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+        border: none;
+        padding: 0.8rem 2rem;
+        border-radius: 8px;
+        color: white;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+
+    .add-category-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        color: white;
+    }
+
+    .modal-content {
+        border-radius: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-tags text-primary"></i>
+                Product Categories
+            </h2>
+            <p class="text-muted mb-0">Manage your product categories</p>
+        </div>
+        <div>
+            <a href="{{ url_for('inventory.index') }}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left"></i> Back to Inventory
+            </a>
+            <button class="btn add-category-btn" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+                <i class="fas fa-plus"></i> Add Category
+            </button>
+        </div>
+    </div>
+
+    <!-- Categories Grid -->
+    <div class="row g-4">
+        {% for category in categories %}
+        <div class="col-md-3">
+            <div class="card category-card border-0 shadow-sm">
+                <div class="card-body text-center p-4">
+                    <div class="category-icon" style="color: {{ category.color or '#3B82F6' }};">
+                        <i class="fas fa-{{ category.icon or 'box' }}"></i>
+                    </div>
+                    <h5 class="card-title mb-2">{{ category.name }}</h5>
+                    <p class="text-muted small mb-3">{{ category.description or 'No description' }}</p>
+                    <div class="category-count mb-3">
+                        {{ category.products.count() }}
+                        <small class="text-muted d-block" style="font-size: 0.9rem;">Products</small>
+                    </div>
+                    <div class="d-flex justify-content-center gap-2">
+                        <button class="btn btn-sm btn-primary" onclick="editCategory({{ category.id }}, '{{ category.name }}', '{{ category.description or '' }}')">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteCategory({{ category.id }}, '{{ category.name }}')">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if not categories %}
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-tags fa-4x text-muted mb-3"></i>
+                    <h4 class="text-muted">No categories yet</h4>
+                    <p class="text-muted">Start by adding your first product category</p>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+                        <i class="fas fa-plus"></i> Add Your First Category
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Category Modal -->
+<div class="modal fade" id="addCategoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus-circle"></i> Add New Category
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addCategoryForm">
+                    <div class="mb-3">
+                        <label for="categoryName" class="form-label">Category Name *</label>
+                        <input type="text" class="form-control" id="categoryName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="categoryDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="categoryDescription" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveCategory()">
+                    <i class="fas fa-save"></i> Save Category
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Category Modal -->
+<div class="modal fade" id="editCategoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit"></i> Edit Category
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editCategoryForm">
+                    <input type="hidden" id="editCategoryId">
+                    <div class="mb-3">
+                        <label for="editCategoryName" class="form-label">Category Name *</label>
+                        <input type="text" class="form-control" id="editCategoryName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editCategoryDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="editCategoryDescription" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="updateCategory()">
+                    <i class="fas fa-save"></i> Update Category
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function saveCategory() {
+    const name = $('#categoryName').val().trim();
+    const description = $('#categoryDescription').val().trim();
+
+    if (!name) {
+        alert('Please enter a category name');
+        return;
+    }
+
+    $.ajax({
+        url: '/inventory/category/add',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            name: name,
+            description: description
+        }),
+        success: function(response) {
+            $('#addCategoryModal').modal('hide');
+            location.reload();
+        },
+        error: function(xhr) {
+            alert('Error adding category: ' + (xhr.responseJSON?.error || 'Unknown error'));
+        }
+    });
+}
+
+function editCategory(id, name, description) {
+    $('#editCategoryId').val(id);
+    $('#editCategoryName').val(name);
+    $('#editCategoryDescription').val(description);
+    $('#editCategoryModal').modal('show');
+}
+
+function updateCategory() {
+    const id = $('#editCategoryId').val();
+    const name = $('#editCategoryName').val().trim();
+    const description = $('#editCategoryDescription').val().trim();
+
+    if (!name) {
+        alert('Please enter a category name');
+        return;
+    }
+
+    $.ajax({
+        url: `/inventory/category/edit/${id}`,
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            name: name,
+            description: description
+        }),
+        success: function(response) {
+            $('#editCategoryModal').modal('hide');
+            location.reload();
+        },
+        error: function(xhr) {
+            alert('Error updating category: ' + (xhr.responseJSON?.error || 'Unknown error'));
+        }
+    });
+}
+
+function deleteCategory(id, name) {
+    if (!confirm(`Are you sure you want to delete category "${name}"?\n\nThis will not delete the products in this category.`)) {
+        return;
+    }
+
+    $.ajax({
+        url: `/inventory/category/delete/${id}`,
+        method: 'POST',
+        success: function(response) {
+            location.reload();
+        },
+        error: function(xhr) {
+            alert('Error deleting category: ' + (xhr.responseJSON?.error || 'Unknown error'));
+        }
+    });
+}
+</script>
+{% endblock %}

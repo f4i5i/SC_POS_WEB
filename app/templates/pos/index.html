@@ -1,0 +1,2149 @@
+{% extends "base.html" %}
+
+{% block title %}Point of Sale - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .pos-container {
+        height: calc(100vh - 120px);
+        margin: 0;
+        padding: 0;
+    }
+
+    .pos-container > .col-md-7,
+    .pos-container > .col-md-5 {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .pos-container > .col-md-7:first-child {
+        padding-left: 0;
+    }
+
+    .pos-container > .col-md-5:last-child {
+        padding-right: 0;
+    }
+
+    .product-search {
+        position: relative;
+    }
+
+    /* Glassmorphism Search Results */
+    .search-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        border-top: none;
+        border-radius: 0 0 16px 16px;
+        max-height: 400px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    }
+
+    .search-results::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .search-results::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        border-radius: 10px;
+    }
+
+    .search-result-item {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .search-result-item::before {
+        content: '';
+        position: absolute;
+        left: -100%;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
+        transition: left 0.5s;
+    }
+
+    .search-result-item:hover::before {
+        left: 100%;
+    }
+
+    .search-result-item:hover {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+        transform: translateX(5px);
+    }
+
+    /* Compact Cart Items */
+    .cart-item {
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.5rem;
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(10px);
+        border-radius: 8px;
+        border: 1px solid rgba(59, 130, 246, 0.1);
+        transition: all 0.2s ease;
+    }
+
+    .cart-item:hover {
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .cart-item .btn-remove {
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        font-size: 0.65rem;
+        line-height: 1;
+        border-radius: 4px;
+    }
+
+    .cart-item .quantity-control {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .cart-item .quantity-control .btn {
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        font-size: 0.75rem;
+    }
+
+    .cart-item .quantity-control input {
+        width: 40px !important;
+        height: 24px;
+        padding: 0;
+        font-size: 0.8rem;
+    }
+
+    .cart-item .item-name {
+        font-size: 0.85rem;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 120px;
+    }
+
+    .cart-item .item-price {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #10B981;
+    }
+
+    .cart-total-section {
+        flex-shrink: 0;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.95));
+        border-top: 1px solid rgba(59, 130, 246, 0.2);
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+    }
+
+    .cart-total-section .calc-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.2rem 0;
+    }
+
+    .cart-total-section hr {
+        margin: 0.4rem 0;
+    }
+
+    .cart-total-section .total-row {
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .payment-btn {
+        font-size: 0.95rem;
+        padding: 0.6rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #10B981, #059669);
+        border: none;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .payment-btn::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        transform: translate(-50%, -50%);
+        transition: width 0.6s, height 0.6s;
+    }
+
+    .payment-btn:hover::before {
+        width: 400px;
+        height: 400px;
+    }
+
+    .payment-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
+    }
+
+    .quantity-control {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .quantity-control button {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        font-weight: 700;
+        border-radius: 8px;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        transition: all 0.3s ease;
+    }
+
+    .quantity-control button:hover {
+        background: linear-gradient(135deg, #3B82F6, #2563EB);
+        color: white;
+        transform: scale(1.1);
+    }
+
+    .cart-badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background: linear-gradient(135deg, #EF4444, #DC2626);
+        color: white;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 700;
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.1);
+        }
+    }
+
+    .empty-cart {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #9CA3AF;
+    }
+
+    .empty-cart i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.3;
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .animate-add {
+        animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .product-stock {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-weight: 600;
+    }
+
+    .stock-ok {
+        background: linear-gradient(135deg, #D1FAE5, #A7F3D0);
+        color: #065F46;
+    }
+
+    .stock-low {
+        background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+        color: #92400E;
+    }
+
+    .stock-out {
+        background: linear-gradient(135deg, #FEE2E2, #FECACA);
+        color: #991B1B;
+    }
+
+    /* Search Input Styling */
+    #productSearch {
+        border-radius: 16px;
+        border: 2px solid rgba(59, 130, 246, 0.2);
+        padding: 0.875rem 1.25rem;
+        font-size: 1.05rem;
+        background: rgba(255, 255, 255, 0.9);
+        transition: all 0.3s ease;
+    }
+
+    #productSearch:focus {
+        border-color: #3B82F6;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        background: white;
+    }
+
+    /* Card Styling */
+    .pos-container .card {
+        border-radius: 20px;
+        border: 1px solid rgba(59, 130, 246, 0.15);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .pos-container .card-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+    }
+
+    /* Card Header Styling */
+    .card-header {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+        border-bottom: 2px solid rgba(59, 130, 246, 0.2);
+        font-weight: 700;
+        padding: 1.25rem 1.5rem;
+        border-radius: 20px 20px 0 0;
+    }
+
+    .card-header h5 {
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin: 0;
+    }
+
+    /* Modal Improvements - Disable all backdrop-filter when modal is open */
+    body.modal-open * {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    body.modal-open .sidebar {
+        z-index: 900 !important;
+    }
+
+    body.modal-open .navbar {
+        z-index: 900 !important;
+    }
+
+    /* Modal z-index must be higher than everything */
+    .modal-backdrop {
+        z-index: 1040 !important;
+        opacity: 0.5 !important;
+        background-color: #000 !important;
+    }
+
+    .modal {
+        z-index: 1050 !important;
+    }
+
+    #returnsModal.modal {
+        pointer-events: auto !important;
+    }
+
+    #returnsModal .modal-dialog {
+        pointer-events: auto !important;
+        max-width: 900px;
+        margin: 1.75rem auto;
+    }
+
+    #returnsModal .modal-content {
+        background: #ffffff !important;
+        border-radius: 8px;
+        border: none;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+        pointer-events: auto !important;
+        opacity: 1 !important;
+    }
+
+    #returnsModal .modal-header {
+        background: #dc3545 !important;
+        border-radius: 8px 8px 0 0;
+        border: none;
+        padding: 1rem 1.5rem;
+    }
+
+    #returnsModal .modal-body {
+        pointer-events: auto !important;
+        background: #fff !important;
+        padding: 1.5rem;
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    #returnsModal .modal-footer {
+        pointer-events: auto !important;
+        background: #f8f9fa !important;
+        border-top: 1px solid #dee2e6;
+        padding: 1rem 1.5rem;
+    }
+
+    /* Force all form elements to be clickable */
+    #returnsModal input,
+    #returnsModal button,
+    #returnsModal select,
+    #returnsModal textarea,
+    #returnsModal .btn,
+    #returnsModal .form-control,
+    #returnsModal .form-select,
+    #returnsModal .form-check-input,
+    #returnsModal label {
+        pointer-events: auto !important;
+        cursor: pointer;
+    }
+
+    #returnsModal .form-control,
+    #returnsModal .form-select {
+        cursor: text;
+    }
+
+    /* Clean Theme Overrides for POS */
+    [data-theme="clean"] .search-results {
+        background: #FFFFFF !important;
+        backdrop-filter: none !important;
+        border: 1px solid #E2E8F0 !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    }
+
+    [data-theme="clean"] .search-result-item {
+        background: #FFFFFF !important;
+        border-bottom: 1px solid #E2E8F0 !important;
+    }
+
+    [data-theme="clean"] .search-result-item::before {
+        display: none !important;
+    }
+
+    [data-theme="clean"] .search-result-item:hover {
+        background: #F1F5F9 !important;
+        transform: none !important;
+    }
+
+    [data-theme="clean"] .cart-item {
+        background: #FFFFFF !important;
+        backdrop-filter: none !important;
+        border: 1px solid #E2E8F0 !important;
+    }
+
+    [data-theme="clean"] .cart-item:hover {
+        background: #F8FAFC !important;
+    }
+
+    [data-theme="clean"] .cart-item .item-name {
+        color: #0F172A !important;
+    }
+
+    [data-theme="clean"] .cart-item .item-price {
+        color: #059669 !important;
+    }
+
+    [data-theme="clean"] .cart-total-section {
+        background: #F8FAFC !important;
+        border-top: 1px solid #E2E8F0 !important;
+    }
+
+    [data-theme="clean"] .cart-total-section span,
+    [data-theme="clean"] .cart-total-section strong {
+        color: #1E293B !important;
+    }
+
+    [data-theme="clean"] .cart-total-section #total {
+        color: #059669 !important;
+    }
+
+    [data-theme="clean"] .cart-total-section #discountAmountDisplay {
+        color: #DC2626 !important;
+    }
+
+    [data-theme="clean"] .payment-btn {
+        background: #059669 !important;
+        box-shadow: none !important;
+    }
+
+    [data-theme="clean"] .payment-btn::before {
+        display: none !important;
+    }
+
+    [data-theme="clean"] .payment-btn:hover {
+        background: #047857 !important;
+        transform: none !important;
+    }
+
+    [data-theme="clean"] .quantity-control button {
+        background: #F1F5F9 !important;
+        border: 1px solid #CBD5E1 !important;
+        color: #1E293B !important;
+    }
+
+    [data-theme="clean"] .quantity-control button:hover {
+        background: #2563EB !important;
+        color: #FFFFFF !important;
+        transform: none !important;
+    }
+
+    [data-theme="clean"] .stock-ok {
+        background: #DCFCE7 !important;
+        color: #166534 !important;
+    }
+
+    [data-theme="clean"] .stock-low {
+        background: #FEF3C7 !important;
+        color: #92400E !important;
+    }
+
+    [data-theme="clean"] .stock-out {
+        background: #FEE2E2 !important;
+        color: #991B1B !important;
+    }
+
+    [data-theme="clean"] #productSearch {
+        background: #FFFFFF !important;
+        border: 1px solid #CBD5E1 !important;
+    }
+
+    [data-theme="clean"] #productSearch:focus {
+        border-color: #2563EB !important;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
+    }
+
+    [data-theme="clean"] .pos-container .card {
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    [data-theme="clean"] .pos-container .card-header {
+        background: #F8FAFC !important;
+        border-bottom: 1px solid #E2E8F0 !important;
+    }
+
+    [data-theme="clean"] .pos-container .card-header h5,
+    [data-theme="clean"] .pos-container .card-header h6 {
+        background: none !important;
+        -webkit-background-clip: unset !important;
+        -webkit-text-fill-color: #0F172A !important;
+        color: #0F172A !important;
+    }
+
+    [data-theme="clean"] .empty-cart {
+        color: #64748B !important;
+    }
+
+    [data-theme="clean"] .empty-cart i {
+        background: none !important;
+        -webkit-background-clip: unset !important;
+        -webkit-text-fill-color: #94A3B8 !important;
+        color: #94A3B8 !important;
+        opacity: 0.5 !important;
+    }
+
+    [data-theme="clean"] #customerInfoPanel > div:first-child {
+        background: #EFF6FF !important;
+    }
+
+    [data-theme="clean"] #customerInfoPanel h6 {
+        color: #0F172A !important;
+    }
+
+    [data-theme="clean"] #customerName {
+        color: #0F172A !important;
+    }
+
+    [data-theme="clean"] #noCustomerPanel {
+        color: #64748B !important;
+    }
+
+    [data-theme="clean"] #noCustomerPanel i {
+        opacity: 0.3 !important;
+        color: #94A3B8 !important;
+    }
+
+    [data-theme="clean"] .input-group-text {
+        background: #F8FAFC !important;
+        border: 1px solid #CBD5E1 !important;
+        color: #1E293B !important;
+    }
+
+    [data-theme="clean"] #popularProducts .text-muted {
+        color: #64748B !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="row pos-container gx-2 align-items-start">
+        <!-- Left Panel - Products & Search -->
+        <div class="col-lg-5">
+            <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-search"></i> Search Products</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-danger" onclick="showReturnsModal()" title="Process Return">
+                        <i class="fas fa-undo"></i> Returns
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="showQuickSale()">
+                        <i class="fas fa-bolt"></i> Quick Sale
+                    </button>
+                    <button class="btn btn-sm btn-warning" onclick="showCloseDayModal()" title="Close Day & Generate Report">
+                        <i class="fas fa-moon"></i> Close Day
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Search Box -->
+                <div class="product-search mb-4">
+                    <input type="text"
+                           class="form-control form-control-lg"
+                           id="productSearch"
+                           placeholder="Search by name, code, or barcode..."
+                           autofocus>
+                    <div class="search-results d-none" id="searchResults"></div>
+                </div>
+
+                <!-- Quick Categories -->
+                <div class="mb-3">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button class="btn btn-outline-secondary active" onclick="filterCategory('all')">All</button>
+                        <button class="btn btn-outline-secondary" onclick="filterCategory('perfumes')">Perfumes</button>
+                        <button class="btn btn-outline-secondary" onclick="filterCategory('attars')">Attars</button>
+                        <button class="btn btn-outline-secondary" onclick="filterCategory('oils')">Oils</button>
+                    </div>
+                </div>
+
+                <!-- Popular Products Grid -->
+                <div class="row g-3" id="popularProducts">
+                    <div class="col-12 text-center text-muted">
+                        <i class="fas fa-box-open fa-3x mb-3"></i>
+                        <p>Start typing to search products or use barcode scanner</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Middle Panel - Cart -->
+    <div class="col-lg-4">
+        <div class="card d-flex flex-column" style="height: calc(100vh - 120px);">
+            <div class="card-header py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-shopping-cart"></i> Cart
+                        <span class="badge bg-primary ms-1" id="cartCount">0</span>
+                    </h6>
+                    <div>
+                        <button class="btn btn-sm btn-warning py-0 px-1" onclick="holdSale()" title="Hold Sale">
+                            <i class="fas fa-pause"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger py-0 px-1" onclick="clearCart()" title="Clear Cart">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body flex-grow-1 overflow-auto p-2" id="cartItemsContainer">
+                <div id="cartItems">
+                    <div class="empty-cart">
+                        <i class="fas fa-shopping-basket fa-3x mb-2"></i>
+                        <p class="small mb-0">Cart is empty</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cart Totals -->
+            <div class="cart-total-section">
+                <div class="calc-row">
+                    <span>Subtotal:</span>
+                    <strong id="subtotal">Rs. 0</strong>
+                </div>
+
+                <!-- Compact Discount -->
+                <div class="calc-row">
+                    <div class="d-flex align-items-center gap-1">
+                        <span>Discount:</span>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="discountType" id="discountPercent" value="percent" checked>
+                            <label class="btn btn-outline-primary py-0 px-1" for="discountPercent" style="font-size: 0.7rem;">%</label>
+                            <input type="radio" class="btn-check" name="discountType" id="discountAmount" value="amount">
+                            <label class="btn btn-outline-primary py-0 px-1" for="discountAmount" style="font-size: 0.7rem;">Rs</label>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-1">
+                        <input type="number" class="form-control form-control-sm text-end py-0"
+                               id="discountValue" value="0" min="0" step="0.01"
+                               style="width: 50px; height: 24px; font-size: 0.8rem;"
+                               onchange="updateTotals()" oninput="updateTotals()">
+                        <span class="text-danger small" id="discountAmountDisplay">-Rs. 0</span>
+                    </div>
+                </div>
+
+                <div class="calc-row">
+                    <span>Tax:</span>
+                    <span id="tax">Rs. 0</span>
+                </div>
+
+                <hr>
+                <div class="calc-row total-row">
+                    <span>Total:</span>
+                    <span class="text-success" id="total">Rs. 0</span>
+                </div>
+
+                <button class="btn btn-success payment-btn w-100 mt-2"
+                        onclick="showPaymentModal()"
+                        id="checkoutBtn"
+                        disabled>
+                    <i class="fas fa-credit-card"></i> Checkout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel - Customer History -->
+    <div class="col-lg-3">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-user-circle"></i> Customer</h5>
+            </div>
+            <div class="card-body p-3">
+                <!-- Customer Lookup -->
+                <div class="mb-3">
+                    <label class="form-label small">Customer Phone</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white">
+                            <i class="fas fa-phone"></i>
+                        </span>
+                        <input type="text"
+                               class="form-control"
+                               id="customerPhone"
+                               placeholder="03xx-xxxxxxx"
+                               maxlength="15">
+                        <button class="btn btn-primary" type="button" onclick="lookupCustomer()">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Customer Info Panel (hidden by default) -->
+                <div id="customerInfoPanel" class="d-none">
+                    <!-- Customer Basic Info -->
+                    <div class="p-3 rounded mb-3" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="mb-1" id="customerName"></h6>
+                                <span id="customerTierBadge" class="badge"></span>
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger" onclick="clearCustomer()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="small text-muted">
+                            <i class="fas fa-gift"></i> <span id="customerPoints"></span> points
+                            <br>
+                            <i class="fas fa-rupee-sign"></i> Rs. <span id="customerPointsValue"></span>
+                        </div>
+                    </div>
+
+                    <!-- Last Order -->
+                    <div id="lastOrderSection" class="mb-3 d-none">
+                        <h6 class="text-muted small mb-2"><i class="fas fa-history"></i> Last Order</h6>
+                        <div class="p-2 bg-light rounded">
+                            <div class="small">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="text-muted">Date:</span>
+                                    <strong id="lastOrderDate"></strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="text-muted">Total:</span>
+                                    <strong class="text-success" id="lastOrderTotal"></strong>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Items:</span>
+                                    <strong id="lastOrderItems"></strong>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary w-100 mt-2" onclick="viewOrderDetails()">
+                                <i class="fas fa-eye"></i> View Details
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Frequently Purchased -->
+                    <div id="frequentProductsSection" class="mb-3 d-none">
+                        <h6 class="text-muted small mb-2"><i class="fas fa-star"></i> Frequently Purchased</h6>
+                        <div id="frequentProductsList" class="list-group list-group-flush">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Recommendations -->
+                    <div id="recommendationsSection" class="d-none">
+                        <h6 class="text-muted small mb-2"><i class="fas fa-thumbs-up"></i> Recommended</h6>
+                        <div id="recommendationsList" class="list-group list-group-flush">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- No Customer Selected -->
+                <div id="noCustomerPanel">
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-user-slash fa-3x mb-3" style="opacity: 0.3;"></i>
+                        <p class="small">Enter phone number<br>to lookup customer</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-cash-register"></i> Complete Payment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h4 class="mb-3">Payment Method</h4>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary btn-lg" onclick="selectPayment('cash')">
+                                <i class="fas fa-money-bill-wave fa-2x d-block mb-2"></i> Cash
+                            </button>
+                            <button class="btn btn-outline-primary btn-lg" onclick="selectPayment('card')">
+                                <i class="fas fa-credit-card fa-2x d-block mb-2"></i> Card
+                            </button>
+                            <button class="btn btn-outline-primary btn-lg" onclick="selectPayment('easypaisa')">
+                                <i class="fas fa-mobile-alt fa-2x d-block mb-2"></i> EasyPaisa
+                            </button>
+                            <button class="btn btn-outline-primary btn-lg" onclick="selectPayment('jazzcash')">
+                                <i class="fas fa-mobile-alt fa-2x d-block mb-2"></i> JazzCash
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h4 class="mb-3">Payment Details</h4>
+                        <div class="mb-3">
+                            <label class="form-label">Total Amount</label>
+                            <input type="text" class="form-control form-control-lg text-end" id="paymentTotal" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Amount Paid</label>
+                            <input type="number" class="form-control form-control-lg text-end" id="amountPaid" onchange="calculateChange()">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Change</label>
+                            <input type="text" class="form-control form-control-lg text-end bg-light" id="change" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Customer (Optional)</label>
+                            <select class="form-select" id="customerId">
+                                <option value="">Walk-in Customer</option>
+                                {% for customer in customers %}
+                                <option value="{{ customer.id }}">{{ customer.name }} - {{ customer.phone }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success btn-lg" onclick="completeSale()">
+                    <i class="fas fa-check"></i> Complete Sale
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Returns Modal -->
+<div class="modal fade" id="returnsModal" tabindex="-1" aria-labelledby="returnsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="returnsModalLabel"><i class="fas fa-undo"></i> Process Return</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Search Sale -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label">Search by Sale Number or Customer Phone</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="returnSaleSearch"
+                                   placeholder="Enter sale number or phone...">
+                            <button class="btn btn-primary" type="button" onclick="searchSaleForReturn()">
+                                <i class="fas fa-search"></i> Search
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Return Type</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="returnType" id="returnCash" value="cash" checked>
+                            <label class="btn btn-outline-success" for="returnCash">
+                                <i class="fas fa-money-bill"></i> Cash Refund
+                            </label>
+                            <input type="radio" class="btn-check" name="returnType" id="returnCredit" value="store_credit">
+                            <label class="btn btn-outline-info" for="returnCredit">
+                                <i class="fas fa-wallet"></i> Store Credit
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sale Details (hidden initially) -->
+                <div id="returnSaleDetails" class="d-none">
+                    <div class="card mb-3">
+                        <div class="card-header bg-light d-flex justify-content-between">
+                            <div>
+                                <strong>Sale #: </strong><span id="returnSaleNumber"></span>
+                                <span class="ms-3"><strong>Date: </strong><span id="returnSaleDate"></span></span>
+                            </div>
+                            <div>
+                                <strong>Customer: </strong><span id="returnCustomerName"></span>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 40px;">
+                                            <input type="checkbox" class="form-check-input" id="selectAllItems" onchange="toggleAllReturnItems()">
+                                        </th>
+                                        <th>Product</th>
+                                        <th class="text-center">Purchased</th>
+                                        <th class="text-center">Already Returned</th>
+                                        <th class="text-center">Return Qty</th>
+                                        <th class="text-end">Unit Price</th>
+                                        <th class="text-end">Refund</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="returnItemsList"></tbody>
+                                <tfoot class="table-light">
+                                    <tr>
+                                        <td colspan="6" class="text-end"><strong>Total Refund:</strong></td>
+                                        <td class="text-end"><strong class="text-danger fs-5" id="totalRefundAmount">Rs. 0</strong></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Return Reason -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Return Reason</label>
+                            <select class="form-select" id="returnReason">
+                                <option value="defective">Defective/Damaged Product</option>
+                                <option value="wrong_item">Wrong Item Purchased</option>
+                                <option value="not_satisfied">Customer Not Satisfied</option>
+                                <option value="size_issue">Size/Fit Issue</option>
+                                <option value="changed_mind">Customer Changed Mind</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Notes</label>
+                            <input type="text" class="form-control" id="returnNotes" placeholder="Additional notes...">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- No Sale Found Message -->
+                <div id="noSaleFound" class="d-none text-center py-5">
+                    <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No sale found. Try searching by sale number or customer phone.</p>
+                </div>
+
+                <!-- Search Results List -->
+                <div id="returnSearchResults" class="d-none">
+                    <h6 class="mb-3">Search Results</h6>
+                    <div class="list-group" id="returnSearchResultsList"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="processReturnBtn" onclick="processReturn()" disabled>
+                    <i class="fas fa-undo"></i> Process Return
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let cart = [];
+let selectedPaymentMethod = 'cash';
+
+// Cart Persistence Functions
+function saveCartToStorage() {
+    try {
+        localStorage.setItem('pos_cart', JSON.stringify(cart));
+        localStorage.setItem('pos_cart_timestamp', Date.now().toString());
+    } catch (e) {
+        console.warn('Could not save cart to storage:', e);
+    }
+}
+
+function loadCartFromStorage() {
+    try {
+        const savedCart = localStorage.getItem('pos_cart');
+        const timestamp = localStorage.getItem('pos_cart_timestamp');
+
+        if (savedCart) {
+            // Check if cart is less than 24 hours old
+            const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+            if (timestamp && (Date.now() - parseInt(timestamp)) < maxAge) {
+                cart = JSON.parse(savedCart);
+                if (cart.length > 0) {
+                    updateCartDisplay();
+                    showToast(`Cart restored with ${cart.length} item(s)`, 'info');
+                }
+            } else {
+                // Clear old cart
+                clearCartStorage();
+            }
+        }
+    } catch (e) {
+        console.warn('Could not load cart from storage:', e);
+        clearCartStorage();
+    }
+}
+
+function clearCartStorage() {
+    try {
+        localStorage.removeItem('pos_cart');
+        localStorage.removeItem('pos_cart_timestamp');
+    } catch (e) {
+        console.warn('Could not clear cart storage:', e);
+    }
+}
+
+// Load cart on page load
+$(document).ready(function() {
+    loadCartFromStorage();
+});
+
+// Product Search
+$('#productSearch').on('input', function() {
+    const query = $(this).val();
+    if (query.length < 2) {
+        $('#searchResults').addClass('d-none');
+        return;
+    }
+
+    $.get('/pos/search-products?q=' + query, function(data) {
+        displaySearchResults(data.products);
+    });
+});
+
+function displaySearchResults(products) {
+    const resultsDiv = $('#searchResults');
+    if (products.length === 0) {
+        resultsDiv.addClass('d-none');
+        return;
+    }
+
+    let html = '';
+    products.forEach(product => {
+        const stockClass = product.quantity > 10 ? 'stock-ok' : product.quantity > 0 ? 'stock-low' : 'stock-out';
+        html += `
+            <div class="search-result-item" onclick='addToCart(${JSON.stringify(product)})'>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${product.name}</strong>
+                        <br><small class="text-muted">${product.code} - ${product.brand || ''}</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-bold text-primary">Rs. ${product.selling_price.toFixed(2)}</div>
+                        <span class="product-stock ${stockClass}">${product.quantity} in stock</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    resultsDiv.html(html).removeClass('d-none');
+}
+
+function addToCart(product) {
+    $('#searchResults').addClass('d-none');
+    $('#productSearch').val('');
+
+    const existingItem = cart.find(item => item.id === product.id);
+    if (existingItem) {
+        if (existingItem.quantity < product.quantity) {
+            existingItem.quantity++;
+        } else {
+            alert('Not enough stock!');
+            return;
+        }
+    } else {
+        cart.push({
+            id: product.id,
+            name: product.name,
+            price: product.selling_price,
+            quantity: 1,
+            max_quantity: product.quantity
+        });
+    }
+
+    updateCartDisplay();
+}
+
+function updateCartDisplay() {
+    const cartDiv = $('#cartItems');
+    $('#cartCount').text(cart.length);
+
+    if (cart.length === 0) {
+        cartDiv.html(`
+            <div class="empty-cart">
+                <i class="fas fa-shopping-basket fa-4x mb-3"></i>
+                <p>Cart is empty<br>Add products to start</p>
+            </div>
+        `);
+        $('#checkoutBtn').prop('disabled', true);
+        updateTotals();
+        return;
+    }
+
+    $('#checkoutBtn').prop('disabled', false);
+
+    let html = '';
+    cart.forEach((item, index) => {
+        html += `
+            <div class="cart-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="item-name" title="${item.name}">${item.name}</span>
+                    <button class="btn btn-danger btn-remove" onclick="removeFromCart(${index})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-1">
+                    <div class="quantity-control">
+                        <button class="btn btn-outline-secondary" onclick="updateQuantity(${index}, -1)">-</button>
+                        <input type="number" class="form-control text-center"
+                               value="${item.quantity}" min="1" max="${item.max_quantity}"
+                               onchange="setQuantity(${index}, this.value)">
+                        <button class="btn btn-outline-secondary" onclick="updateQuantity(${index}, 1)">+</button>
+                    </div>
+                    <span class="item-price">Rs. ${(item.price * item.quantity).toLocaleString()}</span>
+                </div>
+            </div>
+        `;
+    });
+
+    cartDiv.html(html);
+    updateTotals();
+    saveCartToStorage();
+}
+
+function updateQuantity(index, change) {
+    const item = cart[index];
+    const newQty = item.quantity + change;
+
+    if (newQty <= 0) {
+        removeFromCart(index);
+        return;
+    }
+
+    if (newQty > item.max_quantity) {
+        alert('Not enough stock!');
+        return;
+    }
+
+    item.quantity = newQty;
+    updateCartDisplay();
+}
+
+function setQuantity(index, value) {
+    const qty = parseInt(value);
+    if (qty <= 0) {
+        removeFromCart(index);
+        return;
+    }
+
+    if (qty > cart[index].max_quantity) {
+        alert('Not enough stock!');
+        cart[index].quantity = cart[index].max_quantity;
+    } else {
+        cart[index].quantity = qty;
+    }
+
+    updateCartDisplay();
+}
+
+function removeFromCart(index) {
+    cart.splice(index, 1);
+    updateCartDisplay();
+}
+
+function clearCart() {
+    if (cart.length === 0) return;
+
+    if (confirm('Clear all items from cart?')) {
+        cart = [];
+        clearCartStorage();
+        updateCartDisplay();
+    }
+}
+
+function updateTotals() {
+    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+    // Get discount type and value
+    const discountType = $('input[name="discountType"]:checked').val();
+    const discountValue = parseFloat($('#discountValue').val()) || 0;
+
+    // Calculate discount amount
+    let discountAmount = 0;
+    if (discountType === 'percent') {
+        // Percentage discount (max 100%)
+        const percent = Math.min(discountValue, 100);
+        discountAmount = (subtotal * percent) / 100;
+    } else {
+        // Fixed amount discount (max subtotal)
+        discountAmount = Math.min(discountValue, subtotal);
+    }
+
+    const tax = 0; // Add tax calculation if needed
+    const total = Math.max(0, subtotal - discountAmount + tax);
+
+    $('#subtotal').text('Rs. ' + subtotal.toLocaleString());
+    $('#discountAmountDisplay').text('-Rs. ' + discountAmount.toLocaleString());
+    $('#tax').text('Rs. ' + tax.toLocaleString());
+    $('#total').text('Rs. ' + total.toLocaleString());
+}
+
+function showPaymentModal() {
+    const finalTotal = parseFloat($('#total').text().replace('Rs. ', ''));
+
+    $('#paymentTotal').val('Rs. ' + finalTotal.toFixed(2));
+    $('#amountPaid').val(finalTotal.toFixed(2));
+    calculateChange();
+
+    $('#paymentModal').modal('show');
+}
+
+function selectPayment(method) {
+    selectedPaymentMethod = method;
+    $('.btn-outline-primary').removeClass('active');
+    event.target.closest('button').classList.add('active');
+}
+
+function calculateChange() {
+    const total = parseFloat($('#total').text().replace('Rs. ', ''));
+    const paid = parseFloat($('#amountPaid').val()) || 0;
+    const change = paid - total;
+
+    $('#change').val('Rs. ' + Math.max(0, change).toFixed(2));
+}
+
+function completeSale() {
+    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const discount = parseFloat($('#discount').val()) || 0;
+    const total = subtotal - discount;
+    const amountPaid = parseFloat($('#amountPaid').val()) || 0;
+
+    if (amountPaid < total) {
+        alert('Amount paid is less than total!');
+        return;
+    }
+
+    const saleData = {
+        items: cart.map(item => ({
+            product_id: item.id,
+            quantity: item.quantity,
+            unit_price: item.price,
+            discount: 0,
+            subtotal: item.price * item.quantity
+        })),
+        subtotal: subtotal,
+        discount: discount,
+        discount_type: 'amount',
+        tax: 0,
+        total: total,
+        payment_method: selectedPaymentMethod,
+        amount_paid: amountPaid,
+        customer_id: $('#customerId').val() || null,
+        notes: ''
+    };
+
+    $.ajax({
+        url: '/pos/complete-sale',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(saleData),
+        success: function(response) {
+            if (response.success) {
+                alert('Sale completed successfully!\nChange: Rs. ' + response.change.toFixed(2));
+                cart = [];
+                clearCartStorage();
+                updateCartDisplay();
+                $('#paymentModal').modal('hide');
+                $('#discount').val(0);
+
+                // Optionally print receipt
+                if (confirm('Print receipt?')) {
+                    window.open('/pos/print-receipt/' + response.sale_id, '_blank');
+                }
+            }
+        },
+        error: function(xhr) {
+            alert('Error: ' + (xhr.responseJSON?.error || 'Failed to complete sale'));
+        }
+    });
+}
+
+function holdSale() {
+    if (cart.length === 0) return;
+
+    // Implementation for holding sale
+    alert('Sale held successfully!');
+}
+
+// Keyboard shortcuts
+$(document).on('keydown', function(e) {
+    if (e.key === 'F1') {
+        e.preventDefault();
+        $('#productSearch').focus();
+    } else if (e.key === 'F4' && !$('#checkoutBtn').prop('disabled')) {
+        e.preventDefault();
+        showPaymentModal();
+    }
+});
+
+// Customer Lookup Functions
+let currentCustomer = null;
+
+function lookupCustomer() {
+    const phone = $('#customerPhone').val().trim();
+    if (!phone) {
+        showToast('Please enter customer phone number', 'warning');
+        return;
+    }
+
+    $.ajax({
+        url: `/pos/customer-lookup/${phone}`,
+        method: 'GET',
+        success: function(response) {
+            if (response.success) {
+                currentCustomer = response.customer;
+                displayCustomerInfo(response);
+            } else {
+                showToast(response.message || 'Customer not found', 'error');
+                currentCustomer = null;
+            }
+        },
+        error: function() {
+            showToast('Error looking up customer', 'error');
+        }
+    });
+}
+
+function displayCustomerInfo(data) {
+    const customer = data.customer;
+
+    // Hide no customer panel, show customer info panel
+    $('#noCustomerPanel').hide();
+    $('#customerInfoPanel').removeClass('d-none');
+
+    // Update customer basic info
+    $('#customerName').text(customer.name);
+    $('#customerTierBadge')
+        .removeClass()
+        .addClass(`badge bg-${customer.loyalty_tier_color}`)
+        .text(customer.loyalty_tier);
+    $('#customerPoints').text(customer.loyalty_points);
+    $('#customerPointsValue').text(customer.points_value_pkr);
+
+    // Populate last order if available
+    if (data.last_order) {
+        $('#lastOrderDate').text(new Date(data.last_order.sale_date).toLocaleDateString());
+        $('#lastOrderTotal').text('Rs. ' + data.last_order.total.toFixed(2));
+        $('#lastOrderItems').text(data.last_order.items.length);
+        $('#lastOrderSection').removeClass('d-none');
+
+        // Store order data for view details
+        window.currentLastOrder = data.last_order;
+    } else {
+        $('#lastOrderSection').addClass('d-none');
+    }
+
+    // Populate frequently purchased products
+    if (data.frequently_purchased && data.frequently_purchased.length > 0) {
+        $('#frequentProductsList').html('');
+        data.frequently_purchased.forEach(product => {
+            $('#frequentProductsList').append(`
+                <a href="#" class="list-group-item list-group-item-action small py-2"
+                   onclick="searchProduct('${product.product_name}'); return false;">
+                    <div class="d-flex justify-content-between">
+                        <span>${product.product_name}</span>
+                        <span class="badge bg-secondary">${product.purchase_count}x</span>
+                    </div>
+                </a>
+            `);
+        });
+        $('#frequentProductsSection').removeClass('d-none');
+    } else {
+        $('#frequentProductsSection').addClass('d-none');
+    }
+
+    // Populate recommendations
+    if (data.recommendations && data.recommendations.length > 0) {
+        $('#recommendationsList').html('');
+        data.recommendations.forEach(product => {
+            $('#recommendationsList').append(`
+                <a href="#" class="list-group-item list-group-item-action small py-2"
+                   onclick="searchProduct('${product.product_name}'); return false;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>${product.product_name}</span>
+                        <div>
+                            <small class="text-success me-2">Rs. ${product.selling_price.toFixed(2)}</small>
+                            <i class="fas fa-plus-circle text-primary"></i>
+                        </div>
+                    </div>
+                </a>
+            `);
+        });
+        $('#recommendationsSection').removeClass('d-none');
+    } else {
+        $('#recommendationsSection').addClass('d-none');
+    }
+
+    // Show success message
+    showToast(`Welcome back, ${customer.name}! 🎉 ${customer.loyalty_tier} Member`, 'success');
+}
+
+function viewOrderDetails() {
+    if (!window.currentLastOrder) {
+        showToast('No previous order found', 'warning');
+        return;
+    }
+
+    const order = window.currentLastOrder;
+    let itemsHtml = '';
+    order.items.forEach(item => {
+        itemsHtml += `
+            <tr>
+                <td>${item.product_name}</td>
+                <td class="text-center">${item.quantity}</td>
+                <td class="text-end">Rs. ${parseFloat(item.unit_price).toLocaleString()}</td>
+                <td class="text-end">Rs. ${parseFloat(item.subtotal).toLocaleString()}</td>
+            </tr>
+        `;
+    });
+
+    // Payment method badge color
+    const paymentColors = {
+        'cash': 'success',
+        'card': 'primary',
+        'bank_transfer': 'info',
+        'easypaisa': 'success',
+        'jazzcash': 'danger',
+        'credit': 'warning'
+    };
+    const paymentColor = paymentColors[order.payment_method] || 'secondary';
+    const paymentLabel = order.payment_method ? order.payment_method.replace('_', ' ').toUpperCase() : 'CASH';
+
+    const modalHtml = `
+        <div class="modal fade" id="orderDetailsModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="fas fa-receipt me-2"></i>Last Order Details</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <small class="text-muted">Order #</small>
+                                <div class="fw-bold">${order.sale_number || 'N/A'}</div>
+                            </div>
+                            <div class="col-6 text-end">
+                                <small class="text-muted">Date</small>
+                                <div class="fw-bold">${order.sale_date}</div>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <small class="text-muted">Payment Method</small>
+                                <div><span class="badge bg-${paymentColor}">${paymentLabel}</span></div>
+                            </div>
+                            <div class="col-6 text-end">
+                                <small class="text-muted">Days Ago</small>
+                                <div class="fw-bold">${order.days_ago} days</div>
+                            </div>
+                        </div>
+                        <hr>
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Product</th>
+                                    <th class="text-center">Qty</th>
+                                    <th class="text-end">Price</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${itemsHtml}
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <th colspan="3" class="text-end">Grand Total:</th>
+                                    <th class="text-end text-success fs-5">Rs. ${parseFloat(order.total).toLocaleString()}</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-primary" onclick="reorderItems()">
+                            <i class="fas fa-redo"></i> Reorder Same Items
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if any
+    $('#orderDetailsModal').remove();
+    $(modalHtml).appendTo('body');
+    const modal = new bootstrap.Modal(document.getElementById('orderDetailsModal'));
+    modal.show();
+    $('#orderDetailsModal').on('hidden.bs.modal', function() {
+        $(this).remove();
+    });
+}
+
+function reorderItems() {
+    if (!window.currentLastOrder || !window.currentLastOrder.items) return;
+
+    window.currentLastOrder.items.forEach(item => {
+        // Search and add each product from last order
+        searchProduct(item.product_name);
+    });
+
+    // Close the modal
+    bootstrap.Modal.getInstance(document.getElementById('orderDetailsModal')).hide();
+    showToast('Previous order items added to search', 'success');
+}
+
+function clearCustomer() {
+    currentCustomer = null;
+    window.currentLastOrder = null;
+    $('#customerPhone').val('');
+    $('#customerInfoPanel').addClass('d-none');
+    $('#noCustomerPanel').show();
+}
+
+function searchProduct(query) {
+    $('#productSearch').val(query).trigger('input');
+}
+
+// Close Day Functions
+function showCloseDayModal() {
+    // Get day close summary
+    $.ajax({
+        url: '/pos/close-day-summary',
+        method: 'GET',
+        success: function(response) {
+            if (response.success) {
+                displayCloseDayModal(response.summary);
+            } else {
+                alert(response.error || 'Unable to close day');
+            }
+        },
+        error: function(xhr) {
+            const error = xhr.responseJSON?.error || 'Error loading day summary';
+            alert(error);
+        }
+    });
+}
+
+function displayCloseDayModal(summary) {
+    const modalHtml = `
+    <div class="modal fade" id="closeDayModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-white">
+                        <i class="fas fa-moon"></i> Close Day - ${summary.date}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6>Sales Summary</h6>
+                                    <table class="table table-sm mb-0">
+                                        <tr>
+                                            <td>Total Transactions:</td>
+                                            <td class="text-end"><strong>${summary.total_sales}</strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Total Revenue:</td>
+                                            <td class="text-end"><strong class="text-success">Rs. ${summary.total_revenue.toFixed(2)}</strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Cash Sales:</td>
+                                            <td class="text-end">Rs. ${summary.total_cash.toFixed(2)}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Card Sales:</td>
+                                            <td class="text-end">Rs. ${summary.total_card.toFixed(2)}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6>Cash Drawer</h6>
+                                    <table class="table table-sm mb-0">
+                                        <tr>
+                                            <td>Opening Balance:</td>
+                                            <td class="text-end">Rs. ${summary.opening_balance.toFixed(2)}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Cash Sales:</td>
+                                            <td class="text-end">Rs. ${summary.total_cash.toFixed(2)}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Expected Cash:</td>
+                                            <td class="text-end"><strong>Rs. ${summary.expected_cash.toFixed(2)}</strong></td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form id="closeDayForm">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Actual Closing Balance (Count Cash)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Rs.</span>
+                                    <input type="number" class="form-control" id="closingBalance"
+                                           step="0.01" min="0" required
+                                           placeholder="${summary.expected_cash.toFixed(2)}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Total Expenses (Optional)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Rs.</span>
+                                    <input type="number" class="form-control" id="totalExpenses"
+                                           step="0.01" min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Email Report To:</label>
+                                <input type="email" class="form-control" id="emailTo"
+                                       placeholder="email@example.com">
+                                <small class="text-muted">Leave blank to skip email</small>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Notes</label>
+                                <textarea class="form-control" id="closeNotes" rows="2"
+                                          placeholder="Any notes about today's business..."></textarea>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-warning" onclick="processCloseDay()">
+                        <i class="fas fa-moon"></i> Close Day & Generate Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    $('body').append(modalHtml);
+    $('#closeDayModal').modal('show');
+    $('#closeDayModal').on('hidden.bs.modal', function() {
+        $(this).remove();
+    });
+}
+
+function processCloseDay() {
+    const closingBalance = parseFloat($('#closingBalance').val());
+    if (!closingBalance && closingBalance !== 0) {
+        alert('Please enter the actual closing balance');
+        return;
+    }
+
+    const data = {
+        closing_balance: closingBalance,
+        total_expenses: parseFloat($('#totalExpenses').val()) || 0,
+        email_to: $('#emailTo').val().trim(),
+        notes: $('#closeNotes').val().trim()
+    };
+
+    // Disable button to prevent double submission
+    const $btn = $('button[onclick="processCloseDay()"]');
+    $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Processing...');
+
+    $.ajax({
+        url: '/pos/close-day',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function(response) {
+            if (response.success) {
+                $('#closeDayModal').modal('hide');
+                showToast('Day closed successfully! Report generated.', 'success');
+                if (response.email_sent) {
+                    showToast('Report sent via email', 'info');
+                }
+                // Optionally reload page or clear sales
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                alert(response.error || 'Error closing day');
+                $btn.prop('disabled', false).html('<i class="fas fa-moon"></i> Close Day & Generate Report');
+            }
+        },
+        error: function(xhr) {
+            alert(xhr.responseJSON?.error || 'Error closing day');
+            $btn.prop('disabled', false).html('<i class="fas fa-moon"></i> Close Day & Generate Report');
+        }
+    });
+}
+
+function showToast(message, type = 'info') {
+    const bgColor = {
+        'success': 'bg-success',
+        'error': 'bg-danger',
+        'info': 'bg-info',
+        'warning': 'bg-warning'
+    }[type] || 'bg-info';
+
+    const toast = $(`
+        <div class="toast align-items-center text-white ${bgColor} border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `);
+
+    $('.toast-container').append(toast);
+    const bsToast = new bootstrap.Toast(toast[0]);
+    bsToast.show();
+
+    toast.on('hidden.bs.toast', function() {
+        $(this).remove();
+    });
+}
+
+// Initialize on page load
+$(document).ready(function() {
+    // Add toast container if not exists
+    if (!$('.toast-container').length) {
+        $('body').append('<div class="toast-container position-fixed top-0 end-0 p-3"></div>');
+    }
+
+    // Enable Enter key for customer lookup
+    $('#customerPhone').on('keypress', function(e) {
+        if (e.key === 'Enter') {
+            lookupCustomer();
+        }
+    });
+
+    // Discount type toggle
+    $('input[name="discountType"]').on('change', function() {
+        const selectedType = $(this).val();
+        if (selectedType === 'percent') {
+            $('#discountLabel').text('%');
+            $('#discountValue').attr('max', '100');
+            $('#discountValue').attr('placeholder', 'e.g., 10 for 10%');
+        } else {
+            $('#discountLabel').text('Rs');
+            $('#discountValue').removeAttr('max');
+            $('#discountValue').attr('placeholder', 'e.g., 500');
+        }
+        updateTotals();
+    });
+
+    // Reset discount value when switching types
+    $('input[name="discountType"]').trigger('change');
+
+    // Enter key for return search
+    $('#returnSaleSearch').on('keypress', function(e) {
+        if (e.key === 'Enter') {
+            searchSaleForReturn();
+        }
+    });
+});
+
+// ============================================
+// RETURNS FUNCTIONALITY
+// ============================================
+let currentReturnSale = null;
+let returnItems = [];
+let returnsModal = null;
+
+function showReturnsModal() {
+    console.log('Opening returns modal...');
+
+    // Get modal element
+    var modalEl = document.getElementById('returnsModal');
+    if (!modalEl) {
+        console.error('Returns modal element not found!');
+        alert('Error: Returns modal not found');
+        return;
+    }
+
+    // Move modal to body to avoid z-index issues from parent containers
+    if (modalEl.parentElement !== document.body) {
+        document.body.appendChild(modalEl);
+    }
+
+    // Reset modal state
+    var searchInput = document.getElementById('returnSaleSearch');
+    var saleDetails = document.getElementById('returnSaleDetails');
+    var noSaleFound = document.getElementById('noSaleFound');
+    var searchResults = document.getElementById('returnSearchResults');
+    var processBtn = document.getElementById('processReturnBtn');
+
+    if (searchInput) searchInput.value = '';
+    if (saleDetails) saleDetails.classList.add('d-none');
+    if (noSaleFound) noSaleFound.classList.add('d-none');
+    if (searchResults) searchResults.classList.add('d-none');
+    if (processBtn) processBtn.disabled = true;
+
+    currentReturnSale = null;
+    returnItems = [];
+    window.returnItemsData = [];
+
+    // Remove any existing backdrops
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+    document.body.classList.remove('modal-open');
+
+    // Always create a fresh modal instance
+    returnsModal = new bootstrap.Modal(modalEl, {
+        backdrop: true,
+        keyboard: true,
+        focus: true
+    });
+
+    // Show modal
+    returnsModal.show();
+    console.log('Modal shown');
+
+    // Focus on search field after modal opens
+    modalEl.addEventListener('shown.bs.modal', function () {
+        console.log('Modal fully shown, focusing search');
+        if (searchInput) {
+            searchInput.focus();
+        }
+    }, { once: true });
+}
+
+function searchSaleForReturn() {
+    const query = $('#returnSaleSearch').val().trim();
+    if (!query) {
+        showToast('Please enter a sale number or phone', 'warning');
+        return;
+    }
+
+    $.ajax({
+        url: '/pos/search-sales-for-return',
+        method: 'GET',
+        data: { q: query },
+        success: function(response) {
+            if (response.success && response.sales.length > 0) {
+                if (response.sales.length === 1) {
+                    // Single result - load directly
+                    loadSaleForReturn(response.sales[0].id);
+                } else {
+                    // Multiple results - show list
+                    displayReturnSearchResults(response.sales);
+                }
+            } else {
+                $('#returnSaleDetails').addClass('d-none');
+                $('#returnSearchResults').addClass('d-none');
+                $('#noSaleFound').removeClass('d-none');
+            }
+        },
+        error: function() {
+            showToast('Error searching for sale', 'error');
+        }
+    });
+}
+
+function displayReturnSearchResults(sales) {
+    let html = '';
+    sales.forEach(sale => {
+        html += `
+            <a href="#" class="list-group-item list-group-item-action" onclick="loadSaleForReturn(${sale.id}); return false;">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <strong>${sale.sale_number}</strong>
+                        <br><small class="text-muted">${sale.customer_name} - ${sale.sale_date}</small>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-${sale.status === 'completed' ? 'success' : 'warning'}">${sale.status}</span>
+                        <br><strong class="text-success">Rs. ${sale.total.toFixed(2)}</strong>
+                    </div>
+                </div>
+            </a>
+        `;
+    });
+
+    $('#returnSearchResultsList').html(html);
+    $('#noSaleFound').addClass('d-none');
+    $('#returnSaleDetails').addClass('d-none');
+    $('#returnSearchResults').removeClass('d-none');
+}
+
+function loadSaleForReturn(saleId) {
+    $.ajax({
+        url: `/pos/sale-items-for-return/${saleId}`,
+        method: 'GET',
+        success: function(response) {
+            if (response.success) {
+                currentReturnSale = response.sale;
+                returnItems = response.items;
+                displaySaleForReturn(response);
+            } else {
+                showToast(response.error || 'Error loading sale', 'error');
+            }
+        },
+        error: function() {
+            showToast('Error loading sale details', 'error');
+        }
+    });
+}
+
+function displaySaleForReturn(data) {
+    const sale = data.sale;
+    const items = data.items;
+
+    // Update sale info
+    $('#returnSaleNumber').text(sale.sale_number);
+    $('#returnSaleDate').text(sale.sale_date);
+    $('#returnCustomerName').text(sale.customer_name || 'Walk-in Customer');
+
+    // Build items table
+    let html = '';
+    items.forEach((item, index) => {
+        const maxReturn = item.quantity - item.returned_quantity;
+        const canReturn = maxReturn > 0;
+
+        html += `
+            <tr class="${!canReturn ? 'table-secondary' : ''}">
+                <td>
+                    <input type="checkbox" class="form-check-input return-item-check"
+                           data-index="${index}" ${!canReturn ? 'disabled' : ''}
+                           onchange="updateReturnItem(${index})">
+                </td>
+                <td>
+                    <strong>${item.product_name}</strong>
+                    <br><small class="text-muted">${item.product_code}</small>
+                </td>
+                <td class="text-center">${item.quantity}</td>
+                <td class="text-center">
+                    ${item.returned_quantity > 0 ? `<span class="badge bg-warning">${item.returned_quantity}</span>` : '-'}
+                </td>
+                <td class="text-center">
+                    <input type="number" class="form-control form-control-sm text-center return-qty"
+                           id="returnQty_${index}" value="${canReturn ? 1 : 0}"
+                           min="0" max="${maxReturn}" style="width: 70px; display: inline-block;"
+                           ${!canReturn ? 'disabled' : ''}
+                           onchange="updateReturnItem(${index})">
+                    <small class="text-muted d-block">max: ${maxReturn}</small>
+                </td>
+                <td class="text-end">Rs. ${item.unit_price.toFixed(2)}</td>
+                <td class="text-end return-item-total" id="returnTotal_${index}">Rs. 0</td>
+            </tr>
+        `;
+    });
+
+    $('#returnItemsList').html(html);
+    $('#returnSearchResults').addClass('d-none');
+    $('#noSaleFound').addClass('d-none');
+    $('#returnSaleDetails').removeClass('d-none');
+
+    // Store items for later
+    window.returnItemsData = items;
+    updateTotalRefund();
+}
+
+function toggleAllReturnItems() {
+    const selectAll = $('#selectAllItems').is(':checked');
+    $('.return-item-check:not(:disabled)').each(function(index) {
+        $(this).prop('checked', selectAll);
+        updateReturnItem($(this).data('index'));
+    });
+}
+
+function updateReturnItem(index) {
+    const items = window.returnItemsData;
+    const item = items[index];
+    const isChecked = $(`.return-item-check[data-index="${index}"]`).is(':checked');
+    const qty = parseInt($(`#returnQty_${index}`).val()) || 0;
+
+    if (isChecked && qty > 0) {
+        const refund = qty * item.unit_price;
+        $(`#returnTotal_${index}`).text(`Rs. ${refund.toFixed(2)}`).addClass('text-danger fw-bold');
+    } else {
+        $(`#returnTotal_${index}`).text('Rs. 0').removeClass('text-danger fw-bold');
+    }
+
+    updateTotalRefund();
+}
+
+function updateTotalRefund() {
+    const items = window.returnItemsData || [];
+    let total = 0;
+    let hasItems = false;
+
+    items.forEach((item, index) => {
+        const isChecked = $(`.return-item-check[data-index="${index}"]`).is(':checked');
+        const qty = parseInt($(`#returnQty_${index}`).val()) || 0;
+
+        if (isChecked && qty > 0) {
+            total += qty * item.unit_price;
+            hasItems = true;
+        }
+    });
+
+    $('#totalRefundAmount').text(`Rs. ${total.toFixed(2)}`);
+    $('#processReturnBtn').prop('disabled', !hasItems);
+}
+
+function processReturn() {
+    if (!currentReturnSale) {
+        showToast('No sale selected', 'error');
+        return;
+    }
+
+    const items = window.returnItemsData || [];
+    const returnData = {
+        sale_id: currentReturnSale.id,
+        return_type: $('input[name="returnType"]:checked').val(),
+        return_reason: $('#returnReason').val(),
+        notes: $('#returnNotes').val(),
+        items: []
+    };
+
+    // Collect items to return
+    items.forEach((item, index) => {
+        const isChecked = $(`.return-item-check[data-index="${index}"]`).is(':checked');
+        const qty = parseInt($(`#returnQty_${index}`).val()) || 0;
+
+        if (isChecked && qty > 0) {
+            returnData.items.push({
+                sale_item_id: item.sale_item_id,
+                product_id: item.product_id,
+                quantity: qty,
+                unit_price: item.unit_price
+            });
+        }
+    });
+
+    if (returnData.items.length === 0) {
+        showToast('Please select at least one item to return', 'warning');
+        return;
+    }
+
+    // Disable button
+    const $btn = $('#processReturnBtn');
+    $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Processing...');
+
+    $.ajax({
+        url: '/pos/process-return',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(returnData),
+        success: function(response) {
+            if (response.success) {
+                // Hide modal
+                if (returnsModal) {
+                    returnsModal.hide();
+                }
+                // Remove backdrop manually just in case
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+
+                showToast(`Return processed successfully! ${response.return_type === 'cash' ? 'Refund: Rs. ' + response.refund_amount.toFixed(2) : 'Store credit added.'}`, 'success');
+
+                // Show refund amount prominently for cash refund
+                if (response.return_type === 'cash') {
+                    setTimeout(() => {
+                        alert(`CASH REFUND: Rs. ${response.refund_amount.toFixed(2)}\n\nReturn #: ${response.return_number}`);
+                    }, 300);
+                }
+            } else {
+                showToast(response.error || 'Error processing return', 'error');
+                $btn.prop('disabled', false).html('<i class="fas fa-undo"></i> Process Return');
+            }
+        },
+        error: function(xhr) {
+            showToast(xhr.responseJSON?.error || 'Error processing return', 'error');
+            $btn.prop('disabled', false).html('<i class="fas fa-undo"></i> Process Return');
+        }
+    });
+}
+</script>
+{% endblock %}

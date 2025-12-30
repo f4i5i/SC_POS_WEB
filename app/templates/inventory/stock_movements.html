@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Movement History - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .product-info-card {
+        background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 2rem;
+    }
+
+    .movement-item {
+        border-left: 3px solid #E5E7EB;
+        padding-left: 1.5rem;
+        position: relative;
+        padding-bottom: 1.5rem;
+    }
+
+    .movement-item::before {
+        content: '';
+        position: absolute;
+        left: -8px;
+        top: 0;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: white;
+        border: 3px solid #3B82F6;
+    }
+
+    .movement-sale::before {
+        border-color: #EF4444;
+    }
+
+    .movement-return::before {
+        border-color: #10B981;
+    }
+
+    .movement-adjustment::before {
+        border-color: #F59E0B;
+    }
+
+    .movement-type-badge {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        font-weight: 600;
+    }
+
+    .qty-positive {
+        color: #10B981;
+        font-weight: bold;
+    }
+
+    .qty-negative {
+        color: #EF4444;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-history text-primary"></i>
+                Stock Movement History
+            </h2>
+            <p class="text-muted mb-0">Track all stock changes for this product</p>
+        </div>
+        <div>
+            <a href="{{ url_for('inventory.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Inventory
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Product Info -->
+        <div class="col-md-4">
+            <div class="product-info-card">
+                {% if product.image_url %}
+                <img src="{{ product.image_url }}" alt="{{ product.name }}" class="img-fluid rounded mb-3" style="max-height: 200px;">
+                {% else %}
+                <div class="text-center mb-3">
+                    <i class="fas fa-box fa-4x opacity-50"></i>
+                </div>
+                {% endif %}
+                <h4 class="mb-2">{{ product.name }}</h4>
+                <p class="mb-1"><code>{{ product.code }}</code></p>
+                {% if product.brand %}
+                <p class="mb-3 opacity-75">{{ product.brand }}</p>
+                {% endif %}
+
+                <hr class="my-3 opacity-25">
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>Current Stock:</span>
+                    <strong class="fs-4">{{ product.quantity }}</strong>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>Reorder Level:</span>
+                    <span>{{ product.reorder_level }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>Status:</span>
+                    {% if product.quantity == 0 %}
+                    <span class="badge bg-danger">Out of Stock</span>
+                    {% elif product.is_low_stock %}
+                    <span class="badge bg-warning">Low Stock</span>
+                    {% else %}
+                    <span class="badge bg-success">In Stock</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card border-0 shadow-sm mt-3">
+                <div class="card-body">
+                    <h6 class="mb-3">Quick Actions</h6>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('inventory.edit_product', product_id=product.id) }}" class="btn btn-outline-primary">
+                            <i class="fas fa-edit"></i> Edit Product
+                        </a>
+                        <button class="btn btn-outline-success" onclick="adjustStock()">
+                            <i class="fas fa-plus-circle"></i> Adjust Stock
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Movement History -->
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list-alt text-primary"></i>
+                            Movement History ({{ movements|length }})
+                        </h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="window.print()">
+                            <i class="fas fa-print"></i> Print
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                    {% if movements %}
+                    <div class="timeline">
+                        {% for movement in movements %}
+                        <div class="movement-item movement-{{ movement.movement_type }}">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <span class="movement-type-badge
+                                        {% if movement.movement_type == 'sale' %}bg-danger{%
+                                        elif movement.movement_type == 'return' %}bg-success{%
+                                        elif movement.movement_type == 'adjustment' %}bg-warning text-dark{%
+                                        else %}bg-secondary{% endif %}">
+                                        {% if movement.movement_type == 'sale' %}
+                                        <i class="fas fa-shopping-cart"></i> Sale
+                                        {% elif movement.movement_type == 'return' %}
+                                        <i class="fas fa-undo"></i> Return
+                                        {% elif movement.movement_type == 'adjustment' %}
+                                        <i class="fas fa-sliders-h"></i> Adjustment
+                                        {% else %}
+                                        <i class="fas fa-exchange-alt"></i> {{ movement.movement_type|title }}
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="text-end">
+                                    <div class="{% if movement.quantity > 0 %}qty-positive{% else %}qty-negative{% endif %}">
+                                        {% if movement.quantity > 0 %}+{% endif %}{{ movement.quantity }}
+                                    </div>
+                                    <small class="text-muted">{{ movement.timestamp.strftime('%b %d, %Y %I:%M %p') }}</small>
+                                </div>
+                            </div>
+
+                            {% if movement.reference %}
+                            <div class="mb-1">
+                                <small class="text-muted">
+                                    <i class="fas fa-tag"></i> Ref: <code>{{ movement.reference }}</code>
+                                </small>
+                            </div>
+                            {% endif %}
+
+                            {% if movement.notes %}
+                            <div class="mb-1">
+                                <small class="text-muted">{{ movement.notes }}</small>
+                            </div>
+                            {% endif %}
+
+                            <div>
+                                <small class="text-muted">
+                                    <i class="fas fa-user"></i> By: {{ movement.user.full_name if movement.user else 'System' }}
+                                </small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+                        <h5 class="text-muted">No Movement History</h5>
+                        <p class="text-muted">This product has no stock movement records yet.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Adjust Stock Modal -->
+<div class="modal fade" id="adjustStockModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-sliders-h"></i> Adjust Stock
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <strong>Current Stock:</strong> {{ product.quantity }} units
+                </div>
+                <div class="mb-3">
+                    <label for="adjustmentQty" class="form-label">Adjustment Quantity</label>
+                    <input type="number" class="form-control" id="adjustmentQty" placeholder="Use negative number to decrease">
+                    <small class="text-muted">Example: +10 to add, -5 to remove</small>
+                </div>
+                <div class="mb-3">
+                    <label for="adjustmentReason" class="form-label">Reason</label>
+                    <input type="text" class="form-control" id="adjustmentReason" placeholder="e.g., Damaged goods, Found extra stock">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveAdjustment()">
+                    <i class="fas fa-save"></i> Save Adjustment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function adjustStock() {
+    $('#adjustStockModal').modal('show');
+}
+
+function saveAdjustment() {
+    const adjustment = parseInt($('#adjustmentQty').val());
+    const reason = $('#adjustmentReason').val();
+
+    if (!adjustment || adjustment === 0) {
+        alert('Please enter a valid adjustment quantity');
+        return;
+    }
+
+    $.ajax({
+        url: `/inventory/adjust-stock/{{ product.id }}`,
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            adjustment: adjustment,
+            reason: reason || 'Manual adjustment'
+        }),
+        success: function(response) {
+            $('#adjustStockModal').modal('hide');
+            location.reload();
+        },
+        error: function(xhr) {
+            alert('Error: ' + (xhr.responseJSON?.error || 'Failed to adjust stock'));
+        }
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Business Settings - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-building"></i> Business Settings</h2>
+            <a href="{{ url_for('settings.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <img src="{{ url_for('static', filename='images/SC - Main.png') }}" alt="Business Logo" style="max-width: 200px; height: auto;">
+                    <p class="text-muted mt-2">Current Business Logo</p>
+                </div>
+                <form method="POST" action="{{ url_for('settings.update_business_settings') }}">
+                    <h5 class="mb-3">Business Information</h5>
+
+                    <div class="mb-3">
+                        <label class="form-label">Business Name</label>
+                        <input type="text" class="form-control" name="business_name" value="{{ settings.get('business_name', '') }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number</label>
+                        <input type="tel" class="form-control" name="business_phone" value="{{ settings.get('business_phone', '') }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" name="business_email" value="{{ settings.get('business_email', '') }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Address</label>
+                        <textarea class="form-control" name="business_address" rows="3">{{ settings.get('business_address', 'First Floor, Mall of Wah, G.T Road') }}</textarea>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <h5 class="mb-3">Currency Settings</h5>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Currency</label>
+                                <select class="form-select" name="currency">
+                                    <option value="PKR" {% if settings.get('currency') == 'PKR' or not settings.get('currency') %}selected{% endif %}>Pakistani Rupee (PKR)</option>
+                                    <option value="USD" {% if settings.get('currency') == 'USD' %}selected{% endif %}>US Dollar (USD)</option>
+                                    <option value="EUR" {% if settings.get('currency') == 'EUR' %}selected{% endif %}>Euro (EUR)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Currency Symbol</label>
+                                <input type="text" class="form-control" name="currency_symbol" value="{{ settings.get('currency_symbol', 'Rs.') }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Tax Rate (%)</label>
+                        <input type="number" class="form-control" name="tax_rate" step="0.01" value="{{ settings.get('tax_rate', '0') }}">
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}SMS Templates - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-file-alt text-primary"></i> SMS Templates
+            </h2>
+            <p class="text-muted mb-0">Manage message templates</p>
+        </div>
+        <div>
+            <a href="{{ url_for('notifications.sms_index') }}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTemplateModal">
+                <i class="fas fa-plus"></i> Add Template
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        {% for template in templates %}
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">{{ template.name }}</h5>
+                    <span class="badge bg-info">{{ template.template_type|title }}</span>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2">{{ template.content }}</p>
+                    <div class="small text-muted">
+                        <strong>Variables:</strong>
+                        {% for var in template.get_variables() %}
+                        <code>{{ '{{' }}{{ var }}{{ '}}' }}</code>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-sm btn-outline-primary" onclick="editTemplate({{ template.id }})">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteTemplate({{ template.id }})">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12">
+            <div class="alert alert-info text-center">
+                <i class="fas fa-info-circle"></i> No templates found. Create your first template!
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Add Template Modal -->
+<div class="modal fade" id="addTemplateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('notifications.add_sms_template') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add SMS Template</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Template Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Type <span class="text-danger">*</span></label>
+                        <select class="form-select" name="template_type" required>
+                            <option value="birthday">Birthday Wish</option>
+                            <option value="payment_reminder">Payment Reminder</option>
+                            <option value="promotion">Promotion</option>
+                            <option value="order_confirmation">Order Confirmation</option>
+                            <option value="general">General</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Message Content <span class="text-danger">*</span></label>
+                        <textarea class="form-control" name="content" rows="4" required
+                                  placeholder="Use {{name}}, {{amount}}, {{date}} for variables"></textarea>
+                        <div class="form-text">
+                            Available variables: <code>{{name}}</code>, <code>{{phone}}</code>,
+                            <code>{{amount}}</code>, <code>{{date}}</code>, <code>{{business}}</code>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Template</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function editTemplate(id) {
+    window.location.href = '/notifications/sms/templates/' + id + '/edit';
+}
+
+function deleteTemplate(id) {
+    if (confirm('Delete this template?')) {
+        window.location.href = '/notifications/sms/templates/' + id + '/delete';
+    }
+}
+</script>
+{% endblock %}

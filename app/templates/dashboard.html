@@ -1,0 +1,670 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Override main content padding for compact dashboard */
+    .main-content {
+        padding: 0.75rem !important;
+    }
+
+    /* Compact Dashboard - No Scroll */
+    .dashboard-container {
+        height: calc(100vh - 70px);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Compact Header */
+    .dashboard-header {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.85));
+        backdrop-filter: blur(20px);
+        padding: 0.75rem 1rem;
+        border-radius: 12px;
+        margin-bottom: 0.75rem;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .dashboard-header h1 {
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-weight: 800;
+        font-size: 1.25rem;
+        margin-bottom: 0;
+    }
+
+    .dashboard-header p {
+        font-size: 0.8rem;
+    }
+
+    .date-badge {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2));
+        padding: 0.3rem 0.75rem;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 0.75rem;
+        color: #4B5563;
+        display: inline-block;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    /* Compact Stats Cards */
+    .stat-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 12px;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    .stat-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+    }
+
+    .stat-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .stat-value {
+        font-size: 1.25rem;
+        font-weight: 800;
+        line-height: 1.2;
+        background: linear-gradient(135deg, #1F2937, #4B5563);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .stat-label {
+        color: #6B7280;
+        font-weight: 600;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .stat-change {
+        font-size: 0.65rem;
+        font-weight: 600;
+    }
+
+    /* Compact Quick Action Buttons */
+    .action-btn {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 12px;
+        padding: 0.75rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        text-decoration: none;
+        display: block;
+    }
+
+    .action-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    .action-icon {
+        width: 36px;
+        height: 36px;
+        margin: 0 auto 0.4rem;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+    }
+
+    .action-title {
+        font-weight: 700;
+        font-size: 0.75rem;
+        color: #1F2937;
+        margin: 0;
+    }
+
+    .action-btn p {
+        font-size: 0.65rem;
+        margin-bottom: 0;
+    }
+
+    /* Compact Activity Cards */
+    .activity-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        height: 100%;
+    }
+
+    .activity-card .card-header {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+    }
+
+    .activity-card .card-body {
+        padding: 0.75rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 1rem;
+    }
+
+    .empty-state-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+        opacity: 0.3;
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .empty-state h5 {
+        font-size: 0.9rem;
+        margin-bottom: 0.3rem;
+    }
+
+    .empty-state p {
+        font-size: 0.75rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-state .btn {
+        padding: 0.4rem 1rem;
+        font-size: 0.75rem;
+    }
+
+    /* Compact Cards */
+    .card {
+        border-radius: 12px;
+        margin-bottom: 0.5rem;
+    }
+
+    .card-header {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+    }
+
+    .card-body {
+        padding: 0.75rem;
+    }
+
+    /* Compact Alerts Section */
+    .alert {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.75rem;
+        border-radius: 8px;
+    }
+
+    .alert h6 {
+        font-size: 0.8rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .alert ul {
+        margin-bottom: 0.25rem;
+    }
+
+    .alert .btn-sm {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.7rem;
+    }
+
+    /* Row spacing */
+    .row.mb-4 {
+        margin-bottom: 0.5rem !important;
+    }
+
+    .row.g-4 {
+        --bs-gutter-y: 0.5rem;
+        --bs-gutter-x: 0.5rem;
+    }
+
+    .row.g-3 {
+        --bs-gutter-y: 0.4rem;
+        --bs-gutter-x: 0.4rem;
+    }
+
+    .mb-4 {
+        margin-bottom: 0.5rem !important;
+    }
+
+    .pulse {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
+    /* Clean Theme Overrides for Dashboard */
+    [data-theme="clean"] .dashboard-header {
+        background: #FFFFFF !important;
+        backdrop-filter: none !important;
+        border: 1px solid #E2E8F0 !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    [data-theme="clean"] .dashboard-header h1 {
+        background: none !important;
+        -webkit-background-clip: unset !important;
+        -webkit-text-fill-color: #0F172A !important;
+        color: #0F172A !important;
+    }
+
+    [data-theme="clean"] .dashboard-header p {
+        color: #64748B !important;
+    }
+
+    [data-theme="clean"] .date-badge {
+        background: #F1F5F9 !important;
+        color: #1E293B !important;
+        border: 1px solid #CBD5E1 !important;
+    }
+
+    [data-theme="clean"] .stat-card {
+        background: #FFFFFF !important;
+        backdrop-filter: none !important;
+        border: 1px solid #E2E8F0 !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    [data-theme="clean"] .stat-card:hover {
+        transform: none !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    [data-theme="clean"] .stat-value {
+        background: none !important;
+        -webkit-background-clip: unset !important;
+        -webkit-text-fill-color: #0F172A !important;
+        color: #0F172A !important;
+    }
+
+    [data-theme="clean"] .stat-label {
+        color: #64748B !important;
+    }
+
+    [data-theme="clean"] .action-btn {
+        background: #FFFFFF !important;
+        backdrop-filter: none !important;
+        border: 1px solid #E2E8F0 !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    [data-theme="clean"] .action-btn:hover {
+        transform: none !important;
+        border-color: #2563EB !important;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15) !important;
+    }
+
+    [data-theme="clean"] .action-title {
+        color: #0F172A !important;
+    }
+
+    [data-theme="clean"] .activity-card {
+        background: #FFFFFF !important;
+        backdrop-filter: none !important;
+        border: 1px solid #E2E8F0 !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    [data-theme="clean"] .activity-card .card-header {
+        background: #F8FAFC !important;
+        border-bottom: 1px solid #E2E8F0 !important;
+        color: #0F172A !important;
+    }
+
+    [data-theme="clean"] .activity-card .card-body {
+        background: #FFFFFF !important;
+        color: #1E293B !important;
+    }
+
+    [data-theme="clean"] .empty-state {
+        background: #F8FAFC !important;
+    }
+
+    [data-theme="clean"] .empty-state-icon {
+        background: none !important;
+        -webkit-background-clip: unset !important;
+        -webkit-text-fill-color: #94A3B8 !important;
+        color: #94A3B8 !important;
+        opacity: 0.7 !important;
+    }
+
+    [data-theme="clean"] .empty-state h5 {
+        color: #1E293B !important;
+    }
+
+    [data-theme="clean"] .empty-state p {
+        color: #64748B !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+<!-- Dashboard Header -->
+<div class="dashboard-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1><i class="fas fa-tachometer-alt me-2"></i>Dashboard</h1>
+            <p class="text-muted mb-0">Welcome back, {{ current_user.full_name }}!</p>
+        </div>
+        <div class="date-badge">
+            <i class="far fa-calendar me-2"></i>{{ now.strftime('%A, %B %d, %Y') }}
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #3B82F6, #2563EB); color: white;">
+                <i class="fas fa-dollar-sign"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">Rs. 0</div>
+                <div class="stat-label">Today's Sales</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #10B981, #059669); color: white;">
+                <i class="fas fa-receipt"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">0</div>
+                <div class="stat-label">Transactions</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #F59E0B, #D97706); color: white;">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">0</div>
+                <div class="stat-label">Low Stock</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #8B5CF6, #7C3AED); color: white;">
+                <i class="fas fa-boxes"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">0</div>
+                <div class="stat-label">Products</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Smart Alerts -->
+{% set critical_products = namespace(count=0, items=[]) %}
+{% set expiring_products = namespace(count=0, items=[]) %}
+{% set reorder_products = namespace(count=0, items=[]) %}
+
+{% for product in products %}
+    {% if product.quantity == 0 or product.is_expired %}
+        {% set critical_products.count = critical_products.count + 1 %}
+        {% set _ = critical_products.items.append(product) %}
+    {% endif %}
+    {% if product.is_expiring_soon or product.is_expiring_critical %}
+        {% set expiring_products.count = expiring_products.count + 1 %}
+        {% set _ = expiring_products.items.append(product) %}
+    {% endif %}
+    {% if product.needs_reorder %}
+        {% set reorder_products.count = reorder_products.count + 1 %}
+        {% set _ = reorder_products.items.append(product) %}
+    {% endif %}
+{% endfor %}
+
+{% if critical_products.count > 0 or expiring_products.count > 0 or reorder_products.count > 0 %}
+<div class="card mb-4 border-warning">
+    <div class="card-header bg-warning text-dark">
+        <i class="fas fa-exclamation-triangle me-2"></i><strong>Smart Alerts & Reordering</strong>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% if critical_products.count > 0 %}
+            <div class="col-md-4">
+                <div class="alert alert-danger mb-0">
+                    <h6 class="alert-heading mb-2">
+                        <i class="fas fa-times-circle me-2"></i>Critical ({{ critical_products.count }})
+                    </h6>
+                    <small>Out of stock or expired products</small>
+                    <ul class="mt-2 mb-0" style="font-size: 0.85rem;">
+                        {% for product in critical_products.items[:3] %}
+                        <li>
+                            <strong>{{ product.name }}</strong>
+                            {% if product.quantity == 0 %}
+                            <span class="badge bg-danger">Out of Stock</span>
+                            {% elif product.is_expired %}
+                            <span class="badge bg-danger">Expired</span>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                        {% if critical_products.count > 3 %}
+                        <li><em>+{{ critical_products.count - 3 }} more</em></li>
+                        {% endif %}
+                    </ul>
+                    <a href="/inventory?stock_status=out" class="btn btn-sm btn-danger mt-2">View All</a>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if expiring_products.count > 0 %}
+            <div class="col-md-4">
+                <div class="alert alert-warning mb-0">
+                    <h6 class="alert-heading mb-2">
+                        <i class="fas fa-clock me-2"></i>Expiring Soon ({{ expiring_products.count }})
+                    </h6>
+                    <small>Products expiring within 30 days</small>
+                    <ul class="mt-2 mb-0" style="font-size: 0.85rem;">
+                        {% for product in expiring_products.items[:3] %}
+                        <li>
+                            <strong>{{ product.name }}</strong>
+                            <span class="badge bg-warning text-dark">{{ product.days_until_expiry }}d</span>
+                        </li>
+                        {% endfor %}
+                        {% if expiring_products.count > 3 %}
+                        <li><em>+{{ expiring_products.count - 3 }} more</em></li>
+                        {% endif %}
+                    </ul>
+                    <a href="/inventory" class="btn btn-sm btn-warning mt-2">View All</a>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if reorder_products.count > 0 %}
+            <div class="col-md-4">
+                <div class="alert alert-info mb-0">
+                    <h6 class="alert-heading mb-2">
+                        <i class="fas fa-shopping-cart me-2"></i>Needs Reorder ({{ reorder_products.count }})
+                    </h6>
+                    <small>Low stock or running out soon</small>
+                    <ul class="mt-2 mb-0" style="font-size: 0.85rem;">
+                        {% for product in reorder_products.items[:3] %}
+                        <li>
+                            <strong>{{ product.name }}</strong>
+                            <span class="badge bg-info">Qty: {{ product.quantity }}</span>
+                            <small class="text-muted">(Suggest: {{ product.suggested_reorder_quantity }})</small>
+                        </li>
+                        {% endfor %}
+                        {% if reorder_products.count > 3 %}
+                        <li><em>+{{ reorder_products.count - 3 }} more</em></li>
+                        {% endif %}
+                    </ul>
+                    <a href="/inventory?stock_status=low" class="btn btn-sm btn-info mt-2">View All</a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Quick Actions -->
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="fas fa-bolt me-2"></i>Quick Actions
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% if current_user.has_permission('pos') %}
+            <div class="col-lg-3 col-md-6">
+                <a href="/pos" class="action-btn action-btn-primary">
+                    <div class="action-icon" style="background: linear-gradient(135deg, #3B82F6, #2563EB); color: white;">
+                        <i class="fas fa-cash-register"></i>
+                    </div>
+                    <h6 class="action-title">New Sale</h6>
+                </a>
+            </div>
+            {% endif %}
+
+            {% if current_user.has_permission('inventory') %}
+            <div class="col-lg-3 col-md-6">
+                <a href="/inventory/add" class="action-btn action-btn-success">
+                    <div class="action-icon" style="background: linear-gradient(135deg, #10B981, #059669); color: white;">
+                        <i class="fas fa-plus-circle"></i>
+                    </div>
+                    <h6 class="action-title">Add Product</h6>
+                </a>
+            </div>
+            {% endif %}
+
+            {% if current_user.has_permission('customers') %}
+            <div class="col-lg-3 col-md-6">
+                <a href="/customers/add" class="action-btn action-btn-info">
+                    <div class="action-icon" style="background: linear-gradient(135deg, #0EA5E9, #0284C7); color: white;">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <h6 class="action-title">Add Customer</h6>
+                </a>
+            </div>
+            {% endif %}
+
+            {% if current_user.has_permission('reports') %}
+            <div class="col-lg-3 col-md-6">
+                <a href="/reports" class="action-btn action-btn-warning">
+                    <div class="action-icon" style="background: linear-gradient(135deg, #F59E0B, #D97706); color: white;">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h6 class="action-title">Reports</h6>
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity & Alerts -->
+<div class="row">
+    <div class="col-lg-6">
+        <div class="activity-card">
+            <div class="card-header">
+                <i class="fas fa-clock me-2"></i>Recent Sales
+            </div>
+            <div class="card-body">
+                <div class="empty-state">
+                    <div class="empty-state-icon pulse">
+                        <i class="fas fa-shopping-cart"></i>
+                    </div>
+                    <h5>No sales yet today</h5>
+                    <a href="/pos" class="btn btn-primary btn-sm">
+                        <i class="fas fa-cash-register me-1"></i>Make Sale
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="activity-card">
+            <div class="card-header">
+                <i class="fas fa-exclamation-triangle me-2"></i>Stock Alerts
+            </div>
+            <div class="card-body">
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h5>All stock levels healthy</h5>
+                    <a href="/inventory" class="btn btn-success btn-sm">
+                        <i class="fas fa-boxes me-1"></i>Inventory
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Add active class to current page nav link
+const currentPath = window.location.pathname;
+document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+    if (link.getAttribute('href') === currentPath) {
+        link.classList.add('active');
+    }
+});
+
+// Animate numbers counting up
+function animateValue(element, start, end, duration) {
+    let startTimestamp = null;
+    const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        element.textContent = Math.floor(progress * (end - start) + start);
+        if (progress < 1) {
+            window.requestAnimationFrame(step);
+        }
+    };
+    window.requestAnimationFrame(step);
+}
+
+// Auto-refresh dashboard every 5 minutes
+setTimeout(function() {
+    location.reload();
+}, 300000);
+</script>
+{% endblock %}

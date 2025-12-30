@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Product Performance Report - Sunnat Collection{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-box-open text-primary"></i>
+                Product Performance Analysis
+            </h2>
+            <p class="text-muted mb-0">{{ start_date.strftime('%B %d, %Y') }} - {{ end_date.strftime('%B %d, %Y') }}</p>
+        </div>
+        <div>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Reports
+            </a>
+        </div>
+    </div>
+
+    <!-- Top Performers -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0">
+                <i class="fas fa-trophy text-warning"></i>
+                Top 20 Performing Products
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Code</th>
+                            <th>Product</th>
+                            <th>Brand</th>
+                            <th class="text-end">Units Sold</th>
+                            <th class="text-end">Revenue</th>
+                            <th class="text-end">Profit</th>
+                            <th class="text-end">Transactions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in top_products %}
+                        <tr>
+                            <td>
+                                {% if loop.index <= 3 %}
+                                <span class="badge bg-warning">{{ loop.index }}</span>
+                                {% else %}
+                                {{ loop.index }}
+                                {% endif %}
+                            </td>
+                            <td><code>{{ product.code }}</code></td>
+                            <td>{{ product.name }}</td>
+                            <td>{{ product.brand or '-' }}</td>
+                            <td class="text-end">{{ product.units_sold }}</td>
+                            <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(product.revenue) }}</td>
+                            <td class="text-end text-success">Rs. {{ "{:,.2f}".format(product.profit) }}</td>
+                            <td class="text-end">{{ product.transactions }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Worst Performers -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle text-warning"></i>
+                        Underperforming Products
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th class="text-end">Units</th>
+                                    <th class="text-end">Revenue</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for product in worst_products %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold small">{{ product.name }}</div>
+                                        <small class="text-muted">{{ product.code }}</small>
+                                    </td>
+                                    <td class="text-end">{{ product.units_sold }}</td>
+                                    <td class="text-end">Rs. {{ "{:,.2f}".format(product.revenue) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Never Sold -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-times-circle text-danger"></i>
+                        Never Sold ({{ never_sold|length }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th class="text-end">Stock</th>
+                                    <th class="text-end">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for product in never_sold %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold small">{{ product.name }}</div>
+                                        <small class="text-muted">{{ product.code }}</small>
+                                    </td>
+                                    <td class="text-end">{{ product.quantity }}</td>
+                                    <td class="text-end">Rs. {{ "{:,.2f}".format(product.cost_price * product.quantity) }}</td>
+                                </tr>
+                                {% endfor %}
+                                {% if not never_sold %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-success py-3">
+                                        <i class="fas fa-check-circle"></i> All products have sales!
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

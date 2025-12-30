@@ -1,0 +1,489 @@
+{% extends "base.html" %}
+
+{% block title %}Supplier Management - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideInRight {
+        from { transform: translateX(50px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+
+    .supplier-card {
+        transition: all 0.3s;
+        border-radius: 10px;
+        border: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        animation: fadeIn 0.4s;
+        overflow: hidden;
+    }
+
+    .supplier-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    }
+
+    .supplier-header {
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+        color: white;
+        padding: 1.5rem;
+    }
+
+    .supplier-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 10px;
+        background: rgba(255,255,255,0.2);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        margin-right: 1rem;
+        backdrop-filter: blur(10px);
+    }
+
+    .supplier-name {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+
+    .supplier-contact {
+        opacity: 0.9;
+        font-size: 0.9rem;
+    }
+
+    .supplier-stats {
+        padding: 1rem 1.5rem;
+        background: white;
+    }
+
+    .stat-row {
+        display: flex;
+        justify-content: space-around;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #E5E7EB;
+    }
+
+    .stat-row:last-child {
+        border-bottom: none;
+    }
+
+    .stat-item {
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 1.3rem;
+        font-weight: bold;
+        color: #10B981;
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        color: #6B7280;
+        text-transform: uppercase;
+    }
+
+    .action-btn {
+        transition: all 0.2s;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-size: 0.9rem;
+    }
+
+    .action-btn:hover {
+        transform: scale(1.05);
+    }
+
+    .search-box {
+        position: relative;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #9CA3AF;
+    }
+
+    .search-input {
+        padding-left: 45px;
+        border-radius: 25px;
+        border: 2px solid #E5E7EB;
+        transition: all 0.3s;
+    }
+
+    .search-input:focus {
+        border-color: #10B981;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        animation: slideInRight 0.5s;
+        border-left: 4px solid;
+    }
+
+    .stat-card-1 { border-left-color: #10B981; }
+    .stat-card-2 { border-left-color: #3B82F6; }
+    .stat-card-3 { border-left-color: #F59E0B; }
+    .stat-card-4 { border-left-color: #8B5CF6; }
+
+    .stat-card-value {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-card-label {
+        color: #6B7280;
+        font-size: 0.9rem;
+    }
+
+    .badge-status {
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .supplier-rating {
+        color: #F59E0B;
+    }
+
+    /* Clean Theme Overrides for Suppliers */
+    [data-theme="clean"] .supplier-card {
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    [data-theme="clean"] .supplier-card:hover {
+        transform: none !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    [data-theme="clean"] .supplier-header {
+        background: #059669 !important;
+    }
+
+    [data-theme="clean"] .supplier-icon {
+        background: rgba(255, 255, 255, 0.25) !important;
+        backdrop-filter: none !important;
+    }
+
+    [data-theme="clean"] .supplier-stats {
+        background: #FFFFFF !important;
+    }
+
+    [data-theme="clean"] .stat-card {
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    [data-theme="clean"] .stat-card-value {
+        color: #0F172A !important;
+    }
+
+    [data-theme="clean"] .stat-card-value.text-success {
+        color: #059669 !important;
+    }
+
+    [data-theme="clean"] .stat-card-value.text-primary {
+        color: #2563EB !important;
+    }
+
+    [data-theme="clean"] .stat-card-value.text-warning {
+        color: #D97706 !important;
+    }
+
+    [data-theme="clean"] .stat-card-value.text-purple {
+        color: #7C3AED !important;
+    }
+
+    [data-theme="clean"] .stat-card-label {
+        color: #64748B !important;
+    }
+
+    [data-theme="clean"] .stat-value {
+        color: #059669 !important;
+    }
+
+    [data-theme="clean"] .stat-label {
+        color: #64748B !important;
+    }
+
+    [data-theme="clean"] .search-input {
+        background: #FFFFFF !important;
+        border: 2px solid #CBD5E1 !important;
+    }
+
+    [data-theme="clean"] .search-input:focus {
+        border-color: #059669 !important;
+        box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1) !important;
+    }
+
+    [data-theme="clean"] .action-btn:hover {
+        transform: none !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-truck"></i> Supplier Management</h2>
+    <div>
+        <a href="{{ url_for('suppliers.add_supplier') }}" class="btn btn-success">
+            <i class="fas fa-plus-circle"></i> Add New Supplier
+        </a>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+{% set total_suppliers = suppliers.total if suppliers else 0 %}
+{% set active_count = suppliers.items|length if suppliers.items else 0 %}
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card stat-card-1" style="animation-delay: 0.1s;">
+            <div class="stat-card-value text-success">{{ total_suppliers }}</div>
+            <div class="stat-card-label">Total Suppliers</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card stat-card-2" style="animation-delay: 0.2s;">
+            <div class="stat-card-value text-primary">{{ active_count }}</div>
+            <div class="stat-card-label">Active Suppliers</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card stat-card-3" style="animation-delay: 0.3s;">
+            <div class="stat-card-value text-warning">{{ suppliers.items|length }}</div>
+            <div class="stat-card-label">On This Page</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card stat-card-4" style="animation-delay: 0.4s;">
+            <div class="stat-card-value text-purple">{{ suppliers.page if suppliers else 1 }}</div>
+            <div class="stat-card-label">Current Page</div>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('suppliers.index') }}" id="filterForm">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="search-box">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text"
+                               class="form-control search-input"
+                               name="search"
+                               placeholder="Search by name, contact, or email..."
+                               value="{{ request.args.get('search', '') }}">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" name="status" onchange="this.form.submit()">
+                        <option value="">All Status</option>
+                        <option value="active" {% if request.args.get('status') == 'active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if request.args.get('status') == 'inactive' %}selected{% endif %}>Inactive</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" name="sort" onchange="this.form.submit()">
+                        <option value="name">Name A-Z</option>
+                        <option value="-name" {% if request.args.get('sort') == '-name' %}selected{% endif %}>Name Z-A</option>
+                        <option value="-created_at" {% if request.args.get('sort') == '-created_at' %}selected{% endif %}>Newest First</option>
+                        <option value="created_at" {% if request.args.get('sort') == 'created_at' %}selected{% endif %}>Oldest First</option>
+                    </select>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Suppliers Grid -->
+<div class="row">
+    {% if suppliers.items %}
+        {% for supplier in suppliers.items %}
+        <div class="col-md-6 col-lg-4 mb-4" style="animation-delay: {{ loop.index * 0.05 }}s;">
+            <div class="supplier-card card h-100">
+                <div class="supplier-header">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="supplier-icon">
+                            <i class="fas fa-industry"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="supplier-name">{{ supplier.name }}</div>
+                            <div class="supplier-contact">
+                                <i class="fas fa-phone"></i> {{ supplier.contact_person }}
+                            </div>
+                        </div>
+                        <span class="badge-status {% if supplier.is_active %}bg-light text-success{% else %}bg-secondary{% endif %}">
+                            {% if supplier.is_active %}Active{% else %}Inactive{% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="supplier-stats">
+                    <div class="mb-3">
+                        {% if supplier.phone %}
+                        <div class="mb-1">
+                            <i class="fas fa-mobile-alt text-muted"></i> {{ supplier.phone }}
+                        </div>
+                        {% endif %}
+                        {% if supplier.email %}
+                        <div class="mb-1">
+                            <i class="fas fa-envelope text-muted"></i> {{ supplier.email }}
+                        </div>
+                        {% endif %}
+                        {% if supplier.address %}
+                        <div class="mb-1">
+                            <i class="fas fa-map-marker-alt text-muted"></i> {{ supplier.address }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="stat-row">
+                        <div class="stat-item">
+                            <div class="stat-value">{{ supplier.products.count() }}</div>
+                            <div class="stat-label">Products</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">
+                                Rs. {{ "{:,.0f}".format(supplier.products|sum(attribute='cost_price') or 0) }}
+                            </div>
+                            <div class="stat-label">Total Value</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-3">
+                        <a href="{{ url_for('suppliers.view_supplier', supplier_id=supplier.id) }}"
+                           class="action-btn btn btn-success text-white flex-grow-1">
+                            <i class="fas fa-eye"></i> View
+                        </a>
+                        <a href="{{ url_for('suppliers.edit_supplier', supplier_id=supplier.id) }}"
+                           class="action-btn btn btn-warning text-white flex-grow-1">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        <button class="action-btn btn btn-danger"
+                                onclick="deleteSupplier({{ supplier.id }}, '{{ supplier.name }}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="fas fa-truck fa-5x text-muted mb-3"></i>
+                <h4 class="text-muted">No Suppliers Found</h4>
+                <p class="text-muted">Start adding your suppliers</p>
+                <a href="{{ url_for('suppliers.add_supplier') }}" class="btn btn-success">
+                    <i class="fas fa-plus-circle"></i> Add First Supplier
+                </a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Pagination -->
+{% if suppliers.pages > 1 %}
+<nav aria-label="Page navigation" class="mt-4">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if not suppliers.has_prev %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('suppliers.index', page=suppliers.prev_num, **request.args) }}">
+                <i class="fas fa-chevron-left"></i> Previous
+            </a>
+        </li>
+
+        {% for page_num in suppliers.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
+            {% if page_num %}
+                <li class="page-item {% if page_num == suppliers.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('suppliers.index', page=page_num, **request.args) }}">
+                        {{ page_num }}
+                    </a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        <li class="page-item {% if not suppliers.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('suppliers.index', page=suppliers.next_num, **request.args) }}">
+                Next <i class="fas fa-chevron-right"></i>
+            </a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Auto-submit search after typing
+    let searchTimeout;
+    $('input[name="search"]').on('keyup', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            $('#filterForm').submit();
+        }, 500);
+    });
+});
+
+function deleteSupplier(supplierId, supplierName) {
+    if (confirm(`Are you sure you want to delete "${supplierName}"?\n\nThis action cannot be undone.`)) {
+        $.ajax({
+            url: `/suppliers/delete/${supplierId}`,
+            method: 'POST',
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + response.error);
+                }
+            },
+            error: function(xhr) {
+                alert('Error deleting supplier');
+            }
+        });
+    }
+}
+
+// Keyboard shortcuts
+$(document).on('keydown', function(e) {
+    // Ctrl+N - New Supplier
+    if (e.ctrlKey && e.key === 'n') {
+        e.preventDefault();
+        window.location.href = '{{ url_for("suppliers.add_supplier") }}';
+    }
+    // Ctrl+F - Focus search
+    if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        $('input[name="search"]').focus();
+    }
+});
+</script>
+{% endblock %}

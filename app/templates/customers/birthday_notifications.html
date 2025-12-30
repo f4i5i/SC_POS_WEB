@@ -1,0 +1,390 @@
+{% extends "base.html" %}
+
+{% block title %}Tomorrow's Birthday Notifications - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .notification-card {
+        border-left: 5px solid #F59E0B;
+        background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+        transition: all 0.3s;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+        }
+        50% {
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.6);
+        }
+    }
+
+    .notification-card:hover {
+        transform: scale(1.02);
+        box-shadow: 0 8px 24px rgba(245, 158, 11, 0.4);
+    }
+
+    .tier-badge {
+        font-size: 1.1rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 700;
+    }
+
+    .tier-vip-elite {
+        background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+        color: #1F2937;
+        border: 2px solid #B8860B;
+    }
+
+    .tier-vip-gold {
+        background: linear-gradient(135deg, #FFA500 0%, #FF8C00 100%);
+        color: white;
+    }
+
+    .tier-vip-silver {
+        background: linear-gradient(135deg, #C0C0C0 0%, #A9A9A9 100%);
+        color: #1F2937;
+    }
+
+    .tier-loyal {
+        background: linear-gradient(135deg, #60A5FA 0%, #3B82F6 100%);
+        color: white;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .stat-item {
+        background: white;
+        padding: 1rem;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #3B82F6;
+    }
+
+    .stat-label {
+        font-size: 0.85rem;
+        color: #6B7280;
+        margin-top: 0.25rem;
+    }
+
+    .parcel-checklist {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    .checklist-item {
+        padding: 0.5rem;
+        border-bottom: 1px solid #E5E7EB;
+    }
+
+    .checklist-item:last-child {
+        border-bottom: none;
+    }
+
+    .priority-indicator {
+        display: inline-block;
+        font-size: 1.5rem;
+    }
+
+    .urgent-alert {
+        background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
+        border-left: 5px solid #EF4444;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        animation: shake 0.5s;
+    }
+
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+        20%, 40%, 60%, 80% { transform: translateX(5px); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-gift text-warning"></i>
+                Tomorrow's Birthday Parcels
+            </h2>
+            <p class="text-muted mb-0">
+                <i class="fas fa-calendar-day"></i>
+                Birthdays on {{ tomorrow.strftime('%A, %B %d, %Y') }}
+            </p>
+        </div>
+        <div>
+            <a href="{{ url_for('customers.birthdays') }}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-calendar-alt"></i> All Birthdays
+            </a>
+            <button class="btn btn-warning" onclick="window.print()">
+                <i class="fas fa-print"></i> Print Checklist
+            </button>
+        </div>
+    </div>
+
+    <!-- Alert if urgent action needed -->
+    {% if notifications|length > 0 %}
+    <div class="urgent-alert">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-exclamation-triangle fa-2x text-danger me-3"></i>
+            <div>
+                <h5 class="mb-1">🔔 URGENT: {{ notifications|length }} Birthday Parcel(s) to Prepare!</h5>
+                <p class="mb-0">These loyal customers have birthdays TOMORROW. Prepare their parcels today for timely delivery.</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Summary Stats -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-box fa-2x text-warning mb-2"></i>
+                    <h3 class="mb-1">{{ notifications|length }}</h3>
+                    <small class="text-muted">Parcels to Prepare</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-crown fa-2x text-warning mb-2"></i>
+                    <h3 class="mb-1">{{ notifications|selectattr('gift.tier', 'equalto', 'VIP Elite')|list|length }}</h3>
+                    <small class="text-muted">VIP Elite Customers</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-star fa-2x text-warning mb-2"></i>
+                    <h3 class="mb-1">{{ notifications|selectattr('gift.tier', 'equalto', 'VIP Gold')|list|length }}</h3>
+                    <small class="text-muted">VIP Gold Customers</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-gift fa-2x text-warning mb-2"></i>
+                    <h3 class="mb-1">Rs. {{ "{:,.0f}".format(notifications|sum(attribute='gift.voucher_amount')) }}</h3>
+                    <small class="text-muted">Total Vouchers</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Cards -->
+    {% if notifications %}
+    <div class="row g-4">
+        {% for notification in notifications %}
+        <div class="col-lg-12">
+            <div class="card notification-card border-0 shadow">
+                <div class="card-body p-4">
+                    <div class="row">
+                        <!-- Customer Info -->
+                        <div class="col-md-4">
+                            <div class="d-flex align-items-start mb-3">
+                                <div class="priority-indicator me-3">
+                                    {% for i in range(5 - notification.gift.priority) %}🔥{% endfor %}
+                                </div>
+                                <div>
+                                    <h4 class="mb-1">{{ notification.customer.name }}</h4>
+                                    <p class="mb-1">
+                                        <i class="fas fa-phone"></i> {{ notification.customer.phone }}
+                                    </p>
+                                    {% if notification.customer.email %}
+                                    <p class="mb-1">
+                                        <i class="fas fa-envelope"></i> {{ notification.customer.email }}
+                                    </p>
+                                    {% endif %}
+                                    <span class="tier-badge tier-{{ notification.gift.tier.lower().replace(' ', '-') }}">
+                                        {{ notification.gift.tier }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Customer Stats -->
+                            <div class="stats-grid">
+                                <div class="stat-item">
+                                    <div class="stat-value">Rs. {{ "{:,.0f}".format(notification.stats.total_purchases) }}</div>
+                                    <div class="stat-label">Lifetime Value</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-value">{{ notification.stats.total_orders }}</div>
+                                    <div class="stat-label">Total Orders</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-value">{{ "{:.1f}".format(notification.stats.perfumes_per_month) }}</div>
+                                    <div class="stat-label">Perfumes/Month</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-value">{{ notification.stats.total_perfumes }}</div>
+                                    <div class="stat-label">Total Perfumes</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Gift Details -->
+                        <div class="col-md-4">
+                            <h5 class="text-warning mb-3">
+                                <i class="fas fa-gift"></i> Birthday Gift Package
+                            </h5>
+                            <div class="parcel-checklist">
+                                <div class="checklist-item">
+                                    <i class="fas fa-check-circle text-success"></i>
+                                    <strong>{{ notification.gift.discount_percentage }}% Birthday Discount</strong>
+                                </div>
+                                {% if notification.gift.voucher_amount > 0 %}
+                                <div class="checklist-item">
+                                    <i class="fas fa-check-circle text-success"></i>
+                                    <strong>Rs. {{ notification.gift.voucher_amount }} Gift Voucher</strong>
+                                </div>
+                                {% endif %}
+                                <div class="checklist-item">
+                                    <i class="fas fa-check-circle text-success"></i>
+                                    <strong>{{ notification.gift.bonus_points }} Bonus Points</strong>
+                                </div>
+                                {% if notification.gift.special_gift %}
+                                <div class="checklist-item">
+                                    <i class="fas fa-check-circle text-success"></i>
+                                    <strong>{{ notification.gift.special_gift }}</strong>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Parcel Recommendations -->
+                        <div class="col-md-4">
+                            <h5 class="text-primary mb-3">
+                                <i class="fas fa-box-open"></i> Recommended Items
+                            </h5>
+
+                            {% if notification.parcel_recommendations.favorites %}
+                            <div class="mb-3">
+                                <h6 class="text-muted mb-2">Their Favorites:</h6>
+                                <ul class="list-unstyled">
+                                    {% for fav in notification.parcel_recommendations.favorites %}
+                                    <li class="mb-1">
+                                        <i class="fas fa-heart text-danger"></i>
+                                        {{ fav.name }}
+                                        <small class="text-muted">({{ fav.quantity }} purchased)</small>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+
+                            {% if notification.parcel_recommendations.new_suggestions %}
+                            <div class="mb-3">
+                                <h6 class="text-muted mb-2">Try Something New:</h6>
+                                <ul class="list-unstyled">
+                                    {% for new in notification.parcel_recommendations.new_suggestions %}
+                                    <li class="mb-1">
+                                        <i class="fas fa-star text-warning"></i>
+                                        {{ new.name }}
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+
+                            <div class="d-grid gap-2 mt-3">
+                                <button class="btn btn-success" onclick="viewCustomer({{ notification.customer.id }})">
+                                    <i class="fas fa-user"></i> View Full Profile
+                                </button>
+                                <button class="btn btn-primary" onclick="printParcelLabel({{ notification.customer.id }})">
+                                    <i class="fas fa-print"></i> Print Parcel Label
+                                </button>
+                                <button class="btn btn-warning" onclick="sendNotification({{ notification.customer.id }})">
+                                    <i class="fas fa-paper-plane"></i> Send Birthday Wishes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Message Preview -->
+                    <div class="alert alert-info mt-3 mb-0">
+                        <strong>Message:</strong> {{ notification.gift.message }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <!-- Empty State -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+            <h4 class="text-success">No Birthday Parcels to Prepare!</h4>
+            <p class="text-muted">No eligible customers have birthdays tomorrow.</p>
+            <a href="{{ url_for('customers.birthdays') }}" class="btn btn-primary">
+                <i class="fas fa-calendar-alt"></i> View All Birthdays
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function viewCustomer(customerId) {
+    window.location.href = `/customers/view/${customerId}`;
+}
+
+function printParcelLabel(customerId) {
+    // Open print view for parcel label
+    window.open(`/customers/birthday-parcel-label/${customerId}`, '_blank', 'width=800,height=600');
+}
+
+function sendNotification(customerId) {
+    if (confirm('Send birthday wishes to this customer?')) {
+        fetch(`/customers/send-birthday-wishes`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ customer_ids: [customerId] })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Birthday wishes sent successfully!');
+            } else {
+                alert('Error: ' + (data.error || 'Failed to send wishes'));
+            }
+        })
+        .catch(error => {
+            alert('Error: ' + error.message);
+        });
+    }
+}
+
+// Auto-refresh every 5 minutes
+setTimeout(() => {
+    location.reload();
+}, 300000);
+</script>
+{% endblock %}

@@ -1,0 +1,466 @@
+{% extends "base.html" %}
+
+{% block title %}Customer Management - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Page Header with Glassmorphism */
+    .page-header {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        animation: slideInDown 0.6s ease;
+    }
+
+    @keyframes slideInDown {
+        from { opacity: 0; transform: translateY(-30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .page-header h2 {
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin: 0;
+        font-weight: 800;
+    }
+
+    /* Glassmorphic Customer Cards */
+    .customer-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        animation: fadeIn 0.6s ease;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .customer-card:hover {
+        transform: translateY(-8px) scale(1.02);
+        box-shadow: 0 12px 40px rgba(59, 130, 246, 0.2);
+    }
+
+    /* Gradient Customer Avatar */
+    .customer-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-right: 1rem;
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        transition: all 0.3s;
+    }
+
+    .customer-card:hover .customer-avatar {
+        transform: rotate(10deg) scale(1.1);
+    }
+
+    .customer-name {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1F2937;
+        margin-bottom: 0.25rem;
+    }
+
+    .customer-info {
+        color: #6B7280;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .customer-stats {
+        display: flex;
+        gap: 2rem;
+        margin-top: 0.5rem;
+    }
+
+    .stat-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .stat-value {
+        font-size: 1.2rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        color: #9CA3AF;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+
+    /* Glassmorphic Action Buttons */
+    .action-btn {
+        backdrop-filter: blur(10px);
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .action-btn::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        transform: translate(-50%, -50%);
+        transition: width 0.6s, height 0.6s;
+    }
+
+    .action-btn:hover::before {
+        width: 200px;
+        height: 200px;
+    }
+
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Glassmorphic Search Box */
+    .search-box {
+        position: relative;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #3B82F6;
+        font-weight: 600;
+    }
+
+    .search-input {
+        padding-left: 45px;
+        border-radius: 25px;
+        border: 2px solid #E5E7EB;
+        transition: all 0.3s;
+    }
+
+    .search-input:focus {
+        border-color: #3B82F6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        animation: slideInRight 0.5s;
+        border-left: 4px solid;
+    }
+
+    .stat-card-1 { border-left-color: #3B82F6; }
+    .stat-card-2 { border-left-color: #10B981; }
+    .stat-card-3 { border-left-color: #F59E0B; }
+    .stat-card-4 { border-left-color: #EF4444; }
+
+    .stat-card-value {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-card-label {
+        color: #6B7280;
+        font-size: 0.9rem;
+    }
+
+    .badge-status {
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .loyalty-badge {
+        background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+        color: #1F2937;
+        padding: 0.25rem 0.75rem;
+        border-radius: 15px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-users"></i> Customer Management</h2>
+    <div>
+        <a href="{{ url_for('customers.add_customer') }}" class="btn btn-primary">
+            <i class="fas fa-user-plus"></i> Add New Customer
+        </a>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+{% set total_customers = customers.total if customers else 0 %}
+{% set active_count = customers.items|length if customers.items else 0 %}
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card stat-card-1" style="animation-delay: 0.1s;">
+            <div class="stat-card-value text-primary">{{ total_customers }}</div>
+            <div class="stat-card-label">Total Customers</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card stat-card-2" style="animation-delay: 0.2s;">
+            <div class="stat-card-value text-success">{{ active_count }}</div>
+            <div class="stat-card-label">Active Customers</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card stat-card-3" style="animation-delay: 0.3s;">
+            <div class="stat-card-value text-warning">{{ customers.items|length }}</div>
+            <div class="stat-card-label">On This Page</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card stat-card-4" style="animation-delay: 0.4s;">
+            <div class="stat-card-value text-info">{{ customers.page if customers else 1 }}</div>
+            <div class="stat-card-label">Current Page</div>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('customers.index') }}" id="filterForm">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="search-box">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text"
+                               class="form-control search-input"
+                               name="search"
+                               placeholder="Search by name, phone, or email..."
+                               value="{{ request.args.get('search', '') }}">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" name="status" onchange="this.form.submit()">
+                        <option value="">All Status</option>
+                        <option value="active" {% if request.args.get('status') == 'active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if request.args.get('status') == 'inactive' %}selected{% endif %}>Inactive</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" name="sort" onchange="this.form.submit()">
+                        <option value="-created_at">Newest First</option>
+                        <option value="created_at" {% if request.args.get('sort') == 'created_at' %}selected{% endif %}>Oldest First</option>
+                        <option value="name" {% if request.args.get('sort') == 'name' %}selected{% endif %}>Name A-Z</option>
+                        <option value="-name" {% if request.args.get('sort') == '-name' %}selected{% endif %}>Name Z-A</option>
+                        <option value="-total_purchases" {% if request.args.get('sort') == '-total_purchases' %}selected{% endif %}>Most Purchases</option>
+                    </select>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Customers Grid -->
+<div class="row">
+    {% if customers.items %}
+        {% for customer in customers.items %}
+        <div class="col-md-6 col-lg-4 mb-4" style="animation-delay: {{ loop.index * 0.05 }}s;">
+            <div class="customer-card card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-start mb-3">
+                        <div class="customer-avatar">
+                            {{ customer.name[0].upper() }}
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="customer-name">
+                                {{ customer.name }}
+                                {% if customer.loyalty_points > 100 %}
+                                <span class="loyalty-badge">
+                                    <i class="fas fa-star"></i> VIP
+                                </span>
+                                {% endif %}
+                            </div>
+                            <div class="customer-info">
+                                <i class="fas fa-phone"></i> {{ customer.phone }}
+                            </div>
+                            {% if customer.email %}
+                            <div class="customer-info">
+                                <i class="fas fa-envelope"></i> {{ customer.email }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <span class="badge-status {% if customer.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                            {% if customer.is_active %}Active{% else %}Inactive{% endif %}
+                        </span>
+                    </div>
+
+                    <div class="customer-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">{{ customer.sales.count() }}</div>
+                            <div class="stat-label">Purchases</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">
+                                Rs. {{ "{:,.0f}".format(customer.total_purchases) }}
+                            </div>
+                            <div class="stat-label">Total Spent</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value text-warning">{{ customer.loyalty_points or 0 }}</div>
+                            <div class="stat-label">Points</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-3">
+                        <a href="{{ url_for('customers.view_customer', customer_id=customer.id) }}"
+                           class="action-btn btn btn-info text-white flex-grow-1">
+                            <i class="fas fa-eye"></i> View
+                        </a>
+                        <a href="{{ url_for('customers.edit_customer', customer_id=customer.id) }}"
+                           class="action-btn btn btn-warning text-white flex-grow-1">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        <button class="action-btn btn btn-danger"
+                                onclick="deleteCustomer({{ customer.id }}, '{{ customer.name }}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="fas fa-users fa-5x text-muted mb-3"></i>
+                <h4 class="text-muted">No Customers Found</h4>
+                <p class="text-muted">Start building your customer base</p>
+                <a href="{{ url_for('customers.add_customer') }}" class="btn btn-primary">
+                    <i class="fas fa-user-plus"></i> Add First Customer
+                </a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Pagination -->
+{% if customers.pages > 1 %}
+<nav aria-label="Page navigation" class="mt-4">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if not customers.has_prev %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('customers.index', page=customers.prev_num, **request.args) }}">
+                <i class="fas fa-chevron-left"></i> Previous
+            </a>
+        </li>
+
+        {% for page_num in customers.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
+            {% if page_num %}
+                <li class="page-item {% if page_num == customers.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('customers.index', page=page_num, **request.args) }}">
+                        {{ page_num }}
+                    </a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        <li class="page-item {% if not customers.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('customers.index', page=customers.next_num, **request.args) }}">
+                Next <i class="fas fa-chevron-right"></i>
+            </a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Auto-submit search after typing
+    let searchTimeout;
+    $('input[name="search"]').on('keyup', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            $('#filterForm').submit();
+        }, 500);
+    });
+});
+
+function deleteCustomer(customerId, customerName) {
+    if (confirm(`Are you sure you want to delete "${customerName}"?\n\nThis action cannot be undone.`)) {
+        $.ajax({
+            url: `/customers/delete/${customerId}`,
+            method: 'POST',
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + response.error);
+                }
+            },
+            error: function(xhr) {
+                alert('Error deleting customer');
+            }
+        });
+    }
+}
+
+// Keyboard shortcuts
+$(document).on('keydown', function(e) {
+    // Ctrl+N - New Customer
+    if (e.ctrlKey && e.key === 'n') {
+        e.preventDefault();
+        window.location.href = '{{ url_for("customers.add_customer") }}';
+    }
+    // Ctrl+F - Focus search
+    if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        $('input[name="search"]').focus();
+    }
+});
+</script>
+{% endblock %}

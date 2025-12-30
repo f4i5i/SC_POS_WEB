@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block title %}Low Stock Alert - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stock-alert-card {
+        border-left: 4px solid #EF4444;
+        transition: all 0.3s;
+    }
+
+    .stock-alert-card:hover {
+        transform: translateX(5px);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+    }
+
+    .stock-level {
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+
+    .stock-critical {
+        color: #DC2626;
+    }
+
+    .stock-warning {
+        color: #F59E0B;
+    }
+
+    .reorder-badge {
+        background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+    }
+
+    .product-image {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-exclamation-triangle text-warning"></i>
+                Low Stock Alert
+            </h2>
+            <p class="text-muted mb-0">Products running low on stock</p>
+        </div>
+        <div>
+            <a href="{{ url_for('inventory.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Inventory
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted mb-1">Critical (Out of Stock)</h6>
+                    <h3 class="mb-0 text-danger">
+                        {{ products|selectattr('quantity', 'equalto', 0)|list|length }}
+                    </h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted mb-1">Low Stock</h6>
+                    <h3 class="mb-0 text-warning">
+                        {{ products|selectattr('quantity', 'gt', 0)|list|length }}
+                    </h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted mb-1">Total Value at Risk</h6>
+                    <h3 class="mb-0 text-info">
+                        Rs. {{ "{:,.2f}".format(products|map(attribute='quantity')|map('int')|sum * 1000) }}
+                    </h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Low Stock Products -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0">
+                <i class="fas fa-list text-primary"></i>
+                Low Stock Items ({{ products|length }})
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            {% if products %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Product</th>
+                            <th class="text-center">Current Stock</th>
+                            <th class="text-center">Reorder Level</th>
+                            <th class="text-center">Reorder Qty</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in products %}
+                        <tr class="{% if product.quantity == 0 %}table-danger{% endif %}">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    {% if product.image_url %}
+                                    <img src="{{ product.image_url }}" alt="{{ product.name }}" class="product-image me-3">
+                                    {% else %}
+                                    <div class="product-image bg-light d-flex align-items-center justify-content-center me-3">
+                                        <i class="fas fa-box text-muted"></i>
+                                    </div>
+                                    {% endif %}
+                                    <div>
+                                        <div class="fw-bold">{{ product.name }}</div>
+                                        <small class="text-muted">
+                                            <code>{{ product.code }}</code>
+                                            {% if product.brand %} | {{ product.brand }}{% endif %}
+                                        </small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <span class="stock-level {% if product.quantity == 0 %}stock-critical{% else %}stock-warning{% endif %}">
+                                    {{ product.quantity }}
+                                </span>
+                            </td>
+                            <td class="text-center">{{ product.reorder_level }}</td>
+                            <td class="text-center">
+                                <span class="badge bg-primary">{{ product.reorder_quantity }}</span>
+                            </td>
+                            <td class="text-center">
+                                {% if product.quantity == 0 %}
+                                <span class="badge bg-danger">Out of Stock</span>
+                                {% elif product.quantity <= product.reorder_level %}
+                                <span class="badge bg-warning">Low Stock</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary"
+                                            onclick="adjustStock({{ product.id }}, '{{ product.name }}', {{ product.reorder_quantity }})"
+                                            title="Quick restock">
+                                        <i class="fas fa-plus"></i> Restock
+                                    </button>
+                                    <a href="{{ url_for('inventory.edit_product', product_id=product.id) }}"
+                                       class="btn btn-outline-secondary"
+                                       title="Edit product">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                <h4 class="text-success">All Stock Levels Good!</h4>
+                <p class="text-muted">No products are running low on stock at the moment.</p>
+                <a href="{{ url_for('inventory.index') }}" class="btn btn-primary">
+                    <i class="fas fa-box"></i> View All Products
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Quick Adjust Stock Modal -->
+<div class="modal fade" id="adjustStockModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus-circle"></i> Quick Restock
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">Restocking: <strong id="restockProductName"></strong></p>
+                <input type="hidden" id="restockProductId">
+                <div class="mb-3">
+                    <label for="restockQuantity" class="form-label">Quantity to Add</label>
+                    <input type="number" class="form-control form-control-lg" id="restockQuantity" min="1" required>
+                </div>
+                <div class="mb-3">
+                    <label for="restockReason" class="form-label">Reason</label>
+                    <input type="text" class="form-control" id="restockReason" placeholder="e.g., New stock arrival" value="Restock - Low Stock">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="saveAdjustment()">
+                    <i class="fas fa-check"></i> Confirm Restock
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function adjustStock(productId, productName, suggestedQty) {
+    $('#restockProductId').val(productId);
+    $('#restockProductName').text(productName);
+    $('#restockQuantity').val(suggestedQty);
+    $('#adjustStockModal').modal('show');
+}
+
+function saveAdjustment() {
+    const productId = $('#restockProductId').val();
+    const quantity = parseInt($('#restockQuantity').val());
+    const reason = $('#restockReason').val();
+
+    if (!quantity || quantity <= 0) {
+        alert('Please enter a valid quantity');
+        return;
+    }
+
+    $.ajax({
+        url: `/inventory/adjust-stock/${productId}`,
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            adjustment: quantity,
+            reason: reason
+        }),
+        success: function(response) {
+            $('#adjustStockModal').modal('hide');
+            showNotification('Stock updated successfully', 'success');
+            setTimeout(() => location.reload(), 1000);
+        },
+        error: function(xhr) {
+            alert('Error: ' + (xhr.responseJSON?.error || 'Failed to update stock'));
+        }
+    });
+}
+
+function showNotification(message, type) {
+    // Simple notification (you can enhance this with toast notifications)
+    const alertDiv = $(`<div class="alert alert-${type} alert-dismissible fade show position-fixed top-0 end-0 m-3" role="alert" style="z-index: 9999;">
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>`);
+    $('body').append(alertDiv);
+    setTimeout(() => alertDiv.remove(), 3000);
+}
+</script>
+{% endblock %}

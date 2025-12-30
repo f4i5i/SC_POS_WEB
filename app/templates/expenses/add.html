@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Add Expense - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-plus-circle text-primary"></i> Add New Expense
+                    </h5>
+                    <a href="{{ url_for('expenses.index') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('expenses.add_expense') }}">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Category <span class="text-danger">*</span></label>
+                                <select class="form-select" name="category_id" required>
+                                    <option value="">Select Category</option>
+                                    {% for cat in categories %}
+                                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Amount (Rs.) <span class="text-danger">*</span></label>
+                                <input type="number" step="0.01" class="form-control" name="amount" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Expense Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" name="expense_date" id="expense_date" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Vendor/Paid To</label>
+                                <input type="text" class="form-control" name="vendor_name"
+                                       placeholder="e.g., Electricity Company">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Description <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="description" rows="3" required
+                                      placeholder="Describe the expense..."></textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Payment Method</label>
+                                <select class="form-select" name="payment_method">
+                                    <option value="cash">Cash</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                    <option value="cheque">Cheque</option>
+                                    <option value="card">Card</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Reference Number</label>
+                                <input type="text" class="form-control" name="reference_number"
+                                       placeholder="Invoice/Receipt number">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" name="notes" rows="2"
+                                      placeholder="Additional notes (optional)"></textarea>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{{ url_for('expenses.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Save Expense
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Set default date to today
+document.getElementById('expense_date').valueAsDate = new Date();
+</script>
+{% endblock %}

@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}Employee Performance Report - Sunnat Collection{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-users-cog text-primary"></i>
+                Employee Performance Report
+            </h2>
+            <p class="text-muted mb-0">{{ start_date.strftime('%B %d, %Y') }} - {{ end_date.strftime('%B %d, %Y') }}</p>
+        </div>
+        <div>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Reports
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted mb-1">Total Revenue</h6>
+                    <h3 class="mb-0">Rs. {{ "{:,.2f}".format(total_revenue) }}</h3>
+                    <small class="text-muted">All employees</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted mb-1">Total Sales</h6>
+                    <h3 class="mb-0">{{ total_sales_count }}</h3>
+                    <small class="text-muted">Completed transactions</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted mb-1">Average Sale</h6>
+                    <h3 class="mb-0">Rs. {{ "{:,.2f}".format(total_revenue / total_sales_count if total_sales_count > 0 else 0) }}</h3>
+                    <small class="text-muted">Per transaction</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Employee Performance Table -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0">
+                <i class="fas fa-chart-bar text-primary"></i>
+                Employee Sales Performance
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Employee</th>
+                            <th class="text-end">Sales Count</th>
+                            <th class="text-end">Total Revenue</th>
+                            <th class="text-end">Avg. Sale</th>
+                            <th class="text-end">Items Sold</th>
+                            <th class="text-end">% of Total</th>
+                            <th class="text-center">Performance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for emp in employee_stats %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>
+                                <div class="fw-bold">{{ emp.full_name }}</div>
+                                <small class="text-muted">@{{ emp.username }}</small>
+                            </td>
+                            <td class="text-end">{{ emp.total_sales }}</td>
+                            <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(emp.total_revenue) }}</td>
+                            <td class="text-end">Rs. {{ "{:,.2f}".format(emp.avg_sale) }}</td>
+                            <td class="text-end">{{ emp.items_sold or 0 }}</td>
+                            <td class="text-end">
+                                {% set percentage = (emp.total_revenue / total_revenue * 100) if total_revenue > 0 else 0 %}
+                                {{ "{:.1f}".format(percentage) }}%
+                            </td>
+                            <td class="text-center">
+                                {% set percentage = (emp.total_revenue / total_revenue * 100) if total_revenue > 0 else 0 %}
+                                {% if percentage >= 30 %}
+                                <span class="badge bg-success">Excellent</span>
+                                {% elif percentage >= 20 %}
+                                <span class="badge bg-primary">Good</span>
+                                {% elif percentage >= 10 %}
+                                <span class="badge bg-info">Average</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Needs Improvement</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not employee_stats %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">
+                                No sales data available for this period
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Chart -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0">
+                <i class="fas fa-chart-pie text-primary"></i>
+                Revenue Distribution
+            </h5>
+        </div>
+        <div class="card-body">
+            <canvas id="employeeRevenueChart" height="80"></canvas>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const employeeData = {{ employee_stats | tojson }};
+const labels = employeeData.map(e => e.full_name);
+const revenues = employeeData.map(e => e.total_revenue);
+
+new Chart(document.getElementById('employeeRevenueChart'), {
+    type: 'bar',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Revenue',
+            data: revenues,
+            backgroundColor: 'rgba(99, 102, 241, 0.8)',
+            borderColor: 'rgba(99, 102, 241, 1)',
+            borderWidth: 2,
+            borderRadius: 8
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: context => 'Rs. ' + context.parsed.y.toLocaleString('en-PK', {minimumFractionDigits: 2})
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: value => 'Rs. ' + value.toLocaleString()
+                }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Voucher {{ voucher.code }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-gift text-primary"></i> Voucher Details</h5>
+                    <a href="{{ url_for('promotions.vouchers') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <h2 class="text-primary mb-2"><code>{{ voucher.code }}</code></h2>
+                        {% if voucher.is_active and voucher.current_balance > 0 %}
+                        <span class="badge bg-success fs-6">Active</span>
+                        {% elif voucher.current_balance == 0 %}
+                        <span class="badge bg-secondary fs-6">Fully Redeemed</span>
+                        {% else %}
+                        <span class="badge bg-danger fs-6">Inactive</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-4 text-center">
+                            <p class="text-muted mb-1">Initial Value</p>
+                            <h4>Rs. {{ "{:,.0f}".format(voucher.initial_value) }}</h4>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <p class="text-muted mb-1">Current Balance</p>
+                            <h4 class="text-success">Rs. {{ "{:,.0f}".format(voucher.current_balance) }}</h4>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <p class="text-muted mb-1">Used Amount</p>
+                            <h4 class="text-danger">Rs. {{ "{:,.0f}".format(voucher.initial_value - voucher.current_balance) }}</h4>
+                        </div>
+                    </div>
+
+                    <table class="table">
+                        <tr>
+                            <th>Customer:</th>
+                            <td>{{ voucher.customer.name if voucher.customer else 'General Voucher' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Created:</th>
+                            <td>{{ voucher.created_at.strftime('%d %b %Y %H:%M') }}</td>
+                        </tr>
+                        <tr>
+                            <th>Expires:</th>
+                            <td>{{ voucher.expires_at.strftime('%d %b %Y') if voucher.expires_at else 'No Expiry' }}</td>
+                        </tr>
+                        {% if voucher.notes %}
+                        <tr>
+                            <th>Notes:</th>
+                            <td>{{ voucher.notes }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+
+                    {% if transactions %}
+                    <h5 class="mt-4 mb-3">Transaction History</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Amount</th>
+                                    <th>Balance After</th>
+                                    <th>Reference</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for txn in transactions %}
+                                <tr>
+                                    <td>{{ txn.created_at.strftime('%d %b %Y %H:%M') }}</td>
+                                    <td>
+                                        {% if txn.transaction_type == 'redemption' %}
+                                        <span class="badge bg-danger">Redeemed</span>
+                                        {% else %}
+                                        <span class="badge bg-success">{{ txn.transaction_type|title }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>Rs. {{ "{:,.0f}".format(txn.amount) }}</td>
+                                    <td>Rs. {{ "{:,.0f}".format(txn.balance_after) }}</td>
+                                    <td>{{ txn.reference or '-' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

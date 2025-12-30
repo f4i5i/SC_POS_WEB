@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Custom Report - Sunnat Collection{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-filter text-primary"></i>
+                Custom Date Range Report
+            </h2>
+            <p class="text-muted mb-0">Generate reports for specific date ranges</p>
+        </div>
+        <div>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Reports
+            </a>
+        </div>
+    </div>
+
+    <!-- Date Range Filter -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('reports.custom_report') }}" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="from_date" class="form-label">From Date</label>
+                    <input type="date" class="form-control" id="from_date" name="from_date"
+                           value="{{ from_date or '' }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="to_date" class="form-label">To Date</label>
+                    <input type="date" class="form-control" id="to_date" name="to_date"
+                           value="{{ to_date or '' }}" required>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search"></i> Generate Report
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if from_date and to_date %}
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted mb-1">Total Sales</h6>
+                    <h3 class="mb-0">Rs. {{ "{:,.2f}".format(total_sales) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted mb-1">Total Transactions</h6>
+                    <h3 class="mb-0">{{ total_transactions }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted mb-1">Average Transaction</h6>
+                    <h3 class="mb-0">Rs. {{ "{:,.2f}".format(total_sales / total_transactions if total_transactions > 0 else 0) }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Performance -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0">
+                <i class="fas fa-chart-bar text-primary"></i>
+                Product Performance
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Product</th>
+                            <th>Brand</th>
+                            <th class="text-end">Quantity</th>
+                            <th class="text-end">Revenue</th>
+                            <th class="text-end">Profit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in product_performance %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ product.name }}</td>
+                            <td>{{ product.brand or '-' }}</td>
+                            <td class="text-end">{{ product.quantity }}</td>
+                            <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(product.revenue) }}</td>
+                            <td class="text-end text-success">Rs. {{ "{:,.2f}".format(product.profit) }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not product_performance %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                No sales data for the selected date range
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <!-- Empty State -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-calendar-check fa-4x text-muted mb-3"></i>
+            <h4 class="text-muted">Select a date range to generate report</h4>
+            <p class="text-muted">Choose a start and end date above to view detailed sales analytics</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

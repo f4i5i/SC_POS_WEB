@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Expense - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-edit text-primary"></i> Edit Expense
+                    </h5>
+                    <a href="{{ url_for('expenses.index') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Category <span class="text-danger">*</span></label>
+                                <select class="form-select" name="category_id" required>
+                                    <option value="">Select Category</option>
+                                    {% for cat in categories %}
+                                    <option value="{{ cat.id }}" {% if expense.category_id == cat.id %}selected{% endif %}>
+                                        {{ cat.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Amount (Rs.) <span class="text-danger">*</span></label>
+                                <input type="number" step="0.01" class="form-control" name="amount"
+                                       value="{{ expense.amount }}" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Expense Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" name="expense_date"
+                                       value="{{ expense.expense_date.strftime('%Y-%m-%d') }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Vendor/Paid To</label>
+                                <input type="text" class="form-control" name="vendor_name"
+                                       value="{{ expense.vendor_name or '' }}">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Description <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="description" rows="3" required>{{ expense.description }}</textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Payment Method</label>
+                                <select class="form-select" name="payment_method">
+                                    <option value="cash" {% if expense.payment_method == 'cash' %}selected{% endif %}>Cash</option>
+                                    <option value="bank_transfer" {% if expense.payment_method == 'bank_transfer' %}selected{% endif %}>Bank Transfer</option>
+                                    <option value="cheque" {% if expense.payment_method == 'cheque' %}selected{% endif %}>Cheque</option>
+                                    <option value="card" {% if expense.payment_method == 'card' %}selected{% endif %}>Card</option>
+                                    <option value="other" {% if expense.payment_method == 'other' %}selected{% endif %}>Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Reference Number</label>
+                                <input type="text" class="form-control" name="reference_number"
+                                       value="{{ expense.reference_number or '' }}">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" name="notes" rows="2">{{ expense.notes or '' }}</textarea>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{{ url_for('expenses.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Update Expense
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
