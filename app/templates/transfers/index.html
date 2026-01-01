@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Transfers - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-exchange-alt me-2"></i>Stock Transfers</h2>
+        <div>
+            {% if current_user.has_permission('transfer.request') and current_location and current_location.is_kiosk %}
+            <a href="{{ url_for('transfers.create') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Request Transfer
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if current_location %}
+    <div class="alert alert-info">
+        <i class="fas fa-map-marker-alt me-2"></i>
+        Showing transfers for: <strong>{{ current_location.name }}</strong>
+    </div>
+    {% endif %}
+
+    <ul class="nav nav-tabs mb-4">
+        <li class="nav-item">
+            <a class="nav-link active" href="{{ url_for('transfers.index') }}">All Transfers</a>
+        </li>
+        {% if current_user.has_permission('transfer.approve') %}
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('transfers.pending') }}">Pending Approval</a>
+        </li>
+        {% endif %}
+        {% if current_user.has_permission('transfer.receive') %}
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('transfers.incoming') }}">Incoming</a>
+        </li>
+        {% endif %}
+    </ul>
+
+    {% if transfers %}
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Transfer #</th>
+                            <th>From</th>
+                            <th>To</th>
+                            <th>Items</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Requested</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transfer in transfers %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('transfers.view', id=transfer.id) }}">
+                                    {{ transfer.transfer_number }}
+                                </a>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ transfer.source_location.code }}</span>
+                                {{ transfer.source_location.name }}
+                            </td>
+                            <td>
+                                <span class="badge bg-success">{{ transfer.destination_location.code }}</span>
+                                {{ transfer.destination_location.name }}
+                            </td>
+                            <td>{{ transfer.total_items }} items</td>
+                            <td>
+                                {% if transfer.priority == 'urgent' %}
+                                <span class="badge bg-danger">Urgent</span>
+                                {% elif transfer.priority == 'high' %}
+                                <span class="badge bg-warning">High</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ transfer.priority|title }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ transfer.status_badge_class }}">
+                                    {{ transfer.status|title }}
+                                </span>
+                            </td>
+                            <td>
+                                {{ transfer.requested_at.strftime('%Y-%m-%d %H:%M') if transfer.requested_at else '-' }}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('transfers.view', id=transfer.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        No transfers found.
+        {% if current_user.has_permission('transfer.request') and current_location and current_location.is_kiosk %}
+        <a href="{{ url_for('transfers.create') }}">Request a stock transfer</a>.
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

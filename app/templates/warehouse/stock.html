@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Warehouse Stock - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-boxes me-2"></i>Warehouse Stock</h2>
+            <p class="text-muted mb-0">{{ warehouse.name }} ({{ warehouse.code }})</p>
+        </div>
+        <a href="{{ url_for('warehouse.index') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+        </a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">Search</label>
+                    <input type="text" name="search" class="form-control"
+                           placeholder="Product code, name, or barcode..."
+                           value="{{ filters.search }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Stock Status</label>
+                    <select name="stock_status" class="form-select">
+                        <option value="">All Status</option>
+                        <option value="ok" {% if filters.stock_status == 'ok' %}selected{% endif %}>In Stock</option>
+                        <option value="low" {% if filters.stock_status == 'low' %}selected{% endif %}>Low Stock</option>
+                        <option value="out" {% if filters.stock_status == 'out' %}selected{% endif %}>Out of Stock</option>
+                    </select>
+                </div>
+                {% if current_user.is_global_admin and warehouses|length > 1 %}
+                <div class="col-md-3">
+                    <label class="form-label">Warehouse</label>
+                    <select name="warehouse_id" class="form-select" onchange="this.form.submit()">
+                        {% for wh in warehouses %}
+                        <option value="{{ wh.id }}" {% if wh.id == warehouse.id %}selected{% endif %}>{{ wh.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-2"></i>Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            {% if stock_items %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Product Code</th>
+                            <th>Product Name</th>
+                            <th class="text-center">Quantity</th>
+                            <th class="text-center">Reserved</th>
+                            <th class="text-center">Available</th>
+                            <th class="text-center">Reorder Level</th>
+                            <th class="text-end">Unit Cost</th>
+                            <th class="text-end">Stock Value</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stock, product in stock_items %}
+                        <tr>
+                            <td><strong>{{ product.code }}</strong></td>
+                            <td>
+                                {{ product.name }}
+                                {% if product.brand %}
+                                <br><small class="text-muted">{{ product.brand }}</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ stock.quantity }}</td>
+                            <td class="text-center">
+                                {% if stock.reserved_quantity > 0 %}
+                                <span class="badge bg-warning">{{ stock.reserved_quantity }}</span>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <strong>{{ stock.available_quantity }}</strong>
+                            </td>
+                            <td class="text-center">{{ stock.reorder_level }}</td>
+                            <td class="text-end">{{ format_currency(product.cost_price) }}</td>
+                            <td class="text-end">{{ format_currency(stock.stock_value) }}</td>
+                            <td>
+                                {% if stock.quantity == 0 %}
+                                <span class="badge bg-danger">Out of Stock</span>
+                                {% elif stock.is_low_stock %}
+                                <span class="badge bg-warning">Low Stock</span>
+                                {% else %}
+                                <span class="badge bg-success">In Stock</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-boxes fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No stock items found</h5>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

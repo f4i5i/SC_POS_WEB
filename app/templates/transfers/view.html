@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}Transfer {{ transfer.transfer_number }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                <i class="fas fa-exchange-alt me-2"></i>
+                Transfer {{ transfer.transfer_number }}
+            </h2>
+            <span class="badge bg-{{ transfer.status_badge_class }} fs-6">{{ transfer.status|title }}</span>
+        </div>
+        <a href="{{ url_for('transfers.index') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-arrow-right me-2"></i>From (Source)</h5>
+                </div>
+                <div class="card-body">
+                    <h4>{{ transfer.source_location.name }}</h4>
+                    <p class="text-muted mb-0">{{ transfer.source_location.code }} - {{ transfer.source_location.location_type|title }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-arrow-left me-2"></i>To (Destination)</h5>
+                </div>
+                <div class="card-body">
+                    <h4>{{ transfer.destination_location.name }}</h4>
+                    <p class="text-muted mb-0">{{ transfer.destination_location.code }} - {{ transfer.destination_location.location_type|title }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>Transfer Items</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Requested</th>
+                                    <th>Approved</th>
+                                    <th>Dispatched</th>
+                                    <th>Received</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item, product in items %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ product.code }}</strong><br>
+                                        <small>{{ product.name }}</small>
+                                    </td>
+                                    <td>{{ item.quantity_requested }}</td>
+                                    <td>{{ item.quantity_approved or '-' }}</td>
+                                    <td>{{ item.quantity_dispatched or '-' }}</td>
+                                    <td>
+                                        {{ item.quantity_received or '-' }}
+                                        {% if item.has_discrepancy %}
+                                        <span class="badge bg-warning ms-1">Discrepancy: {{ item.discrepancy_amount }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-secondary">
+                                    <th>Total</th>
+                                    <th>{{ transfer.total_quantity_requested }}</th>
+                                    <th>{{ transfer.total_quantity_approved }}</th>
+                                    <th>-</th>
+                                    <th>{{ transfer.total_quantity_received }}</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless table-sm">
+                        <tr>
+                            <th>Priority:</th>
+                            <td>
+                                {% if transfer.priority == 'urgent' %}
+                                <span class="badge bg-danger">Urgent</span>
+                                {% elif transfer.priority == 'high' %}
+                                <span class="badge bg-warning">High</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ transfer.priority|title }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Expected Date:</th>
+                            <td>{{ transfer.expected_delivery_date or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Requested By:</th>
+                            <td>{{ transfer.requester.full_name if transfer.requester else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Requested At:</th>
+                            <td>{{ transfer.requested_at.strftime('%Y-%m-%d %H:%M') if transfer.requested_at else '-' }}</td>
+                        </tr>
+                        {% if transfer.approved_at %}
+                        <tr>
+                            <th>Approved By:</th>
+                            <td>{{ transfer.approver.full_name if transfer.approver else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Approved At:</th>
+                            <td>{{ transfer.approved_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if transfer.dispatched_at %}
+                        <tr>
+                            <th>Dispatched By:</th>
+                            <td>{{ transfer.dispatcher.full_name if transfer.dispatcher else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Dispatched At:</th>
+                            <td>{{ transfer.dispatched_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if transfer.received_at %}
+                        <tr>
+                            <th>Received By:</th>
+                            <td>{{ transfer.receiver.full_name if transfer.receiver else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Received At:</th>
+                            <td>{{ transfer.received_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            {% if transfer.gate_pass %}
+            <div class="card mb-4 border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-file-invoice me-2"></i>Gate Pass</h5>
+                </div>
+                <div class="card-body">
+                    <h5>{{ transfer.gate_pass.gate_pass_number }}</h5>
+                    <span class="badge bg-{{ transfer.gate_pass.status_badge_class }}">
+                        {{ transfer.gate_pass.status|replace('_', ' ')|title }}
+                    </span>
+                    <hr>
+                    <table class="table table-sm table-borderless mb-2">
+                        <tr>
+                            <th>Vehicle:</th>
+                            <td>{{ transfer.gate_pass.vehicle_number or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Driver:</th>
+                            <td>{{ transfer.gate_pass.driver_name or '-' }}</td>
+                        </tr>
+                    </table>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('warehouse.view_gate_pass', id=transfer.gate_pass.id) }}"
+                           class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-eye me-2"></i>View Gate Pass
+                        </a>
+                        <a href="{{ url_for('warehouse.print_gate_pass', id=transfer.gate_pass.id) }}"
+                           class="btn btn-outline-secondary btn-sm" target="_blank">
+                            <i class="fas fa-print me-2"></i>Print Gate Pass
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if transfer.request_notes or transfer.approval_notes or transfer.rejection_reason %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-comment me-2"></i>Notes</h5>
+                </div>
+                <div class="card-body">
+                    {% if transfer.request_notes %}
+                    <p><strong>Request:</strong> {{ transfer.request_notes }}</p>
+                    {% endif %}
+                    {% if transfer.approval_notes %}
+                    <p><strong>Approval:</strong> {{ transfer.approval_notes }}</p>
+                    {% endif %}
+                    {% if transfer.rejection_reason %}
+                    <p class="text-danger"><strong>Rejection:</strong> {{ transfer.rejection_reason }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Actions</h5>
+                </div>
+                <div class="card-body">
+                    {% if transfer.can_approve and current_user.has_permission('transfer.approve') %}
+                    <a href="{{ url_for('transfers.approve', id=transfer.id) }}" class="btn btn-success w-100 mb-2">
+                        <i class="fas fa-check me-2"></i>Approve Transfer
+                    </a>
+                    {% endif %}
+
+                    {% if transfer.can_dispatch and current_user.has_permission('transfer.dispatch') %}
+                    <a href="{{ url_for('warehouse.dispatch_request', id=transfer.id) }}" class="btn btn-warning w-100 mb-2">
+                        <i class="fas fa-truck me-2"></i>Dispatch with Gate Pass
+                    </a>
+                    {% endif %}
+
+                    {% if transfer.can_receive and current_user.has_permission('transfer.receive') %}
+                    <a href="{{ url_for('transfers.receive', id=transfer.id) }}" class="btn btn-primary w-100 mb-2">
+                        <i class="fas fa-box-open me-2"></i>Receive Transfer
+                    </a>
+                    {% endif %}
+
+                    {% if transfer.can_cancel and current_user.has_permission('transfer.cancel') %}
+                    <form method="POST" action="{{ url_for('transfers.cancel', id=transfer.id) }}"
+                          onsubmit="return confirm('Are you sure you want to cancel this transfer?');">
+                        <input type="hidden" name="reason" value="Cancelled by user">
+                        <button type="submit" class="btn btn-danger w-100">
+                            <i class="fas fa-times me-2"></i>Cancel Transfer
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

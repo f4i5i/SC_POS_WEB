@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Bulk Transfer - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-truck-loading me-2"></i>Bulk Transfer</h2>
+            <p class="text-muted mb-0">Send stock to multiple kiosks at once</p>
+        </div>
+        <a href="{{ url_for('warehouse.index') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+        </a>
+    </div>
+
+    <form method="POST">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-box me-2"></i>Select Product</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Product <span class="text-danger">*</span></label>
+                            <select name="product_id" id="product_select" class="form-select form-select-lg" required>
+                                <option value="">Select a product...</option>
+                                {% for product in products %}
+                                <option value="{{ product.id }}" data-code="{{ product.code }}">
+                                    {{ product.code }} - {{ product.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div id="stock_info" class="alert alert-info" style="display: none;">
+                            <strong>Warehouse Stock:</strong> <span id="available_qty">-</span> available
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-store me-2"></i>Distribution to Kiosks</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if kiosks %}
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>
+                                            <div class="form-check">
+                                                <input type="checkbox" id="select_all" class="form-check-input">
+                                                <label class="form-check-label" for="select_all">Kiosk</label>
+                                            </div>
+                                        </th>
+                                        <th>Code</th>
+                                        <th>City</th>
+                                        <th style="width: 150px;">Quantity</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for kiosk in kiosks %}
+                                    <tr>
+                                        <td>
+                                            <div class="form-check">
+                                                <input type="checkbox" class="form-check-input kiosk-check"
+                                                       id="kiosk_{{ kiosk.id }}"
+                                                       onchange="toggleQuantity({{ kiosk.id }})">
+                                                <label class="form-check-label" for="kiosk_{{ kiosk.id }}">
+                                                    {{ kiosk.name }}
+                                                </label>
+                                            </div>
+                                        </td>
+                                        <td>{{ kiosk.code }}</td>
+                                        <td>{{ kiosk.city or '-' }}</td>
+                                        <td>
+                                            <input type="hidden" name="kiosk_id[]" value="{{ kiosk.id }}"
+                                                   class="kiosk-id-input" disabled>
+                                            <input type="number" name="quantity[]" class="form-control quantity-input"
+                                                   id="qty_{{ kiosk.id }}" min="1" placeholder="Qty" disabled>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            No kiosks are connected to this warehouse.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Notes</h5>
+                    </div>
+                    <div class="card-body">
+                        <textarea name="notes" class="form-control" rows="3"
+                                  placeholder="Optional notes for this bulk transfer..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card mb-4 border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <th>Selected Kiosks:</th>
+                                <td class="text-end"><span id="selected_count">0</span></td>
+                            </tr>
+                            <tr>
+                                <th>Total Quantity:</th>
+                                <td class="text-end"><span id="total_qty">0</span></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="fas fa-paper-plane me-2"></i>Create Transfers
+                    </button>
+                    <a href="{{ url_for('warehouse.index') }}" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.getElementById('select_all').addEventListener('change', function() {
+    const checked = this.checked;
+    document.querySelectorAll('.kiosk-check').forEach(function(cb) {
+        cb.checked = checked;
+        const kioskId = cb.id.replace('kiosk_', '');
+        toggleQuantity(parseInt(kioskId));
+    });
+});
+
+function toggleQuantity(kioskId) {
+    const checkbox = document.getElementById('kiosk_' + kioskId);
+    const qtyInput = document.getElementById('qty_' + kioskId);
+    const hiddenInput = qtyInput.previousElementSibling;
+
+    if (checkbox.checked) {
+        qtyInput.disabled = false;
+        hiddenInput.disabled = false;
+        qtyInput.focus();
+    } else {
+        qtyInput.disabled = true;
+        hiddenInput.disabled = true;
+        qtyInput.value = '';
+    }
+    updateSummary();
+}
+
+function updateSummary() {
+    const selected = document.querySelectorAll('.kiosk-check:checked').length;
+    let totalQty = 0;
+    document.querySelectorAll('.quantity-input:not(:disabled)').forEach(function(input) {
+        totalQty += parseInt(input.value) || 0;
+    });
+
+    document.getElementById('selected_count').textContent = selected;
+    document.getElementById('total_qty').textContent = totalQty;
+}
+
+document.querySelectorAll('.quantity-input').forEach(function(input) {
+    input.addEventListener('input', updateSummary);
+});
+
+document.getElementById('product_select').addEventListener('change', function() {
+    const productId = this.value;
+    const stockInfo = document.getElementById('stock_info');
+
+    if (productId) {
+        fetch('{{ url_for("warehouse.api_product_stock", product_id=0) }}'.replace('0', productId))
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('available_qty').textContent = data.stock.available;
+                stockInfo.style.display = 'block';
+            })
+            .catch(err => {
+                stockInfo.style.display = 'none';
+            });
+    } else {
+        stockInfo.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}

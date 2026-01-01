@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Transfer Requests - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-clipboard-list me-2"></i>Transfer Requests</h2>
+            <p class="text-muted mb-0">Pending and approved requests awaiting dispatch</p>
+        </div>
+        <a href="{{ url_for('warehouse.index') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+        </a>
+    </div>
+
+    {% if pending %}
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">
+                <i class="fas fa-clock me-2"></i>Pending Approval
+                <span class="badge bg-dark ms-2">{{ pending|length }}</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Transfer #</th>
+                            <th>From Kiosk</th>
+                            <th>Items</th>
+                            <th>Priority</th>
+                            <th>Requested By</th>
+                            <th>Requested Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transfer in pending %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('warehouse.view_request', id=transfer.id) }}" class="fw-bold">
+                                    {{ transfer.transfer_number }}
+                                </a>
+                            </td>
+                            <td>
+                                <strong>{{ transfer.destination_location.name }}</strong>
+                                <br><small class="text-muted">{{ transfer.destination_location.code }}</small>
+                            </td>
+                            <td>{{ transfer.total_items }}</td>
+                            <td>
+                                {% if transfer.priority == 'urgent' %}
+                                <span class="badge bg-danger">Urgent</span>
+                                {% elif transfer.priority == 'high' %}
+                                <span class="badge bg-warning">High</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ transfer.priority|title }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ transfer.requester.full_name if transfer.requester else '-' }}</td>
+                            <td>{{ transfer.requested_at.strftime('%Y-%m-%d %H:%M') if transfer.requested_at else '-' }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('warehouse.view_request', id=transfer.id) }}"
+                                       class="btn btn-outline-primary" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('transfers.approve', id=transfer.id) }}"
+                                       class="btn btn-success" title="Approve">
+                                        <i class="fas fa-check"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if approved %}
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-check-circle me-2"></i>Approved - Ready for Dispatch
+                <span class="badge bg-light text-dark ms-2">{{ approved|length }}</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Transfer #</th>
+                            <th>Destination</th>
+                            <th>Items</th>
+                            <th>Qty Approved</th>
+                            <th>Approved By</th>
+                            <th>Approved Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transfer in approved %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('warehouse.view_request', id=transfer.id) }}" class="fw-bold">
+                                    {{ transfer.transfer_number }}
+                                </a>
+                            </td>
+                            <td>
+                                <strong>{{ transfer.destination_location.name }}</strong>
+                                <br><small class="text-muted">{{ transfer.destination_location.code }}</small>
+                            </td>
+                            <td>{{ transfer.total_items }}</td>
+                            <td>{{ transfer.total_quantity_approved }}</td>
+                            <td>{{ transfer.approver.full_name if transfer.approver else '-' }}</td>
+                            <td>{{ transfer.approved_at.strftime('%Y-%m-%d %H:%M') if transfer.approved_at else '-' }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('warehouse.view_request', id=transfer.id) }}"
+                                       class="btn btn-outline-primary" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('warehouse.dispatch_request', id=transfer.id) }}"
+                                       class="btn btn-warning" title="Dispatch">
+                                        <i class="fas fa-truck"></i> Dispatch
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if not pending and not approved %}
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-clipboard-check fa-3x text-success mb-3"></i>
+            <h5 class="text-muted">All caught up!</h5>
+            <p class="text-muted">No pending requests at this time.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

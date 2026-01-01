@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}{{ location.name }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                <i class="fas fa-{% if location.is_warehouse %}warehouse{% else %}store{% endif %} me-2"></i>
+                {{ location.name }}
+                <span class="badge bg-{% if location.is_warehouse %}info{% else %}success{% endif %}">
+                    {{ location.location_type|title }}
+                </span>
+            </h2>
+            <p class="text-muted mb-0">{{ location.code }}</p>
+        </div>
+        <div>
+            {% if current_user.has_permission('location.edit') %}
+            <a href="{{ url_for('locations.edit', id=location.id) }}" class="btn btn-warning">
+                <i class="fas fa-edit me-2"></i>Edit
+            </a>
+            {% endif %}
+            <a href="{{ url_for('locations.index') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6>Total Products</h6>
+                    <h3>{{ total_products }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-{% if low_stock_count > 0 %}warning{% else %}success{% endif %} text-white">
+                <div class="card-body">
+                    <h6>Low Stock Items</h6>
+                    <h3>{{ low_stock_count }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6>Stock Value</h6>
+                    <h3>{{ format_currency(total_stock_value) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-secondary text-white">
+                <div class="card-body">
+                    <h6>Assigned Users</h6>
+                    <h3>{{ assigned_users|length }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Location Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless">
+                        <tr>
+                            <th style="width: 40%">Code:</th>
+                            <td>{{ location.code }}</td>
+                        </tr>
+                        <tr>
+                            <th>Type:</th>
+                            <td>
+                                <span class="badge bg-{% if location.is_warehouse %}info{% else %}success{% endif %}">
+                                    {{ location.location_type|title }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>City:</th>
+                            <td>{{ location.city or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Address:</th>
+                            <td>{{ location.address or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Phone:</th>
+                            <td>{{ location.phone or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Email:</th>
+                            <td>{{ location.email or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Manager:</th>
+                            <td>{{ location.manager.full_name if location.manager else '-' }}</td>
+                        </tr>
+                        {% if location.is_kiosk %}
+                        <tr>
+                            <th>Parent Warehouse:</th>
+                            <td>
+                                {% if location.parent_warehouse %}
+                                <a href="{{ url_for('locations.view', id=location.parent_warehouse.id) }}">
+                                    {{ location.parent_warehouse.name }}
+                                </a>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>POS Enabled:</th>
+                            <td>
+                                {% if location.can_sell %}
+                                <span class="badge bg-success">Yes</span>
+                                {% else %}
+                                <span class="badge bg-secondary">No</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% if location.is_warehouse %}
+                        <tr>
+                            <th>Child Kiosks:</th>
+                            <td>{{ location.child_kiosks|length }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-users me-2"></i>Assigned Users</h5>
+                </div>
+                <div class="card-body">
+                    {% if assigned_users %}
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in assigned_users %}
+                            <tr>
+                                <td>{{ user.full_name }}</td>
+                                <td><span class="badge bg-secondary">{{ user.role }}</span></td>
+                                <td>
+                                    {% if user.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="text-muted mb-0">No users assigned to this location.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if location.is_warehouse and location.child_kiosks %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-store me-2"></i>Child Kiosks</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Name</th>
+                                <th>City</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for kiosk in location.child_kiosks %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('locations.view', id=kiosk.id) }}">{{ kiosk.code }}</a>
+                                </td>
+                                <td>{{ kiosk.name }}</td>
+                                <td>{{ kiosk.city or '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if stock_items %}
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>Stock at this Location</h5>
+            <a href="{{ url_for('locations.stock', id=location.id) }}" class="btn btn-sm btn-outline-primary">
+                View All Stock
+            </a>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Product</th>
+                            <th>Quantity</th>
+                            <th>Reserved</th>
+                            <th>Available</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stock in stock_items[:20] %}
+                        <tr>
+                            <td>{{ stock.product.code }}</td>
+                            <td>{{ stock.product.name }}</td>
+                            <td>{{ stock.quantity }}</td>
+                            <td>{{ stock.reserved_quantity }}</td>
+                            <td>{{ stock.available_quantity }}</td>
+                            <td>
+                                {% if stock.quantity == 0 %}
+                                <span class="badge bg-danger">Out of Stock</span>
+                                {% elif stock.is_low_stock %}
+                                <span class="badge bg-warning">Low Stock</span>
+                                {% else %}
+                                <span class="badge bg-success">OK</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if stock_items|length > 20 %}
+            <p class="text-muted text-center mt-3">
+                Showing 20 of {{ stock_items|length }} items.
+                <a href="{{ url_for('locations.stock', id=location.id) }}">View all</a>
+            </p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

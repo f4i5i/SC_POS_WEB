@@ -1,61 +1,73 @@
-# Core Flask packages
-Flask==3.0.0
-Flask-SQLAlchemy==3.1.1
-Flask-Login==0.6.3
-Flask-WTF==1.2.1
-Flask-Migrate==4.0.5
-Werkzeug==3.0.1
-
-# Database
-SQLAlchemy==2.0.23
-psycopg2-binary==2.9.9  # PostgreSQL adapter
-PyMySQL==1.1.0  # MySQL adapter
-
-# Forms and validation
-WTForms==3.1.1
-email-validator==2.1.0
-
-# PDF generation
-reportlab==4.0.7
-weasyprint==60.1  # Alternative PDF generator
-
-# Excel/CSV handling
-pandas==2.1.4
-openpyxl==3.1.2
-xlsxwriter==3.1.9
-
-# Image processing
-Pillow==10.1.0
-
-# Barcode generation
-python-barcode==0.15.1
-
-# Email
-sendgrid==6.11.0
-
-# Scheduling
+alembic==1.17.2
 APScheduler==3.10.4
-
-# HTTP requests for sync
-requests==2.31.0
-
-# Password hashing
 bcrypt==4.1.2
-
-# Environment variables
-python-dotenv==1.0.0
-
-# Date/Time utilities
-python-dateutil==2.8.2
-
-# Data validation
-marshmallow==3.20.1
-
-# Testing
-pytest==7.4.3
-pytest-flask==1.3.0
-pytest-cov==4.1.0
-
-# Development
 black==23.12.1
+blinker==1.9.0
+brotli==1.2.0
+certifi==2025.11.12
+cffi==2.0.0
+charset-normalizer==3.4.4
+click==8.3.1
+coverage==7.13.0
+cssselect2==0.8.0
+dnspython==2.8.0
+email-validator==2.1.0
+et_xmlfile==2.0.0
 flake8==6.1.0
+Flask==3.0.0
+Flask-Login==0.6.3
+Flask-Migrate==4.0.5
+Flask-SQLAlchemy==3.1.1
+Flask-WTF==1.2.1
+fonttools==4.61.1
+greenlet==3.3.0
+html5lib==1.1
+idna==3.11
+iniconfig==2.3.0
+itsdangerous==2.2.0
+Jinja2==3.1.6
+Mako==1.3.10
+MarkupSafe==3.0.3
+marshmallow==3.20.1
+mccabe==0.7.0
+mypy_extensions==1.1.0
+numpy==1.26.4
+openpyxl==3.1.2
+packaging==25.0
+pandas==2.1.4
+pathspec==0.12.1
+Pillow==10.1.0
+platformdirs==4.5.1
+pluggy==1.6.0
+psycopg2-binary==2.9.9
+pycodestyle==2.11.1
+pycparser==2.23
+pydyf==0.12.1
+pyflakes==3.1.0
+PyMySQL==1.1.0
+pyphen==0.17.2
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-flask==1.3.0
+python-barcode==0.15.1
+python-dateutil==2.8.2
+python-dotenv==1.0.0
+python-http-client==3.3.7
+pytz==2025.2
+reportlab==4.0.7
+requests==2.31.0
+sendgrid==6.11.0
+six==1.17.0
+SQLAlchemy==2.0.23
+starkbank-ecdsa==2.2.0
+tinycss2==1.5.1
+typing_extensions==4.15.0
+tzdata==2025.3
+tzlocal==5.3.1
+urllib3==2.6.2
+weasyprint==60.1
+webencodings==0.5.1
+Werkzeug==3.0.1
+WTForms==3.1.1
+XlsxWriter==3.1.9
+zopfli==0.4.0

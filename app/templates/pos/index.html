@@ -892,6 +892,15 @@
                                 {% endfor %}
                             </select>
                         </div>
+                        {% if current_user.role in ['admin', 'manager'] %}
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-calendar-alt text-warning"></i> Sale Date (Backdate)
+                            </label>
+                            <input type="date" class="form-control" id="saleDate" max="{{ today }}">
+                            <small class="text-muted">Leave empty for today's date. Only admin/manager can backdate.</small>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -1302,6 +1311,10 @@ function completeSale() {
         return;
     }
 
+    // Get sale date if backdating (admin/manager only)
+    const saleDateInput = $('#saleDate');
+    const saleDate = saleDateInput.length ? saleDateInput.val() : null;
+
     const saleData = {
         items: cart.map(item => ({
             product_id: item.id,
@@ -1318,7 +1331,8 @@ function completeSale() {
         payment_method: selectedPaymentMethod,
         amount_paid: amountPaid,
         customer_id: $('#customerId').val() || null,
-        notes: ''
+        notes: '',
+        sale_date: saleDate || null
     };
 
     $.ajax({
@@ -1334,6 +1348,7 @@ function completeSale() {
                 updateCartDisplay();
                 $('#paymentModal').modal('hide');
                 $('#discount').val(0);
+                $('#saleDate').val(''); // Reset backdate field
 
                 // Optionally print receipt
                 if (confirm('Print receipt?')) {

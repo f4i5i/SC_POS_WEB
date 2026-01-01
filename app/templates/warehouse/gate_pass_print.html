@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gate Pass - {{ gate_pass.gate_pass_number }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+            padding: 20px;
+        }
+        .gate-pass {
+            max-width: 800px;
+            margin: 0 auto;
+            border: 2px solid #333;
+            padding: 0;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .header .gp-number {
+            font-size: 18px;
+            font-weight: bold;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 5px;
+        }
+        .company-info {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .company-info h2 {
+            font-size: 16px;
+            color: #333;
+        }
+        .company-info p {
+            color: #666;
+            font-size: 11px;
+        }
+        .section {
+            padding: 15px 20px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .section-title {
+            font-weight: bold;
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #007bff;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .info-item {
+            display: flex;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #666;
+            min-width: 120px;
+        }
+        .info-value {
+            color: #333;
+        }
+        .locations {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 10px;
+            align-items: center;
+        }
+        .location-box {
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .location-box h4 {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .location-box .name {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+        }
+        .location-box .code {
+            font-size: 11px;
+            color: #666;
+        }
+        .arrow {
+            font-size: 24px;
+            color: #007bff;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 11px;
+            color: #333;
+        }
+        td {
+            font-size: 11px;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .totals {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+        .signatures {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 30px;
+            padding-top: 20px;
+        }
+        .signature-box {
+            text-align: center;
+        }
+        .signature-line {
+            border-top: 1px solid #333;
+            margin-top: 40px;
+            padding-top: 5px;
+        }
+        .signature-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #666;
+        }
+        .seal-box {
+            border: 2px dashed #dc3545;
+            padding: 10px;
+            margin-top: 10px;
+            background: #fff5f5;
+        }
+        .seal-box .label {
+            color: #dc3545;
+            font-weight: bold;
+            font-size: 11px;
+        }
+        .seal-box .value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            letter-spacing: 2px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .status-issued { background: #cce5ff; color: #004085; }
+        .status-in_transit { background: #fff3cd; color: #856404; }
+        .status-delivered { background: #d4edda; color: #155724; }
+        .footer {
+            padding: 10px 20px;
+            background: #f8f9fa;
+            font-size: 10px;
+            color: #666;
+            text-align: center;
+        }
+        .barcode {
+            text-align: center;
+            margin: 10px 0;
+            font-family: 'Libre Barcode 39', monospace;
+            font-size: 40px;
+        }
+        .notes {
+            background: #fffbe6;
+            padding: 10px;
+            border-left: 4px solid #ffc107;
+            margin-top: 10px;
+            font-size: 11px;
+        }
+        @media print {
+            body { padding: 0; }
+            .gate-pass { border: 1px solid #333; }
+            .no-print { display: none !important; }
+        }
+        .print-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .print-button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <button class="print-button no-print" onclick="window.print()">
+        Print Gate Pass
+    </button>
+
+    <div class="gate-pass">
+        <div class="header">
+            <h1>GATE PASS</h1>
+            <div class="gp-number">{{ gate_pass.gate_pass_number }}</div>
+        </div>
+
+        <div class="company-info">
+            <h2>{{ business_name }}</h2>
+            {% if business_address %}<p>{{ business_address }}</p>{% endif %}
+            {% if business_phone %}<p>Phone: {{ business_phone }}</p>{% endif %}
+        </div>
+
+        <div class="section">
+            <div class="locations">
+                <div class="location-box">
+                    <h4>FROM (SOURCE)</h4>
+                    <div class="name">{{ gate_pass.transfer.source_location.name }}</div>
+                    <div class="code">{{ gate_pass.transfer.source_location.code }}</div>
+                </div>
+                <div class="arrow">&rarr;</div>
+                <div class="location-box">
+                    <h4>TO (DESTINATION)</h4>
+                    <div class="name">{{ gate_pass.transfer.destination_location.name }}</div>
+                    <div class="code">{{ gate_pass.transfer.destination_location.code }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">DISPATCH INFORMATION</div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Transfer Number:</span>
+                    <span class="info-value">{{ gate_pass.transfer.transfer_number }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Dispatch Date:</span>
+                    <span class="info-value">{{ gate_pass.dispatch_date.strftime('%Y-%m-%d %H:%M') if gate_pass.dispatch_date else '-' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Expected Arrival:</span>
+                    <span class="info-value">{{ gate_pass.expected_arrival.strftime('%Y-%m-%d %H:%M') if gate_pass.expected_arrival else '-' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Status:</span>
+                    <span class="info-value">
+                        <span class="status-badge status-{{ gate_pass.status }}">{{ gate_pass.status|replace('_', ' ')|title }}</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">VEHICLE & DRIVER DETAILS</div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Vehicle Number:</span>
+                    <span class="info-value"><strong>{{ gate_pass.vehicle_number or '-' }}</strong></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Vehicle Type:</span>
+                    <span class="info-value">{{ gate_pass.vehicle_type|title if gate_pass.vehicle_type else '-' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Driver Name:</span>
+                    <span class="info-value"><strong>{{ gate_pass.driver_name or '-' }}</strong></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Driver Phone:</span>
+                    <span class="info-value">{{ gate_pass.driver_phone or '-' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Driver CNIC:</span>
+                    <span class="info-value">{{ gate_pass.driver_cnic or '-' }}</span>
+                </div>
+            </div>
+
+            {% if gate_pass.security_seal_number %}
+            <div class="seal-box text-center">
+                <div class="label">SECURITY SEAL NUMBER</div>
+                <div class="value">{{ gate_pass.security_seal_number }}</div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <div class="section-title">ITEMS BEING DISPATCHED</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 5%;">#</th>
+                        <th style="width: 15%;">Code</th>
+                        <th style="width: 40%;">Product Name</th>
+                        <th class="text-center" style="width: 15%;">Quantity</th>
+                        <th class="text-right" style="width: 12%;">Unit Price</th>
+                        <th class="text-right" style="width: 13%;">Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in items %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ entry.product.code }}</td>
+                        <td>{{ entry.product.name }}</td>
+                        <td class="text-center"><strong>{{ entry.item.quantity_dispatched or entry.item.quantity_approved or 0 }}</strong></td>
+                        <td class="text-right">{{ "%.2f"|format(entry.product.cost_price) }}</td>
+                        <td class="text-right">{{ "%.2f"|format((entry.item.quantity_dispatched or entry.item.quantity_approved or 0) * entry.product.cost_price) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="totals">
+                        <td colspan="3"><strong>TOTAL</strong></td>
+                        <td class="text-center"><strong>{{ gate_pass.total_quantity }}</strong></td>
+                        <td></td>
+                        <td class="text-right"><strong>Rs. {{ "%.2f"|format(gate_pass.total_value) }}</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        {% if gate_pass.special_instructions %}
+        <div class="section">
+            <div class="section-title">SPECIAL INSTRUCTIONS</div>
+            <div class="notes">{{ gate_pass.special_instructions }}</div>
+        </div>
+        {% endif %}
+
+        <div class="section">
+            <div class="signatures">
+                <div class="signature-box">
+                    <div class="signature-line">
+                        <div class="signature-label">Prepared By</div>
+                        <div>{{ gate_pass.creator.full_name if gate_pass.creator else '' }}</div>
+                    </div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-line">
+                        <div class="signature-label">Driver Signature</div>
+                    </div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-line">
+                        <div class="signature-label">Security Check</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="signatures">
+                <div class="signature-box">
+                    <div class="signature-line">
+                        <div class="signature-label">Received By (Kiosk)</div>
+                    </div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-line">
+                        <div class="signature-label">Date & Time</div>
+                    </div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-line">
+                        <div class="signature-label">Verified By</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Generated on {{ gate_pass.created_at.strftime('%Y-%m-%d %H:%M:%S') }} | This is a computer-generated document</p>
+            <p>{{ gate_pass.gate_pass_number }}</p>
+        </div>
+    </div>
+</body>
+</html>

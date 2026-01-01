@@ -1,0 +1,510 @@
+{% extends "base.html" %}
+
+{% block title %}Request {{ transfer.transfer_number }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                <i class="fas fa-file-alt me-2"></i>
+                Transfer Request {{ transfer.transfer_number }}
+            </h2>
+            <span class="badge bg-{{ transfer.status_badge_class }} fs-6">{{ transfer.status|title }}</span>
+            {% if transfer.priority == 'urgent' %}
+            <span class="badge bg-danger fs-6 ms-2">Urgent</span>
+            {% elif transfer.priority == 'high' %}
+            <span class="badge bg-warning fs-6 ms-2">High Priority</span>
+            {% endif %}
+        </div>
+        <div>
+            {% if transfer.can_dispatch and current_user.has_permission('transfer.dispatch') %}
+            <a href="{{ url_for('warehouse.dispatch_request', id=transfer.id) }}" class="btn btn-success">
+                <i class="fas fa-truck me-2"></i>Dispatch with Gate Pass
+            </a>
+            {% endif %}
+            {% if transfer.gate_pass %}
+            <a href="{{ url_for('warehouse.print_gate_pass', id=transfer.gate_pass.id) }}"
+               class="btn btn-outline-success" target="_blank">
+                <i class="fas fa-print me-2"></i>Print Gate Pass
+            </a>
+            {% endif %}
+            <a href="{{ url_for('warehouse.requests') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h6 class="mb-1 opacity-75">Total Items</h6>
+                    <h2 class="mb-0">{{ items|length }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h6 class="mb-1 opacity-75">Qty Requested</h6>
+                    <h2 class="mb-0">{{ total_qty_requested }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h6 class="mb-1 opacity-75">Qty Approved</h6>
+                    <h2 class="mb-0">{{ total_qty_approved }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h6 class="mb-1 opacity-75">Total Value</h6>
+                    <h2 class="mb-0">{{ format_currency(total_value) }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-warehouse me-2"></i>Source Location</h5>
+                </div>
+                <div class="card-body">
+                    <h4>{{ transfer.source_location.name }}</h4>
+                    <p class="mb-2">
+                        <span class="badge bg-secondary">{{ transfer.source_location.code }}</span>
+                        <span class="badge bg-outline-info">{{ transfer.source_location.location_type|title }}</span>
+                    </p>
+                    {% if transfer.source_location.address %}
+                    <p class="text-muted mb-1">
+                        <i class="fas fa-map-marker-alt me-2"></i>{{ transfer.source_location.address }}
+                    </p>
+                    {% endif %}
+                    {% if transfer.source_location.city %}
+                    <p class="text-muted mb-1">
+                        <i class="fas fa-city me-2"></i>{{ transfer.source_location.city }}
+                    </p>
+                    {% endif %}
+                    {% if transfer.source_location.phone %}
+                    <p class="text-muted mb-0">
+                        <i class="fas fa-phone me-2"></i>{{ transfer.source_location.phone }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-store me-2"></i>Destination Location</h5>
+                </div>
+                <div class="card-body">
+                    <h4>{{ transfer.destination_location.name }}</h4>
+                    <p class="mb-2">
+                        <span class="badge bg-secondary">{{ transfer.destination_location.code }}</span>
+                        <span class="badge bg-outline-success">{{ transfer.destination_location.location_type|title }}</span>
+                    </p>
+                    {% if transfer.destination_location.address %}
+                    <p class="text-muted mb-1">
+                        <i class="fas fa-map-marker-alt me-2"></i>{{ transfer.destination_location.address }}
+                    </p>
+                    {% endif %}
+                    {% if transfer.destination_location.city %}
+                    <p class="text-muted mb-1">
+                        <i class="fas fa-city me-2"></i>{{ transfer.destination_location.city }}
+                    </p>
+                    {% endif %}
+                    {% if transfer.destination_location.phone %}
+                    <p class="text-muted mb-0">
+                        <i class="fas fa-phone me-2"></i>{{ transfer.destination_location.phone }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>Order Items</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Product</th>
+                                    <th class="text-center">Requested</th>
+                                    <th class="text-center">Approved</th>
+                                    <th class="text-center">Dispatched</th>
+                                    <th class="text-center">Received</th>
+                                    <th class="text-center">Source Stock</th>
+                                    <th class="text-center">Dest Stock</th>
+                                    <th class="text-end">Unit Value</th>
+                                    <th class="text-end">Total Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in items %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>
+                                        <strong>{{ entry.product.code }}</strong><br>
+                                        <small class="text-muted">{{ entry.product.name }}</small>
+                                        {% if entry.product.brand %}
+                                        <br><span class="badge bg-light text-dark">{{ entry.product.brand }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">{{ entry.item.quantity_requested }}</td>
+                                    <td class="text-center">
+                                        {% if entry.item.quantity_approved %}
+                                        <span class="badge bg-success">{{ entry.item.quantity_approved }}</span>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if entry.item.quantity_dispatched %}
+                                        <span class="badge bg-warning text-dark">{{ entry.item.quantity_dispatched }}</span>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if entry.item.quantity_received %}
+                                        <span class="badge bg-primary">{{ entry.item.quantity_received }}</span>
+                                        {% if entry.item.has_discrepancy %}
+                                        <br><span class="badge bg-danger">{{ entry.item.discrepancy_amount }}</span>
+                                        {% endif %}
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if entry.source_available >= (entry.item.quantity_approved or entry.item.quantity_requested) %}
+                                        <span class="text-success">{{ entry.source_stock }}</span>
+                                        {% else %}
+                                        <span class="text-danger">{{ entry.source_stock }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">{{ entry.dest_stock }}</td>
+                                    <td class="text-end">{{ format_currency(entry.unit_value) }}</td>
+                                    <td class="text-end"><strong>{{ format_currency(entry.total_value) }}</strong></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-secondary">
+                                <tr>
+                                    <th colspan="2">Total</th>
+                                    <th class="text-center">{{ total_qty_requested }}</th>
+                                    <th class="text-center">{{ total_qty_approved }}</th>
+                                    <th class="text-center">{{ transfer.total_quantity_received or '-' }}</th>
+                                    <th class="text-center">-</th>
+                                    <th></th>
+                                    <th></th>
+                                    <th></th>
+                                    <th class="text-end"><strong>{{ format_currency(total_value) }}</strong></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {% if movements %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>Stock Movements</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Date/Time</th>
+                                    <th>Type</th>
+                                    <th>Product</th>
+                                    <th class="text-center">Quantity</th>
+                                    <th>User</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for movement in movements %}
+                                <tr>
+                                    <td>{{ movement.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        {% if movement.movement_type == 'transfer_out' %}
+                                        <span class="badge bg-danger">OUT</span>
+                                        {% else %}
+                                        <span class="badge bg-success">IN</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ movement.product.code if movement.product else '-' }}</td>
+                                    <td class="text-center">
+                                        {% if movement.quantity > 0 %}
+                                        <span class="text-success">+{{ movement.quantity }}</span>
+                                        {% else %}
+                                        <span class="text-danger">{{ movement.quantity }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ movement.user.full_name if movement.user else '-' }}</td>
+                                    <td><small>{{ movement.notes or '-' }}</small></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Request Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless table-sm">
+                        <tr>
+                            <th class="text-muted">Priority:</th>
+                            <td>
+                                {% if transfer.priority == 'urgent' %}
+                                <span class="badge bg-danger">Urgent</span>
+                                {% elif transfer.priority == 'high' %}
+                                <span class="badge bg-warning">High</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ transfer.priority|title }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th class="text-muted">Expected Date:</th>
+                            <td>{{ transfer.expected_delivery_date.strftime('%Y-%m-%d') if transfer.expected_delivery_date else '-' }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-users me-2"></i>Workflow Timeline</h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        <div class="timeline-item {% if transfer.requested_at %}active{% endif %}">
+                            <div class="timeline-marker bg-info"></div>
+                            <div class="timeline-content">
+                                <h6 class="mb-0">Requested</h6>
+                                {% if transfer.requested_at %}
+                                <small class="text-muted">{{ transfer.requested_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                <br><small>By: {{ transfer.requester.full_name if transfer.requester else '-' }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="timeline-item {% if transfer.approved_at %}active{% endif %}">
+                            <div class="timeline-marker {% if transfer.status == 'rejected' %}bg-danger{% else %}bg-success{% endif %}"></div>
+                            <div class="timeline-content">
+                                <h6 class="mb-0">{% if transfer.status == 'rejected' %}Rejected{% else %}Approved{% endif %}</h6>
+                                {% if transfer.approved_at %}
+                                <small class="text-muted">{{ transfer.approved_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                <br><small>By: {{ transfer.approver.full_name if transfer.approver else '-' }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="timeline-item {% if transfer.dispatched_at %}active{% endif %}">
+                            <div class="timeline-marker bg-warning"></div>
+                            <div class="timeline-content">
+                                <h6 class="mb-0">Dispatched</h6>
+                                {% if transfer.dispatched_at %}
+                                <small class="text-muted">{{ transfer.dispatched_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                <br><small>By: {{ transfer.dispatcher.full_name if transfer.dispatcher else '-' }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="timeline-item {% if transfer.received_at %}active{% endif %}">
+                            <div class="timeline-marker bg-primary"></div>
+                            <div class="timeline-content">
+                                <h6 class="mb-0">Received</h6>
+                                {% if transfer.received_at %}
+                                <small class="text-muted">{{ transfer.received_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                <br><small>By: {{ transfer.receiver.full_name if transfer.receiver else '-' }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if transfer.gate_pass %}
+            <div class="card mb-4 border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-file-invoice me-2"></i>Gate Pass</h5>
+                </div>
+                <div class="card-body">
+                    <h4>{{ transfer.gate_pass.gate_pass_number }}</h4>
+                    <span class="badge bg-{{ transfer.gate_pass.status_badge_class }}">
+                        {{ transfer.gate_pass.status|replace('_', ' ')|title }}
+                    </span>
+                    <hr>
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <th>Vehicle:</th>
+                            <td>{{ transfer.gate_pass.vehicle_number or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Driver:</th>
+                            <td>{{ transfer.gate_pass.driver_name or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Phone:</th>
+                            <td>{{ transfer.gate_pass.driver_phone or '-' }}</td>
+                        </tr>
+                        {% if transfer.gate_pass.security_seal_number %}
+                        <tr>
+                            <th>Seal #:</th>
+                            <td><span class="badge bg-danger">{{ transfer.gate_pass.security_seal_number }}</span></td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                    <a href="{{ url_for('warehouse.view_gate_pass', id=transfer.gate_pass.id) }}"
+                       class="btn btn-outline-success btn-sm w-100">
+                        <i class="fas fa-eye me-2"></i>View Gate Pass
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if transfer.request_notes or transfer.approval_notes or transfer.dispatch_notes or transfer.receive_notes or transfer.rejection_reason %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-comment me-2"></i>Notes</h5>
+                </div>
+                <div class="card-body">
+                    {% if transfer.request_notes %}
+                    <div class="mb-3">
+                        <strong class="text-muted">Request Notes:</strong>
+                        <p class="mb-0">{{ transfer.request_notes }}</p>
+                    </div>
+                    {% endif %}
+                    {% if transfer.approval_notes %}
+                    <div class="mb-3">
+                        <strong class="text-muted">Approval Notes:</strong>
+                        <p class="mb-0">{{ transfer.approval_notes }}</p>
+                    </div>
+                    {% endif %}
+                    {% if transfer.dispatch_notes %}
+                    <div class="mb-3">
+                        <strong class="text-muted">Dispatch Notes:</strong>
+                        <p class="mb-0">{{ transfer.dispatch_notes }}</p>
+                    </div>
+                    {% endif %}
+                    {% if transfer.receive_notes %}
+                    <div class="mb-3">
+                        <strong class="text-muted">Receive Notes:</strong>
+                        <p class="mb-0">{{ transfer.receive_notes }}</p>
+                    </div>
+                    {% endif %}
+                    {% if transfer.rejection_reason %}
+                    <div class="alert alert-danger mb-0">
+                        <strong>Rejection Reason:</strong><br>
+                        {{ transfer.rejection_reason }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        {% if transfer.can_approve and current_user.has_permission('transfer.approve') %}
+                        <a href="{{ url_for('transfers.approve', id=transfer.id) }}" class="btn btn-success">
+                            <i class="fas fa-check me-2"></i>Approve Transfer
+                        </a>
+                        {% endif %}
+
+                        {% if transfer.can_dispatch and current_user.has_permission('transfer.dispatch') %}
+                        <a href="{{ url_for('warehouse.dispatch_request', id=transfer.id) }}" class="btn btn-warning">
+                            <i class="fas fa-truck me-2"></i>Dispatch with Gate Pass
+                        </a>
+                        {% endif %}
+
+                        {% if transfer.can_receive and current_user.has_permission('transfer.receive') %}
+                        <a href="{{ url_for('transfers.receive', id=transfer.id) }}" class="btn btn-primary">
+                            <i class="fas fa-box-open me-2"></i>Receive Transfer
+                        </a>
+                        {% endif %}
+
+                        {% if transfer.can_cancel and current_user.has_permission('transfer.cancel') %}
+                        <form method="POST" action="{{ url_for('transfers.cancel', id=transfer.id) }}"
+                              onsubmit="return confirm('Are you sure you want to cancel this transfer?');">
+                            <input type="hidden" name="reason" value="Cancelled by warehouse">
+                            <button type="submit" class="btn btn-outline-danger w-100">
+                                <i class="fas fa-times me-2"></i>Cancel Transfer
+                            </button>
+                        </form>
+                        {% endif %}
+
+                        <a href="{{ url_for('transfers.view', id=transfer.id) }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-file-alt me-2"></i>Standard View
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+.timeline-item {
+    position: relative;
+    padding-bottom: 20px;
+}
+.timeline-item:last-child {
+    padding-bottom: 0;
+}
+.timeline-marker {
+    position: absolute;
+    left: -25px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #dee2e6;
+    border: 2px solid #fff;
+}
+.timeline-item.active .timeline-marker {
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.3);
+}
+.timeline-content {
+    padding-left: 5px;
+}
+</style>
+{% endblock %}

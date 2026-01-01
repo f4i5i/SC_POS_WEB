@@ -205,6 +205,31 @@ class Permissions:
     PO_APPROVE = 'purchase_order.approve'
     PO_RECEIVE = 'purchase_order.receive'
 
+    # Location Permissions (Multi-Kiosk)
+    LOCATION_VIEW = 'location.view'
+    LOCATION_CREATE = 'location.create'
+    LOCATION_EDIT = 'location.edit'
+    LOCATION_DELETE = 'location.delete'
+    LOCATION_VIEW_ALL = 'location.view_all'
+
+    # Stock Transfer Permissions
+    TRANSFER_VIEW = 'transfer.view'
+    TRANSFER_REQUEST = 'transfer.request'
+    TRANSFER_APPROVE = 'transfer.approve'
+    TRANSFER_DISPATCH = 'transfer.dispatch'
+    TRANSFER_RECEIVE = 'transfer.receive'
+    TRANSFER_CANCEL = 'transfer.cancel'
+    TRANSFER_VIEW_ALL = 'transfer.view_all'
+
+    # Warehouse Permissions
+    WAREHOUSE_VIEW = 'warehouse.view'
+    WAREHOUSE_MANAGE_STOCK = 'warehouse.manage_stock'
+    WAREHOUSE_APPROVE_REQUESTS = 'warehouse.approve_requests'
+
+    # Multi-Location Reports
+    REPORT_VIEW_ALL_LOCATIONS = 'report.view_all_locations'
+    REPORT_COMPARE_LOCATIONS = 'report.compare_locations'
+
 
 def get_all_permissions():
     """Get all defined permissions as a list of tuples (name, display_name, module)"""
@@ -256,6 +281,31 @@ def get_all_permissions():
         ('purchase_order.create', 'Create Purchase Orders', 'purchase_orders'),
         ('purchase_order.approve', 'Approve Purchase Orders', 'purchase_orders'),
         ('purchase_order.receive', 'Receive Purchase Orders', 'purchase_orders'),
+
+        # Locations (Multi-Kiosk)
+        ('location.view', 'View Locations', 'locations'),
+        ('location.create', 'Create Locations', 'locations'),
+        ('location.edit', 'Edit Locations', 'locations'),
+        ('location.delete', 'Delete Locations', 'locations'),
+        ('location.view_all', 'View All Locations', 'locations'),
+
+        # Stock Transfers
+        ('transfer.view', 'View Transfers', 'transfers'),
+        ('transfer.request', 'Request Transfers', 'transfers'),
+        ('transfer.approve', 'Approve Transfers', 'transfers'),
+        ('transfer.dispatch', 'Dispatch Transfers', 'transfers'),
+        ('transfer.receive', 'Receive Transfers', 'transfers'),
+        ('transfer.cancel', 'Cancel Transfers', 'transfers'),
+        ('transfer.view_all', 'View All Transfers', 'transfers'),
+
+        # Warehouse
+        ('warehouse.view', 'View Warehouse', 'warehouse'),
+        ('warehouse.manage_stock', 'Manage Warehouse Stock', 'warehouse'),
+        ('warehouse.approve_requests', 'Approve Stock Requests', 'warehouse'),
+
+        # Multi-Location Reports
+        ('report.view_all_locations', 'View All Location Reports', 'reports'),
+        ('report.compare_locations', 'Compare Location Reports', 'reports'),
     ]
 
     return permissions
@@ -310,6 +360,47 @@ def get_default_roles():
             'permissions': [
                 'report.view_sales', 'report.view_inventory', 'report.view_financial', 'report.export',
                 'customer.view', 'supplier.view', 'purchase_order.view'
+            ],
+            'is_system': True
+        },
+        'warehouse_manager': {
+            'display_name': 'Warehouse Manager',
+            'description': 'Manages central warehouse operations and approves stock transfers',
+            'permissions': [
+                'warehouse.view', 'warehouse.manage_stock', 'warehouse.approve_requests',
+                'inventory.view', 'inventory.create', 'inventory.edit', 'inventory.adjust_stock',
+                'transfer.view', 'transfer.approve', 'transfer.dispatch', 'transfer.view_all',
+                'location.view', 'location.view_all',
+                'report.view_inventory', 'report.view_all_locations'
+            ],
+            'is_system': True
+        },
+        'kiosk_manager': {
+            'display_name': 'Kiosk Manager',
+            'description': 'Manages a specific kiosk location',
+            'permissions': [
+                'pos.view', 'pos.create_sale', 'pos.void_sale', 'pos.refund', 'pos.close_day',
+                'pos.hold_sale', 'pos.apply_discount',
+                'inventory.view', 'inventory.adjust_stock',
+                'customer.view', 'customer.create', 'customer.edit', 'customer.view_history',
+                'transfer.view', 'transfer.request', 'transfer.receive',
+                'location.view',
+                'report.view_sales', 'report.view_inventory'
+            ],
+            'is_system': True
+        },
+        'regional_manager': {
+            'display_name': 'Regional Manager',
+            'description': 'Oversees multiple kiosk locations in a region',
+            'permissions': [
+                'pos.view', 'pos.create_sale', 'pos.void_sale', 'pos.refund', 'pos.close_day',
+                'pos.hold_sale', 'pos.apply_discount',
+                'inventory.view', 'inventory.adjust_stock',
+                'customer.view', 'customer.create', 'customer.edit', 'customer.view_history',
+                'transfer.view', 'transfer.request', 'transfer.receive', 'transfer.approve', 'transfer.view_all',
+                'location.view', 'location.view_all',
+                'report.view_sales', 'report.view_inventory', 'report.view_all_locations', 'report.compare_locations',
+                'settings.view'
             ],
             'is_system': True
         }

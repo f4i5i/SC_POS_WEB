@@ -21,15 +21,20 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     full_name = db.Column(db.String(128), nullable=False)
     role = db.Column(db.String(32), nullable=False, default='cashier')
-    # Roles: admin, manager, cashier, stock_manager, accountant
+    # Roles: admin, manager, cashier, stock_manager, accountant, warehouse_manager, kiosk_manager
     is_active = db.Column(db.Boolean, default=True)
     last_login = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Multi-kiosk support
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'))  # Assigned kiosk/warehouse
+    is_global_admin = db.Column(db.Boolean, default=False)  # Can access all locations
+
     # Relationships
-    sales = db.relationship('Sale', backref='cashier', lazy='dynamic')
-    stock_movements = db.relationship('StockMovement', backref='user', lazy='dynamic')
+    sales = db.relationship('Sale', backref='cashier', lazy='dynamic', foreign_keys='Sale.user_id')
+    stock_movements = db.relationship('StockMovement', backref='user', lazy='dynamic', foreign_keys='StockMovement.user_id')
+    location = db.relationship('Location', foreign_keys=[location_id], backref=db.backref('users', lazy='dynamic'))
 
     def set_password(self, password):
         """Hash and set password"""
@@ -73,6 +78,20 @@ class User(UserMixin, db.Model):
             for perm in role.permissions:
                 permissions.add(perm.name)
         return list(permissions)
+
+    def can_access_location(self, location_id):
+        """Check if user can access a specific location"""
+        if self.is_global_admin:
+            return True
+        return self.location_id == location_id
+
+    def get_accessible_locations(self):
+        """Get all locations user can access"""
+        if self.is_global_admin:
+            return Location.query.filter_by(is_active=True).all()
+        if self.location:
+            return [self.location]
+        return []
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -461,6 +480,7 @@ class Sale(db.Model):
     # References
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), index=True)  # Kiosk where sale occurred
 
     # Amounts
     subtotal = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
@@ -490,6 +510,7 @@ class Sale(db.Model):
     # Relationships
     items = db.relationship('SaleItem', backref='sale', lazy='dynamic', cascade='all, delete-orphan')
     payments = db.relationship('Payment', backref='sale', lazy='dynamic', cascade='all, delete-orphan')
+    location = db.relationship('Location', backref=db.backref('sales', lazy='dynamic'))
 
     def calculate_totals(self):
         """Calculate sale totals from items"""
@@ -564,12 +585,20 @@ class StockMovement(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
     movement_type = db.Column(db.String(32), nullable=False)
-    # Types: purchase, sale, adjustment, return, damage, transfer
+    # Types: purchase, sale, adjustment, return, damage, transfer_in, transfer_out
     quantity = db.Column(db.Integer, nullable=False)  # Positive for in, negative for out
-    reference = db.Column(db.String(128))  # Reference to sale, PO, etc.
+    reference = db.Column(db.String(128))  # Reference to sale, PO, transfer, etc.
     notes = db.Column(db.Text)
 
+    # Multi-kiosk support
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), index=True)  # Location where movement occurred
+    transfer_id = db.Column(db.Integer, db.ForeignKey('stock_transfers.id'))  # Reference to transfer if applicable
+
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    # Relationships
+    location = db.relationship('Location', backref=db.backref('stock_movements', lazy='dynamic'))
+    transfer = db.relationship('StockTransfer', backref=db.backref('movements', lazy='dynamic'))
 
     def __repr__(self):
         return f'<StockMovement {self.movement_type} - {self.quantity}>'
@@ -713,8 +742,14 @@ class DayClose(db.Model):
     __tablename__ = 'day_closes'
 
     id = db.Column(db.Integer, primary_key=True)
-    close_date = db.Column(db.Date, nullable=False, unique=True, index=True)
+    close_date = db.Column(db.Date, nullable=False, index=True)
     closed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), index=True)  # Kiosk for day close
+
+    # Unique constraint: one day close per date per location
+    __table_args__ = (
+        db.UniqueConstraint('close_date', 'location_id', name='uix_dayclose_location'),
+    )
 
     # Sales summary
     total_sales = db.Column(db.Integer, default=0)  # Number of transactions
@@ -741,8 +776,426 @@ class DayClose(db.Model):
     notes = db.Column(db.Text)
     closed_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Relationship
+    # Relationships
     user = db.relationship('User')
+    location = db.relationship('Location', backref=db.backref('day_closes', lazy='dynamic'))
 
     def __repr__(self):
         return f'<DayClose {self.close_date}>'
+
+
+# ============================================================================
+# MULTI-KIOSK SUPPORT MODELS
+# ============================================================================
+
+class Location(db.Model):
+    """Represents a physical location (kiosk or warehouse)"""
+    __tablename__ = 'locations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(32), unique=True, nullable=False, index=True)  # e.g., "WH-001", "K-001"
+    name = db.Column(db.String(128), nullable=False)
+    location_type = db.Column(db.String(32), nullable=False)  # 'warehouse' or 'kiosk'
+
+    # Address details
+    address = db.Column(db.Text)
+    city = db.Column(db.String(64))
+    phone = db.Column(db.String(32))
+    email = db.Column(db.String(120))
+
+    # Warehouse reference (for kiosks - which warehouse supplies this kiosk)
+    parent_warehouse_id = db.Column(db.Integer, db.ForeignKey('locations.id'))
+
+    # Manager assignment
+    manager_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # Settings
+    is_active = db.Column(db.Boolean, default=True)
+    can_sell = db.Column(db.Boolean, default=True)  # Kiosks can sell, warehouses typically cannot
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Self-referential relationship for warehouse -> kiosks
+    parent_warehouse = db.relationship('Location', remote_side=[id], backref='child_kiosks')
+    manager = db.relationship('User', foreign_keys=[manager_id], backref='managed_locations')
+
+    @property
+    def is_warehouse(self):
+        """Check if this location is a warehouse"""
+        return self.location_type == 'warehouse'
+
+    @property
+    def is_kiosk(self):
+        """Check if this location is a kiosk"""
+        return self.location_type == 'kiosk'
+
+    def get_stock_for_product(self, product_id):
+        """Get stock level for a specific product at this location"""
+        stock = LocationStock.query.filter_by(
+            location_id=self.id,
+            product_id=product_id
+        ).first()
+        return stock.available_quantity if stock else 0
+
+    def __repr__(self):
+        return f'<Location {self.code} - {self.name}>'
+
+
+class LocationStock(db.Model):
+    """Stock levels per product per location"""
+    __tablename__ = 'location_stock'
+
+    id = db.Column(db.Integer, primary_key=True)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False, index=True)
+
+    quantity = db.Column(db.Integer, default=0)
+    reserved_quantity = db.Column(db.Integer, default=0)  # Stock reserved for pending transfers
+    reorder_level = db.Column(db.Integer, default=10)  # Location-specific reorder level
+
+    # Last stock activity
+    last_movement_at = db.Column(db.DateTime)
+    last_count_at = db.Column(db.DateTime)  # Physical inventory count
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Unique constraint: one stock record per product per location
+    __table_args__ = (
+        db.UniqueConstraint('location_id', 'product_id', name='uix_location_product'),
+    )
+
+    # Relationships
+    location = db.relationship('Location', backref=db.backref('stock', lazy='dynamic'))
+    product = db.relationship('Product', backref=db.backref('location_stocks', lazy='dynamic'))
+
+    @property
+    def available_quantity(self):
+        """Quantity available for sale (excludes reserved)"""
+        return max(0, self.quantity - self.reserved_quantity)
+
+    @property
+    def is_low_stock(self):
+        """Check if stock is below reorder level"""
+        return self.available_quantity <= self.reorder_level
+
+    @property
+    def stock_value(self):
+        """Calculate stock value at cost price"""
+        if self.product:
+            return float(self.quantity * self.product.cost_price)
+        return 0
+
+    def __repr__(self):
+        return f'<LocationStock {self.location_id}:{self.product_id} qty={self.quantity}>'
+
+
+class StockTransfer(db.Model):
+    """Stock transfer between locations"""
+    __tablename__ = 'stock_transfers'
+
+    id = db.Column(db.Integer, primary_key=True)
+    transfer_number = db.Column(db.String(64), unique=True, nullable=False, index=True)
+
+    # Locations
+    source_location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False)
+    destination_location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False)
+
+    # Status workflow: draft -> requested -> approved -> dispatched -> received
+    #                           \-> rejected
+    #                  any (before dispatched) -> cancelled
+    status = db.Column(db.String(32), default='draft', index=True)
+    # Statuses: draft, requested, approved, dispatched, received, rejected, cancelled
+
+    # Priority
+    priority = db.Column(db.String(16), default='normal')  # low, normal, high, urgent
+    expected_delivery_date = db.Column(db.Date)
+
+    # Timestamps for workflow
+    requested_at = db.Column(db.DateTime)
+    approved_at = db.Column(db.DateTime)
+    dispatched_at = db.Column(db.DateTime)
+    received_at = db.Column(db.DateTime)
+
+    # Users involved
+    requested_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    dispatched_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    received_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # Notes
+    request_notes = db.Column(db.Text)
+    approval_notes = db.Column(db.Text)
+    dispatch_notes = db.Column(db.Text)
+    receive_notes = db.Column(db.Text)
+    rejection_reason = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    source_location = db.relationship('Location', foreign_keys=[source_location_id],
+                                       backref=db.backref('outgoing_transfers', lazy='dynamic'))
+    destination_location = db.relationship('Location', foreign_keys=[destination_location_id],
+                                            backref=db.backref('incoming_transfers', lazy='dynamic'))
+    requester = db.relationship('User', foreign_keys=[requested_by], backref='transfer_requests')
+    approver = db.relationship('User', foreign_keys=[approved_by], backref='transfer_approvals')
+    dispatcher = db.relationship('User', foreign_keys=[dispatched_by], backref='transfer_dispatches')
+    receiver = db.relationship('User', foreign_keys=[received_by], backref='transfer_receipts')
+    items = db.relationship('StockTransferItem', backref='transfer', lazy='dynamic', cascade='all, delete-orphan')
+
+    @property
+    def total_items(self):
+        """Get total number of items in transfer"""
+        return self.items.count()
+
+    @property
+    def total_quantity_requested(self):
+        """Get total quantity requested across all items"""
+        return sum(item.quantity_requested for item in self.items) or 0
+
+    @property
+    def total_quantity_approved(self):
+        """Get total quantity approved across all items"""
+        return sum(item.quantity_approved or 0 for item in self.items)
+
+    @property
+    def total_quantity_received(self):
+        """Get total quantity received across all items"""
+        return sum(item.quantity_received or 0 for item in self.items)
+
+    @property
+    def status_badge_class(self):
+        """Get Bootstrap badge class for status"""
+        status_classes = {
+            'draft': 'secondary',
+            'requested': 'info',
+            'approved': 'primary',
+            'dispatched': 'warning',
+            'received': 'success',
+            'rejected': 'danger',
+            'cancelled': 'dark'
+        }
+        return status_classes.get(self.status, 'secondary')
+
+    @property
+    def can_approve(self):
+        """Check if transfer can be approved"""
+        return self.status == 'requested'
+
+    @property
+    def can_dispatch(self):
+        """Check if transfer can be dispatched"""
+        return self.status == 'approved'
+
+    @property
+    def can_receive(self):
+        """Check if transfer can be received"""
+        return self.status == 'dispatched'
+
+    @property
+    def can_cancel(self):
+        """Check if transfer can be cancelled"""
+        return self.status in ['draft', 'requested', 'approved']
+
+    def __repr__(self):
+        return f'<StockTransfer {self.transfer_number} {self.status}>'
+
+
+class StockTransferItem(db.Model):
+    """Individual items in a stock transfer"""
+    __tablename__ = 'stock_transfer_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    transfer_id = db.Column(db.Integer, db.ForeignKey('stock_transfers.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+
+    quantity_requested = db.Column(db.Integer, nullable=False)
+    quantity_approved = db.Column(db.Integer)  # May differ from requested
+    quantity_dispatched = db.Column(db.Integer)  # Actually sent
+    quantity_received = db.Column(db.Integer)  # Actually received (for discrepancy tracking)
+
+    notes = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationship
+    product = db.relationship('Product', backref=db.backref('transfer_items', lazy='dynamic'))
+
+    @property
+    def has_discrepancy(self):
+        """Check if there's a discrepancy between dispatched and received"""
+        if self.quantity_dispatched and self.quantity_received:
+            return self.quantity_dispatched != self.quantity_received
+        return False
+
+    @property
+    def discrepancy_amount(self):
+        """Get the discrepancy amount (positive = received more, negative = received less)"""
+        if self.quantity_dispatched and self.quantity_received:
+            return self.quantity_received - self.quantity_dispatched
+        return 0
+
+    def __repr__(self):
+        return f'<StockTransferItem {self.id} product={self.product_id} qty={self.quantity_requested}>'
+
+
+class GatePass(db.Model):
+    """Gate Pass for stock dispatch from warehouse"""
+    __tablename__ = 'gate_passes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    gate_pass_number = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    transfer_id = db.Column(db.Integer, db.ForeignKey('stock_transfers.id'), nullable=False)
+
+    # Vehicle/Carrier Details
+    vehicle_number = db.Column(db.String(32))
+    vehicle_type = db.Column(db.String(32))  # bike, car, van, truck
+    driver_name = db.Column(db.String(128))
+    driver_phone = db.Column(db.String(32))
+    driver_cnic = db.Column(db.String(20))
+
+    # Dispatch Details
+    dispatch_date = db.Column(db.DateTime, default=datetime.utcnow)
+    expected_arrival = db.Column(db.DateTime)
+    actual_arrival = db.Column(db.DateTime)
+
+    # Security/Verification
+    security_seal_number = db.Column(db.String(64))
+    verified_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    verification_notes = db.Column(db.Text)
+
+    # Status
+    status = db.Column(db.String(32), default='issued')
+    # Statuses: issued, in_transit, delivered, verified, discrepancy
+
+    # Totals (calculated from transfer items)
+    total_items = db.Column(db.Integer, default=0)
+    total_quantity = db.Column(db.Integer, default=0)
+    total_value = db.Column(db.Numeric(12, 2), default=0.00)
+
+    # Notes
+    dispatch_notes = db.Column(db.Text)
+    delivery_notes = db.Column(db.Text)
+    special_instructions = db.Column(db.Text)
+
+    # Timestamps
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    transfer = db.relationship('StockTransfer', backref=db.backref('gate_pass', uselist=False))
+    creator = db.relationship('User', foreign_keys=[created_by], backref='created_gate_passes')
+    verifier = db.relationship('User', foreign_keys=[verified_by], backref='verified_gate_passes')
+
+    @property
+    def status_badge_class(self):
+        """Get Bootstrap badge class for status"""
+        status_classes = {
+            'issued': 'info',
+            'in_transit': 'warning',
+            'delivered': 'primary',
+            'verified': 'success',
+            'discrepancy': 'danger'
+        }
+        return status_classes.get(self.status, 'secondary')
+
+    @property
+    def is_editable(self):
+        """Check if gate pass can still be edited"""
+        return self.status in ['issued']
+
+    def calculate_totals(self):
+        """Calculate totals from transfer items"""
+        if self.transfer:
+            self.total_items = self.transfer.items.count()
+            self.total_quantity = sum(
+                item.quantity_dispatched or item.quantity_approved or 0
+                for item in self.transfer.items
+            )
+            self.total_value = sum(
+                (item.quantity_dispatched or item.quantity_approved or 0) * float(item.product.cost_price)
+                for item in self.transfer.items
+                if item.product
+            )
+
+    def __repr__(self):
+        return f'<GatePass {self.gate_pass_number}>'
+
+
+class TransferRequest(db.Model):
+    """Detailed transfer request with approval workflow"""
+    __tablename__ = 'transfer_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    request_number = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    transfer_id = db.Column(db.Integer, db.ForeignKey('stock_transfers.id'))
+
+    # Request Type
+    request_type = db.Column(db.String(32), default='regular')
+    # Types: regular, urgent, emergency, scheduled, return
+
+    # Justification
+    reason = db.Column(db.Text, nullable=False)  # Why stock is needed
+    justification = db.Column(db.Text)  # Business justification
+    expected_usage_date = db.Column(db.Date)  # When stock will be used
+
+    # Current Stock Info (at time of request)
+    current_stock_level = db.Column(db.Text)  # JSON of current stock levels
+    sales_forecast = db.Column(db.Text)  # Sales forecast data
+
+    # Approval Workflow
+    approval_level = db.Column(db.Integer, default=1)  # 1=Manager, 2=Regional, 3=Admin
+    approved_by_manager = db.Column(db.Integer, db.ForeignKey('users.id'))
+    manager_approval_date = db.Column(db.DateTime)
+    manager_comments = db.Column(db.Text)
+
+    approved_by_regional = db.Column(db.Integer, db.ForeignKey('users.id'))
+    regional_approval_date = db.Column(db.DateTime)
+    regional_comments = db.Column(db.Text)
+
+    # Final Decision
+    final_status = db.Column(db.String(32), default='pending')
+    # Statuses: pending, manager_approved, regional_approved, approved, rejected, cancelled
+
+    rejection_reason = db.Column(db.Text)
+
+    # SLA Tracking
+    requested_delivery_date = db.Column(db.Date)
+    promised_delivery_date = db.Column(db.Date)
+    actual_delivery_date = db.Column(db.Date)
+    sla_met = db.Column(db.Boolean)
+
+    # Timestamps
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    transfer = db.relationship('StockTransfer', backref=db.backref('request_details', uselist=False))
+    creator = db.relationship('User', foreign_keys=[created_by], backref='transfer_requests_created')
+    manager_approver = db.relationship('User', foreign_keys=[approved_by_manager])
+    regional_approver = db.relationship('User', foreign_keys=[approved_by_regional])
+
+    @property
+    def is_overdue(self):
+        """Check if request is overdue"""
+        if self.requested_delivery_date and self.final_status not in ['approved', 'rejected', 'cancelled']:
+            from datetime import date
+            return date.today() > self.requested_delivery_date
+        return False
+
+    @property
+    def days_pending(self):
+        """Get number of days request has been pending"""
+        if self.created_at:
+            from datetime import datetime
+            delta = datetime.utcnow() - self.created_at
+            return delta.days
+        return 0
+
+    def __repr__(self):
+        return f'<TransferRequest {self.request_number}>'

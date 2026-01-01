@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Create Location - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="fas fa-plus me-2"></i>Create New Location</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('locations.create') }}">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="code" class="form-label">Location Code *</label>
+                                <input type="text" class="form-control" id="code" name="code" required
+                                       placeholder="e.g., WH-001 or K-001" pattern="[A-Za-z0-9-]+"
+                                       style="text-transform: uppercase;">
+                                <small class="text-muted">Unique identifier (letters, numbers, hyphens only)</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="name" class="form-label">Location Name *</label>
+                                <input type="text" class="form-control" id="name" name="name" required
+                                       placeholder="e.g., Main Warehouse or Mall Kiosk">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="location_type" class="form-label">Location Type *</label>
+                                <select class="form-select" id="location_type" name="location_type" required>
+                                    <option value="kiosk">Kiosk (Retail Location)</option>
+                                    <option value="warehouse">Warehouse (Central Stock)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3" id="warehouse_select_container">
+                                <label for="parent_warehouse_id" class="form-label">Parent Warehouse</label>
+                                <select class="form-select" id="parent_warehouse_id" name="parent_warehouse_id">
+                                    <option value="">-- Select Warehouse --</option>
+                                    {% for wh in warehouses %}
+                                    <option value="{{ wh.id }}">{{ wh.name }} ({{ wh.code }})</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">Warehouse that supplies this kiosk</small>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="city" class="form-label">City</label>
+                                <input type="text" class="form-control" id="city" name="city" placeholder="City name">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="phone" class="form-label">Phone</label>
+                                <input type="text" class="form-control" id="phone" name="phone" placeholder="Contact phone">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Address</label>
+                            <textarea class="form-control" id="address" name="address" rows="2" placeholder="Full address"></textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email" name="email" placeholder="Contact email">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="manager_id" class="form-label">Manager</label>
+                                <select class="form-select" id="manager_id" name="manager_id">
+                                    <option value="">-- Select Manager --</option>
+                                    {% for user in users %}
+                                    <option value="{{ user.id }}">{{ user.full_name }} ({{ user.username }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3" id="can_sell_container">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="can_sell" name="can_sell" checked>
+                                <label class="form-check-label" for="can_sell">
+                                    Can process sales (POS enabled)
+                                </label>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('locations.index') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Create Location
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('location_type').addEventListener('change', function() {
+    const isWarehouse = this.value === 'warehouse';
+    document.getElementById('warehouse_select_container').style.display = isWarehouse ? 'none' : 'block';
+    document.getElementById('can_sell_container').style.display = isWarehouse ? 'none' : 'block';
+
+    if (isWarehouse) {
+        document.getElementById('can_sell').checked = false;
+    }
+});
+</script>
+{% endblock %}

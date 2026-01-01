@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Gate Passes - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-file-invoice me-2"></i>Gate Passes</h2>
+            <p class="text-muted mb-0">Track and manage stock dispatch gate passes</p>
+        </div>
+        <a href="{{ url_for('warehouse.index') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+        </a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">Search</label>
+                    <input type="text" name="search" class="form-control"
+                           placeholder="Gate Pass #, Vehicle, Driver..."
+                           value="{{ filters.search }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="">All Statuses</option>
+                        <option value="issued" {% if filters.status == 'issued' %}selected{% endif %}>Issued</option>
+                        <option value="in_transit" {% if filters.status == 'in_transit' %}selected{% endif %}>In Transit</option>
+                        <option value="delivered" {% if filters.status == 'delivered' %}selected{% endif %}>Delivered</option>
+                        <option value="verified" {% if filters.status == 'verified' %}selected{% endif %}>Verified</option>
+                        <option value="discrepancy" {% if filters.status == 'discrepancy' %}selected{% endif %}>Discrepancy</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-2"></i>Filter
+                    </button>
+                    <a href="{{ url_for('warehouse.gate_passes') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times me-2"></i>Clear
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            {% if gate_passes %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Gate Pass #</th>
+                            <th>Transfer #</th>
+                            <th>Destination</th>
+                            <th>Vehicle</th>
+                            <th>Driver</th>
+                            <th>Items</th>
+                            <th>Value</th>
+                            <th>Status</th>
+                            <th>Dispatch Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for gp in gate_passes %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('warehouse.view_gate_pass', id=gp.id) }}" class="fw-bold">
+                                    {{ gp.gate_pass_number }}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('transfers.view', id=gp.transfer_id) }}">
+                                    {{ gp.transfer.transfer_number }}
+                                </a>
+                            </td>
+                            <td>
+                                <strong>{{ gp.transfer.destination_location.name }}</strong>
+                                <br><small class="text-muted">{{ gp.transfer.destination_location.code }}</small>
+                            </td>
+                            <td>
+                                {% if gp.vehicle_number %}
+                                <span class="badge bg-secondary">{{ gp.vehicle_number }}</span>
+                                {% if gp.vehicle_type %}
+                                <br><small>{{ gp.vehicle_type|title }}</small>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ gp.driver_name or '-' }}
+                                {% if gp.driver_phone %}
+                                <br><small class="text-muted">{{ gp.driver_phone }}</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ gp.total_items }}</td>
+                            <td class="text-end">{{ format_currency(gp.total_value) }}</td>
+                            <td>
+                                <span class="badge bg-{{ gp.status_badge_class }}">
+                                    {{ gp.status|replace('_', ' ')|title }}
+                                </span>
+                            </td>
+                            <td>{{ gp.dispatch_date.strftime('%Y-%m-%d') if gp.dispatch_date else '-' }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('warehouse.view_gate_pass', id=gp.id) }}"
+                                       class="btn btn-outline-primary" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('warehouse.print_gate_pass', id=gp.id) }}"
+                                       class="btn btn-outline-secondary" title="Print" target="_blank">
+                                        <i class="fas fa-print"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-file-invoice fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No gate passes found</h5>
+                <p class="text-muted">Gate passes are created when transfers are dispatched</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

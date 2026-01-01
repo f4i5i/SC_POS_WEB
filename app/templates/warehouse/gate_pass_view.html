@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block title %}Gate Pass {{ gate_pass.gate_pass_number }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                <i class="fas fa-file-invoice me-2"></i>
+                Gate Pass {{ gate_pass.gate_pass_number }}
+            </h2>
+            <span class="badge bg-{{ gate_pass.status_badge_class }} fs-6">
+                {{ gate_pass.status|replace('_', ' ')|title }}
+            </span>
+        </div>
+        <div>
+            <a href="{{ url_for('warehouse.print_gate_pass', id=gate_pass.id) }}"
+               class="btn btn-success" target="_blank">
+                <i class="fas fa-print me-2"></i>Print Gate Pass
+            </a>
+            <a href="{{ url_for('warehouse.gate_passes') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-warehouse me-2"></i>From (Source)</h5>
+                </div>
+                <div class="card-body">
+                    <h4>{{ gate_pass.transfer.source_location.name }}</h4>
+                    <p class="text-muted mb-0">
+                        {{ gate_pass.transfer.source_location.code }} -
+                        {{ gate_pass.transfer.source_location.location_type|title }}
+                    </p>
+                    {% if gate_pass.transfer.source_location.address %}
+                    <p class="text-muted mb-0 mt-2">
+                        <i class="fas fa-map-marker-alt me-1"></i>
+                        {{ gate_pass.transfer.source_location.address }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-store me-2"></i>To (Destination)</h5>
+                </div>
+                <div class="card-body">
+                    <h4>{{ gate_pass.transfer.destination_location.name }}</h4>
+                    <p class="text-muted mb-0">
+                        {{ gate_pass.transfer.destination_location.code }} -
+                        {{ gate_pass.transfer.destination_location.location_type|title }}
+                    </p>
+                    {% if gate_pass.transfer.destination_location.address %}
+                    <p class="text-muted mb-0 mt-2">
+                        <i class="fas fa-map-marker-alt me-1"></i>
+                        {{ gate_pass.transfer.destination_location.address }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-truck me-2"></i>Vehicle & Driver Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th>Vehicle Number:</th>
+                                    <td><strong>{{ gate_pass.vehicle_number or '-' }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th>Vehicle Type:</th>
+                                    <td>{{ gate_pass.vehicle_type|title if gate_pass.vehicle_type else '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Security Seal:</th>
+                                    <td>
+                                        {% if gate_pass.security_seal_number %}
+                                        <span class="badge bg-danger fs-6">{{ gate_pass.security_seal_number }}</span>
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th>Driver Name:</th>
+                                    <td><strong>{{ gate_pass.driver_name or '-' }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th>Driver Phone:</th>
+                                    <td>{{ gate_pass.driver_phone or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Driver CNIC:</th>
+                                    <td>{{ gate_pass.driver_cnic or '-' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>Items</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th class="text-center">Quantity</th>
+                                    <th class="text-end">Unit Value</th>
+                                    <th class="text-end">Total Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in items %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ entry.product.code }}</strong><br>
+                                        <small>{{ entry.product.name }}</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-primary fs-6">
+                                            {{ entry.item.quantity_dispatched or entry.item.quantity_approved or 0 }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">{{ format_currency(entry.product.cost_price) }}</td>
+                                    <td class="text-end">
+                                        {{ format_currency((entry.item.quantity_dispatched or entry.item.quantity_approved or 0) * entry.product.cost_price) }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-secondary">
+                                    <th>Total</th>
+                                    <th class="text-center">{{ gate_pass.total_quantity }}</th>
+                                    <th></th>
+                                    <th class="text-end">{{ format_currency(gate_pass.total_value) }}</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless table-sm">
+                        <tr>
+                            <th>Transfer #:</th>
+                            <td>
+                                <a href="{{ url_for('transfers.view', id=gate_pass.transfer_id) }}">
+                                    {{ gate_pass.transfer.transfer_number }}
+                                </a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Dispatch Date:</th>
+                            <td>{{ gate_pass.dispatch_date.strftime('%Y-%m-%d %H:%M') if gate_pass.dispatch_date else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Expected Arrival:</th>
+                            <td>{{ gate_pass.expected_arrival.strftime('%Y-%m-%d %H:%M') if gate_pass.expected_arrival else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Actual Arrival:</th>
+                            <td>{{ gate_pass.actual_arrival.strftime('%Y-%m-%d %H:%M') if gate_pass.actual_arrival else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Created By:</th>
+                            <td>{{ gate_pass.creator.full_name if gate_pass.creator else '-' }}</td>
+                        </tr>
+                        {% if gate_pass.verified_by %}
+                        <tr>
+                            <th>Verified By:</th>
+                            <td>{{ gate_pass.verifier.full_name if gate_pass.verifier else '-' }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            {% if gate_pass.dispatch_notes or gate_pass.special_instructions %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Notes</h5>
+                </div>
+                <div class="card-body">
+                    {% if gate_pass.dispatch_notes %}
+                    <p><strong>Dispatch Notes:</strong><br>{{ gate_pass.dispatch_notes }}</p>
+                    {% endif %}
+                    {% if gate_pass.special_instructions %}
+                    <div class="alert alert-warning mb-0">
+                        <strong>Special Instructions:</strong><br>
+                        {{ gate_pass.special_instructions }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Actions</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('warehouse.update_gate_pass_status', id=gate_pass.id) }}">
+                        <div class="mb-3">
+                            <label class="form-label">Update Status</label>
+                            <select name="status" class="form-select">
+                                <option value="issued" {% if gate_pass.status == 'issued' %}selected{% endif %}>Issued</option>
+                                <option value="in_transit" {% if gate_pass.status == 'in_transit' %}selected{% endif %}>In Transit</option>
+                                <option value="delivered" {% if gate_pass.status == 'delivered' %}selected{% endif %}>Delivered</option>
+                                <option value="verified" {% if gate_pass.status == 'verified' %}selected{% endif %}>Verified</option>
+                                <option value="discrepancy" {% if gate_pass.status == 'discrepancy' %}selected{% endif %}>Discrepancy</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes (optional)</label>
+                            <textarea name="notes" class="form-control" rows="2"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-save me-2"></i>Update Status
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

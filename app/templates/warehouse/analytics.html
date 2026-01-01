@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Warehouse Analytics - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-chart-bar me-2"></i>Warehouse Analytics</h2>
+            <p class="text-muted mb-0">{{ warehouse.name }} distribution overview</p>
+        </div>
+        <a href="{{ url_for('warehouse.index') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+        </a>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="mb-1 opacity-75">Transfers This Week</h6>
+                    <h2 class="mb-0">{{ transfers_this_week }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6 class="mb-1 opacity-75">Transfers This Month</h6>
+                    <h2 class="mb-0">{{ transfers_this_month }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6 class="mb-1 opacity-75">Connected Kiosks</h6>
+                    <h2 class="mb-0">{{ kiosk_stats|length }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-store me-2"></i>Kiosk Performance</h5>
+                </div>
+                <div class="card-body">
+                    {% if kiosk_stats %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Kiosk</th>
+                                    <th class="text-center">Stock Units</th>
+                                    <th class="text-center">Low Stock</th>
+                                    <th class="text-center">Sales (30d)</th>
+                                    <th class="text-end">Revenue (30d)</th>
+                                    <th class="text-center">Pending</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stat in kiosk_stats %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ stat.kiosk.name }}</strong>
+                                        <br><small class="text-muted">{{ stat.kiosk.code }}</small>
+                                    </td>
+                                    <td class="text-center">{{ stat.total_stock }}</td>
+                                    <td class="text-center">
+                                        {% if stat.low_stock > 0 %}
+                                        <span class="badge bg-warning">{{ stat.low_stock }}</span>
+                                        {% else %}
+                                        <span class="text-success">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">{{ stat.sales_count }}</td>
+                                    <td class="text-end">{{ format_currency(stat.sales_revenue) }}</td>
+                                    <td class="text-center">
+                                        {% if stat.pending_transfers > 0 %}
+                                        <span class="badge bg-info">{{ stat.pending_transfers }}</span>
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-store fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No kiosks connected to this warehouse</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-fire me-2"></i>Top Requested Products</h5>
+                </div>
+                <div class="card-body">
+                    {% if top_products %}
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th class="text-end">Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product, total in top_products %}
+                            <tr>
+                                <td>
+                                    <strong>{{ product.code }}</strong>
+                                    <br><small class="text-muted">{{ product.name[:25] }}{% if product.name|length > 25 %}...{% endif %}</small>
+                                </td>
+                                <td class="text-end">{{ total }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="text-muted text-center mb-0">No data available</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('warehouse.bulk_transfer') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-truck me-2"></i>Bulk Transfer
+                        </a>
+                        <a href="{{ url_for('warehouse.requests') }}" class="btn btn-outline-warning">
+                            <i class="fas fa-clock me-2"></i>Pending Requests
+                        </a>
+                        <a href="{{ url_for('warehouse.gate_passes') }}" class="btn btn-outline-info">
+                            <i class="fas fa-file-invoice me-2"></i>Gate Passes
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

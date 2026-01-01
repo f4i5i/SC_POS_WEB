@@ -1701,6 +1701,24 @@
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav ms-auto">
+                        <!-- Location Indicator (Multi-Kiosk Support) -->
+                        {% if current_location %}
+                        <li class="nav-item me-3">
+                            <span class="nav-link" style="cursor: default;">
+                                <i class="fas fa-{% if current_location.is_warehouse %}warehouse{% else %}store{% endif %} me-1"></i>
+                                <span class="badge bg-{% if current_location.is_warehouse %}info{% else %}success{% endif %}">
+                                    {{ current_location.name }}
+                                </span>
+                            </span>
+                        </li>
+                        {% elif is_global_admin %}
+                        <li class="nav-item me-3">
+                            <span class="nav-link" style="cursor: default;">
+                                <i class="fas fa-globe me-1"></i>
+                                <span class="badge bg-warning">Global Admin</span>
+                            </span>
+                        </li>
+                        {% endif %}
                         <!-- Theme Switcher -->
                         <li class="nav-item dropdown me-2">
                             <a class="nav-link dropdown-toggle" href="#" id="themeDropdown" role="button" data-bs-toggle="dropdown">

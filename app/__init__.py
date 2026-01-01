@@ -89,6 +89,16 @@ def create_app(config_name='default'):
     from app.routes.returns import bp as returns_bp
     app.register_blueprint(returns_bp, url_prefix='/returns')
 
+    # Register multi-kiosk support blueprints
+    from app.routes.locations import bp as locations_bp
+    app.register_blueprint(locations_bp, url_prefix='/locations')
+
+    from app.routes.transfers import bp as transfers_bp
+    app.register_blueprint(transfers_bp, url_prefix='/transfers')
+
+    from app.routes.warehouse import bp as warehouse_bp
+    app.register_blueprint(warehouse_bp, url_prefix='/warehouse')
+
     # Register main routes
     @app.route('/')
     def index():
@@ -136,21 +146,37 @@ def create_app(config_name='default'):
         # Import feature flag helper
         from app.utils.feature_flags import is_feature_enabled, get_enabled_features
 
+        # Get current location for templates
+        from flask import g
+        current_location = getattr(g, 'current_location', None)
+        user_locations = getattr(g, 'user_locations', [])
+        is_global_admin = getattr(g, 'is_global_admin', False)
+
         return dict(
             format_currency=format_currency,
             format_datetime=format_datetime,
             format_date=format_date,
             business_name=app.config.get('BUSINESS_NAME', 'Sunnat Collection'),
             is_feature_enabled=is_feature_enabled,
-            enabled_features=get_enabled_features()
+            enabled_features=get_enabled_features(),
+            # Multi-kiosk support
+            current_location=current_location,
+            user_locations=user_locations,
+            is_global_admin=is_global_admin
         )
 
     # Request hooks
     @app.before_request
     def before_request():
         """Actions to perform before each request"""
-        from flask import session
+        from flask import session, g
+        from flask_login import current_user
         from datetime import datetime
         session.permanent = True
+
+        # Set location context for multi-kiosk support
+        if current_user.is_authenticated:
+            from app.utils.location_context import set_location_context
+            set_location_context()
 
     return app

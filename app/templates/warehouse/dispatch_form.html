@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}Dispatch Transfer - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-truck me-2"></i>Dispatch Transfer</h2>
+            <p class="text-muted mb-0">{{ transfer.transfer_number }}</p>
+        </div>
+        <a href="{{ url_for('warehouse.view_request', id=transfer.id) }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        This will dispatch the transfer and automatically generate a gate pass.
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6 class="opacity-75">From (Source)</h6>
+                    <h4>{{ transfer.source_location.name }}</h4>
+                    <small>{{ transfer.source_location.code }}</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6 class="opacity-75">To (Destination)</h6>
+                    <h4>{{ transfer.destination_location.name }}</h4>
+                    <small>{{ transfer.destination_location.code }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form method="POST">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-truck me-2"></i>Vehicle & Driver Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Vehicle Number <span class="text-danger">*</span></label>
+                                    <input type="text" name="vehicle_number" class="form-control form-control-lg"
+                                           placeholder="e.g., ABC-1234" required style="text-transform: uppercase;">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Vehicle Type</label>
+                                    <select name="vehicle_type" class="form-select form-select-lg">
+                                        <option value="">Select Type</option>
+                                        <option value="bike">Bike / Motorcycle</option>
+                                        <option value="car">Car</option>
+                                        <option value="van">Van</option>
+                                        <option value="truck">Truck</option>
+                                        <option value="pickup">Pickup</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Driver Name <span class="text-danger">*</span></label>
+                                    <input type="text" name="driver_name" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Driver Phone</label>
+                                    <input type="text" name="driver_phone" class="form-control"
+                                           placeholder="0300-1234567">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Driver CNIC</label>
+                                    <input type="text" name="driver_cnic" class="form-control"
+                                           placeholder="12345-1234567-1">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Security Seal Number</label>
+                                    <input type="text" name="security_seal_number" class="form-control"
+                                           placeholder="Seal ID for tamper verification">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Expected Arrival</label>
+                                    <input type="datetime-local" name="expected_arrival" class="form-control">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>Items to Dispatch</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th class="text-center">Requested</th>
+                                        <th class="text-center">Approved</th>
+                                        <th class="text-center">Available</th>
+                                        <th class="text-center">To Dispatch</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for entry in items %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ entry.product.code }}</strong><br>
+                                            <small class="text-muted">{{ entry.product.name }}</small>
+                                        </td>
+                                        <td class="text-center">{{ entry.item.quantity_requested }}</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-success">{{ entry.item.quantity_approved or '-' }}</span>
+                                        </td>
+                                        <td class="text-center">
+                                            {% if entry.available >= (entry.item.quantity_approved or entry.item.quantity_requested) %}
+                                            <span class="text-success">{{ entry.available }}</span>
+                                            {% else %}
+                                            <span class="text-danger">{{ entry.available }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <strong class="fs-5">{{ entry.item.quantity_approved or entry.item.quantity_requested }}</strong>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Notes</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Dispatch Notes</label>
+                            <textarea name="dispatch_notes" class="form-control" rows="2"
+                                      placeholder="Any notes about this dispatch..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Special Instructions</label>
+                            <textarea name="special_instructions" class="form-control" rows="2"
+                                      placeholder="e.g., Handle with care, Fragile items, Temperature sensitive..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card mb-4 border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-clipboard-check me-2"></i>Dispatch Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <th>Transfer #:</th>
+                                <td>{{ transfer.transfer_number }}</td>
+                            </tr>
+                            <tr>
+                                <th>Priority:</th>
+                                <td>
+                                    {% if transfer.priority == 'urgent' %}
+                                    <span class="badge bg-danger">Urgent</span>
+                                    {% elif transfer.priority == 'high' %}
+                                    <span class="badge bg-warning">High</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ transfer.priority|title }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Requested By:</th>
+                                <td>{{ transfer.requester.full_name if transfer.requester else '-' }}</td>
+                            </tr>
+                            <tr>
+                                <th>Requested At:</th>
+                                <td>{{ transfer.requested_at.strftime('%Y-%m-%d') if transfer.requested_at else '-' }}</td>
+                            </tr>
+                            <tr>
+                                <th>Approved By:</th>
+                                <td>{{ transfer.approver.full_name if transfer.approver else '-' }}</td>
+                            </tr>
+                        </table>
+
+                        <hr>
+
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <h3 class="text-primary mb-0">{{ items|length }}</h3>
+                                <small class="text-muted">Products</small>
+                            </div>
+                            <div class="col-6">
+                                <h3 class="text-primary mb-0">
+                                    {{ items|sum(attribute='item.quantity_approved') or items|sum(attribute='item.quantity_requested') }}
+                                </h3>
+                                <small class="text-muted">Total Qty</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="fas fa-truck me-2"></i>Dispatch & Generate Gate Pass
+                    </button>
+                    <a href="{{ url_for('warehouse.view_request', id=transfer.id) }}" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Note:</strong> Stock will be deducted from the warehouse upon dispatch.
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

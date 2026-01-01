@@ -3,14 +3,15 @@ Point of Sale Routes
 Handles POS operations, sales, and transactions
 """
 
-from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for, session, current_app
+from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for, session, current_app, g
 from flask_login import login_required, current_user
 from datetime import datetime, date
 from decimal import Decimal
-from app.models import db, Product, Sale, SaleItem, Customer, StockMovement, Payment, SyncQueue, Setting, DayClose
+from app.models import db, Product, Sale, SaleItem, Customer, StockMovement, Payment, SyncQueue, Setting, DayClose, LocationStock
 from app.utils.helpers import generate_sale_number, has_permission
 from app.utils.pdf_utils import generate_receipt_pdf
 from app.utils.permissions import permission_required, Permissions
+from app.utils.location_context import get_current_location, location_required, get_or_create_location_stock
 import json
 
 # Try to import Return models (may not exist in all setups)
@@ -28,25 +29,45 @@ bp = Blueprint('pos', __name__)
 @permission_required(Permissions.POS_VIEW)
 def index():
     """POS interface"""
+    # Get current location for multi-kiosk support
+    location = get_current_location()
+
+    # Warn if no location assigned (but allow access for backward compatibility)
+    if not location and not current_user.is_global_admin:
+        flash('You are not assigned to a location. Some features may be limited.', 'warning')
+
     # Get recent customers for quick selection
     recent_customers = Customer.query.filter_by(is_active=True).order_by(Customer.created_at.desc()).limit(10).all()
 
-    return render_template('pos/index.html', customers=recent_customers)
+    return render_template('pos/index.html',
+                           customers=recent_customers,
+                           today=date.today().isoformat(),
+                           current_location=location)
 
 
 @bp.route('/search-products')
 @login_required
 @permission_required(Permissions.POS_VIEW)
 def search_products():
-    """Search products for POS"""
+    """Search products for POS with location-aware stock"""
     query = request.args.get('q', '').strip()
 
     if len(query) < 2:
         return jsonify({'products': []})
 
+    # Get current location for stock lookup
+    location = get_current_location()
+
     # Search by code, barcode, name, or brand
-    products = Product.query.filter(
-        db.and_(
+    if location:
+        # Location-aware query with stock from LocationStock
+        products = db.session.query(Product, LocationStock).outerjoin(
+            LocationStock,
+            db.and_(
+                LocationStock.product_id == Product.id,
+                LocationStock.location_id == location.id
+            )
+        ).filter(
             Product.is_active == True,
             db.or_(
                 Product.code.ilike(f'%{query}%'),
@@ -54,23 +75,51 @@ def search_products():
                 Product.name.ilike(f'%{query}%'),
                 Product.brand.ilike(f'%{query}%')
             )
-        )
-    ).limit(20).all()
+        ).limit(20).all()
 
-    results = []
-    for product in products:
-        results.append({
-            'id': product.id,
-            'code': product.code,
-            'barcode': product.barcode,
-            'name': product.name,
-            'brand': product.brand,
-            'size': product.size,
-            'selling_price': float(product.selling_price),
-            'quantity': product.quantity,
-            'is_low_stock': product.is_low_stock,
-            'image_url': product.image_url
-        })
+        results = []
+        for product, stock in products:
+            qty = stock.available_quantity if stock else 0
+            results.append({
+                'id': product.id,
+                'code': product.code,
+                'barcode': product.barcode,
+                'name': product.name,
+                'brand': product.brand,
+                'size': product.size,
+                'selling_price': float(product.selling_price),
+                'quantity': qty,
+                'is_low_stock': stock.is_low_stock if stock else (qty <= 10),
+                'image_url': product.image_url
+            })
+    else:
+        # Fallback: use product.quantity for backward compatibility
+        products = Product.query.filter(
+            db.and_(
+                Product.is_active == True,
+                db.or_(
+                    Product.code.ilike(f'%{query}%'),
+                    Product.barcode.ilike(f'%{query}%'),
+                    Product.name.ilike(f'%{query}%'),
+                    Product.brand.ilike(f'%{query}%')
+                )
+            )
+        ).limit(20).all()
+
+        results = []
+        for product in products:
+            results.append({
+                'id': product.id,
+                'code': product.code,
+                'barcode': product.barcode,
+                'name': product.name,
+                'brand': product.brand,
+                'size': product.size,
+                'selling_price': float(product.selling_price),
+                'quantity': product.quantity,
+                'is_low_stock': product.is_low_stock,
+                'image_url': product.image_url
+            })
 
     return jsonify({'products': results})
 
@@ -79,8 +128,22 @@ def search_products():
 @login_required
 @permission_required(Permissions.POS_VIEW)
 def get_product(product_id):
-    """Get product details"""
+    """Get product details with location-aware stock"""
     product = Product.query.get_or_404(product_id)
+
+    # Get stock for current location
+    location = get_current_location()
+    if location:
+        stock = LocationStock.query.filter_by(
+            location_id=location.id,
+            product_id=product_id
+        ).first()
+        qty = stock.available_quantity if stock else 0
+        is_low_stock = stock.is_low_stock if stock else (qty <= 10)
+    else:
+        # Fallback for backward compatibility
+        qty = product.quantity
+        is_low_stock = product.is_low_stock
 
     return jsonify({
         'id': product.id,
@@ -91,8 +154,8 @@ def get_product(product_id):
         'size': product.size,
         'selling_price': float(product.selling_price),
         'tax_rate': float(product.tax_rate),
-        'quantity': product.quantity,
-        'is_low_stock': product.is_low_stock,
+        'quantity': qty,
+        'is_low_stock': is_low_stock,
         'image_url': product.image_url
     })
 
@@ -101,7 +164,7 @@ def get_product(product_id):
 @login_required
 @permission_required(Permissions.POS_CREATE_SALE)
 def complete_sale():
-    """Complete a sale transaction"""
+    """Complete a sale transaction with location-aware stock"""
     try:
         data = request.get_json()
 
@@ -110,11 +173,30 @@ def complete_sale():
         if not items:
             return jsonify({'success': False, 'error': 'No items in cart'}), 400
 
+        # Get current location for multi-kiosk support
+        location = get_current_location()
+
+        # Handle backdate sales (admin/manager only)
+        sale_date = None
+        backdate_str = data.get('sale_date')
+        if backdate_str:
+            # Check if user has permission to backdate
+            if current_user.role not in ['admin', 'manager']:
+                return jsonify({'success': False, 'error': 'Only admin/manager can backdate sales'}), 403
+            try:
+                sale_date = datetime.strptime(backdate_str, '%Y-%m-%d')
+                # Don't allow future dates
+                if sale_date.date() > date.today():
+                    return jsonify({'success': False, 'error': 'Cannot create sales with future dates'}), 400
+            except ValueError:
+                return jsonify({'success': False, 'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
+
         # Create sale
         sale = Sale(
             sale_number=generate_sale_number(),
             user_id=current_user.id,
             customer_id=data.get('customer_id'),
+            location_id=location.id if location else None,  # Multi-kiosk support
             subtotal=Decimal(str(data.get('subtotal', 0))),
             discount=Decimal(str(data.get('discount', 0))),
             discount_type=data.get('discount_type', 'amount'),
@@ -124,6 +206,10 @@ def complete_sale():
             amount_paid=Decimal(str(data.get('amount_paid', 0))),
             notes=data.get('notes', '')
         )
+
+        # Set sale date if backdating
+        if sale_date:
+            sale.sale_date = sale_date
 
         # Calculate amount due
         sale.amount_due = sale.total - sale.amount_paid
@@ -142,14 +228,31 @@ def complete_sale():
                 db.session.rollback()
                 return jsonify({'success': False, 'error': f'Product {item_data["product_id"]} not found'}), 404
 
-            # Check stock availability
             quantity = int(item_data['quantity'])
-            if product.quantity < quantity:
-                db.session.rollback()
-                return jsonify({
-                    'success': False,
-                    'error': f'Insufficient stock for {product.name}. Available: {product.quantity}'
-                }), 400
+
+            # Check stock availability - location-aware
+            if location:
+                # Use LocationStock for multi-kiosk
+                location_stock = LocationStock.query.filter_by(
+                    location_id=location.id,
+                    product_id=product.id
+                ).first()
+                available_qty = location_stock.available_quantity if location_stock else 0
+
+                if available_qty < quantity:
+                    db.session.rollback()
+                    return jsonify({
+                        'success': False,
+                        'error': f'Insufficient stock for {product.name} at this location. Available: {available_qty}'
+                    }), 400
+            else:
+                # Fallback: use product.quantity
+                if product.quantity < quantity:
+                    db.session.rollback()
+                    return jsonify({
+                        'success': False,
+                        'error': f'Insufficient stock for {product.name}. Available: {product.quantity}'
+                    }), 400
 
             # Create sale item
             sale_item = SaleItem(
@@ -162,17 +265,25 @@ def complete_sale():
             )
             db.session.add(sale_item)
 
-            # Update product stock
-            product.quantity -= quantity
+            # Update stock - location-aware
+            if location:
+                # Update LocationStock
+                if location_stock:
+                    location_stock.quantity -= quantity
+                    location_stock.last_movement_at = datetime.utcnow()
+            else:
+                # Fallback: update product.quantity
+                product.quantity -= quantity
 
-            # Create stock movement record
+            # Create stock movement record with location
             stock_movement = StockMovement(
                 product_id=product.id,
                 user_id=current_user.id,
                 movement_type='sale',
                 quantity=-quantity,
                 reference=sale.sale_number,
-                notes=f'Sale {sale.sale_number}'
+                notes=f'Sale {sale.sale_number}',
+                location_id=location.id if location else None
             )
             db.session.add(stock_movement)
 
