@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, flash, redirect,
 from flask_login import login_required, current_user
 from datetime import datetime, date
 from decimal import Decimal
-from app.models import db, Sale, SaleItem, Product, Customer, StockMovement
+from app.models import db, Sale, SaleItem, Product, Customer, StockMovement, LocationStock
 from app.models_extended import Return, ReturnItem, CustomerCredit
 from app.utils.permissions import permission_required, Permissions
 from app.utils.feature_flags import feature_required, Features
@@ -35,12 +35,19 @@ def generate_return_number():
 @login_required
 @feature_required(Features.RETURNS_MANAGEMENT)
 def index():
-    """List all returns"""
+    """List all returns - filtered by location for store managers"""
     page = request.args.get('page', 1, type=int)
     status = request.args.get('status', '')
     return_type = request.args.get('type', '')
 
     query = Return.query
+
+    # Filter by location for store managers
+    if not current_user.is_global_admin and current_user.role in ['manager', 'kiosk_manager', 'cashier']:
+        if current_user.location_id:
+            query = query.filter(Return.location_id == current_user.location_id)
+        else:
+            query = query.filter(False)  # No location = no data
 
     if status:
         query = query.filter_by(status=status)
@@ -51,20 +58,29 @@ def index():
         page=page, per_page=20, error_out=False
     )
 
-    # Stats
+    # Stats - also filter by location for store managers
     today = date.today()
-    today_returns = Return.query.filter(
+    stats_query = Return.query
+    if not current_user.is_global_admin and current_user.role in ['manager', 'kiosk_manager', 'cashier']:
+        if current_user.location_id:
+            stats_query = stats_query.filter(Return.location_id == current_user.location_id)
+
+    today_returns = stats_query.filter(
         db.func.date(Return.return_date) == today
     ).count()
 
-    pending_returns = Return.query.filter_by(status='pending').count()
+    pending_returns = stats_query.filter_by(status='pending').count()
 
-    total_returns = Return.query.count()
+    total_returns = stats_query.count()
 
     # Calculate total refunded amount
     total_refunded = db.session.query(
         db.func.coalesce(db.func.sum(Return.refund_amount), 0)
-    ).filter(Return.status == 'completed').scalar() or 0
+    ).filter(Return.status == 'completed')
+    if not current_user.is_global_admin and current_user.role in ['manager', 'kiosk_manager', 'cashier']:
+        if current_user.location_id:
+            total_refunded = total_refunded.filter(Return.location_id == current_user.location_id)
+    total_refunded = total_refunded.scalar() or 0
 
     return render_template('returns/index.html',
                          returns=returns,
@@ -99,6 +115,7 @@ def create():
                 return_reason=data.get('return_reason'),
                 notes=data.get('notes'),
                 processed_by=current_user.id,
+                location_id=current_user.location_id,  # Link to user's location
                 status='pending'
             )
 
@@ -197,21 +214,41 @@ def complete(return_id):
         # Process items
         for item in ret.items:
             if item.restock:
-                # Restock the product
-                product = Product.query.get(item.product_id)
-                if product:
-                    product.quantity += item.quantity
+                # Restock to location stock if location is set
+                location_id = ret.location_id or current_user.location_id
+                if location_id:
+                    # Update location stock
+                    location_stock = LocationStock.query.filter_by(
+                        location_id=location_id,
+                        product_id=item.product_id
+                    ).first()
+                    if location_stock:
+                        location_stock.quantity += item.quantity
+                    else:
+                        # Create location stock if it doesn't exist
+                        location_stock = LocationStock(
+                            location_id=location_id,
+                            product_id=item.product_id,
+                            quantity=item.quantity
+                        )
+                        db.session.add(location_stock)
+                else:
+                    # Fallback to global product quantity for non-location users
+                    product = Product.query.get(item.product_id)
+                    if product:
+                        product.quantity += item.quantity
 
-                    # Create stock movement
-                    movement = StockMovement(
-                        product_id=product.id,
-                        user_id=current_user.id,
-                        movement_type='return',
-                        quantity=item.quantity,
-                        reference=ret.return_number,
-                        notes=f'Return from sale {ret.sale.sale_number}'
-                    )
-                    db.session.add(movement)
+                # Create stock movement
+                movement = StockMovement(
+                    product_id=item.product_id,
+                    user_id=current_user.id,
+                    movement_type='return',
+                    quantity=item.quantity,
+                    reference=ret.return_number,
+                    location_id=location_id,
+                    notes=f'Return from sale {ret.sale.sale_number}'
+                )
+                db.session.add(movement)
 
         # Process credit if applicable
         if ret.return_type == 'credit' and ret.credit_issued > 0:
@@ -269,20 +306,27 @@ def reject(return_id):
 @login_required
 @feature_required(Features.RETURNS_MANAGEMENT)
 def find_sale():
-    """Find sale for return by sale number or phone"""
+    """Find sale for return by sale number or phone - filtered by location"""
     query = request.args.get('q', '').strip()
 
     if not query:
         return jsonify({'sales': []})
 
     # Search by sale number
-    sales = Sale.query.filter(
+    sales_query = Sale.query.filter(
         db.or_(
             Sale.sale_number.ilike(f'%{query}%'),
             Sale.customer.has(Customer.phone.ilike(f'%{query}%'))
         ),
         Sale.status == 'completed'
-    ).order_by(Sale.sale_date.desc()).limit(10).all()
+    )
+
+    # Filter by location for store managers
+    if not current_user.is_global_admin and current_user.role in ['manager', 'kiosk_manager', 'cashier']:
+        if current_user.location_id:
+            sales_query = sales_query.filter(Sale.location_id == current_user.location_id)
+
+    sales = sales_query.order_by(Sale.sale_date.desc()).limit(10).all()
 
     results = []
     for sale in sales:

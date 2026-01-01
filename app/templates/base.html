@@ -1615,7 +1615,7 @@
                 </li>
                 {% endif %}
 
-                {% if current_user.has_permission('suppliers') %}
+                {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
                 <li class="nav-item">
                     <a class="nav-link" href="/suppliers">
                         <i class="fas fa-truck"></i> Suppliers
@@ -1631,8 +1631,8 @@
                 </li>
                 {% endif %}
 
-                <!-- Feature-based Menu Items -->
-                {% if is_feature_enabled('expense_tracking') %}
+                <!-- Expenses - Admin, Accountant, and Store Managers can view/add -->
+                {% if is_feature_enabled('expense_tracking') and (current_user.role in ['admin', 'accountant', 'manager', 'kiosk_manager'] or current_user.is_global_admin) %}
                 <li class="nav-item">
                     <a class="nav-link" href="/expenses">
                         <i class="fas fa-wallet"></i> Expenses
@@ -1656,7 +1656,7 @@
                 </li>
                 {% endif %}
 
-                {% if is_feature_enabled('returns_management') %}
+                {% if is_feature_enabled('returns_management') and current_user.role in ['admin', 'manager', 'kiosk_manager'] or current_user.is_global_admin %}
                 <li class="nav-item">
                     <a class="nav-link" href="/returns">
                         <i class="fas fa-undo"></i> Returns
@@ -1671,6 +1671,28 @@
                     </a>
                 </li>
                 {% endif %}
+
+                {% if current_user.role in ['admin', 'warehouse_manager'] or current_user.is_global_admin %}
+                <li class="nav-item">
+                    <a class="nav-link" href="/locations">
+                        <i class="fas fa-map-marker-alt"></i> Locations
+                    </a>
+                </li>
+                {% endif %}
+
+                {% if current_user.role in ['admin', 'warehouse_manager'] or current_user.is_global_admin %}
+                <li class="nav-item">
+                    <a class="nav-link" href="/warehouse">
+                        <i class="fas fa-warehouse"></i> Warehouse
+                    </a>
+                </li>
+                {% endif %}
+
+                <li class="nav-item">
+                    <a class="nav-link" href="/transfers">
+                        <i class="fas fa-exchange-alt"></i> Transfers
+                    </a>
+                </li>
 
                 {% if current_user.role == 'admin' %}
                 <li class="nav-item">

@@ -122,10 +122,12 @@
                 {% endif %}
 
                 <div class="price-display mb-2">Rs. {{ "{:,.2f}".format(product.selling_price) }}</div>
+                {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
                 <div class="cost-display mb-3">Cost: Rs. {{ "{:,.2f}".format(product.cost_price) }}</div>
 
                 {% set margin = ((product.selling_price - product.cost_price) / product.cost_price * 100) if product.cost_price > 0 else 0 %}
                 <span class="badge bg-info fs-6">{{ "{:.1f}".format(margin) }}% Margin</span>
+                {% endif %}
 
                 <hr class="my-4">
 
@@ -189,8 +191,10 @@
                         <div class="detail-label">Minimum Stock Level</div>
                         <div class="detail-value">{{ product.min_stock_level }} {{ product.unit or 'units' }}</div>
 
+                        {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
                         <div class="detail-label">Stock Value</div>
                         <div class="detail-value">Rs. {{ "{:,.2f}".format(product.current_stock * product.cost_price) }}</div>
+                        {% endif %}
 
                         <div class="detail-label">Potential Revenue</div>
                         <div class="detail-value">Rs. {{ "{:,.2f}".format(product.current_stock * product.selling_price) }}</div>

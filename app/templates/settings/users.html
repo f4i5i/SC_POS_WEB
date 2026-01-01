@@ -41,6 +41,22 @@
     .role-cashier { background: #D1FAE5; color: #065F46; }
     .role-stock_manager { background: #FEF3C7; color: #92400E; }
     .role-accountant { background: #EDE9FE; color: #5B21B6; }
+    .role-warehouse_manager { background: #FFEDD5; color: #9A3412; }
+
+    .location-badge {
+        padding: 0.25rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        background: #E5E7EB;
+        color: #374151;
+    }
+    .global-admin-badge {
+        padding: 0.25rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        background: #FEF3C7;
+        color: #92400E;
+    }
 </style>
 {% endblock %}
 
@@ -64,6 +80,14 @@
                     <h5 class="mb-1">{{ user.full_name }}</h5>
                     <div class="text-muted mb-2">{{ user.username }} • {{ user.email or 'No email' }}</div>
                     <span class="role-badge role-{{ user.role }}">{{ user.role|replace('_', ' ') }}</span>
+                    {% if user.is_global_admin %}
+                    <span class="global-admin-badge"><i class="fas fa-globe"></i> Global Admin</span>
+                    {% endif %}
+                    {% if user.location %}
+                    <span class="location-badge"><i class="fas fa-map-marker-alt"></i> {{ user.location.name }}</span>
+                    {% else %}
+                    <span class="location-badge text-warning"><i class="fas fa-exclamation-triangle"></i> No Location</span>
+                    {% endif %}
                 </div>
                 <div class="col-auto">
                     <div class="text-muted mb-2">

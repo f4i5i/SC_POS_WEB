@@ -28,7 +28,9 @@ def index():
 @login_required
 @permission_required(Permissions.REPORT_VIEW_SALES)
 def daily_report():
-    """Daily sales report"""
+    """Daily sales report - filtered by location for non-global admins"""
+    from app.models import Location
+
     # Get date from request or use today
     date_str = request.args.get('date')
     if date_str:
@@ -36,13 +38,25 @@ def daily_report():
     else:
         report_date = datetime.now().date()
 
-    # Get sales for the day
-    sales = Sale.query.filter(
+    # Build query with location filter
+    query = Sale.query.filter(
         and_(
             func.date(Sale.sale_date) == report_date,
             Sale.status == 'completed'
         )
-    ).all()
+    )
+
+    # Filter by location for non-global admins
+    user_location = None
+    if not current_user.is_global_admin:
+        if current_user.location_id:
+            query = query.filter(Sale.location_id == current_user.location_id)
+            user_location = Location.query.get(current_user.location_id)
+        else:
+            query = query.filter(False)  # No location = no data
+
+    # Get sales for the day
+    sales = query.all()
 
     # Calculate summary
     total_sales = sum(sale.total for sale in sales)
@@ -57,28 +71,49 @@ def daily_report():
             payment_methods[method] = 0
         payment_methods[method] += float(sale.total)
 
-    # Top products
-    top_products = db.session.query(
+    # Top products - filter by location
+    top_products_query = db.session.query(
         Product.name,
         Product.brand,
         func.sum(SaleItem.quantity).label('total_quantity'),
         func.sum(SaleItem.subtotal).label('total_sales')
     ).join(SaleItem).join(Sale).filter(
         func.date(Sale.sale_date) == report_date
-    ).group_by(Product.id).order_by(func.sum(SaleItem.quantity).desc()).limit(10).all()
+    )
+    if not current_user.is_global_admin and current_user.location_id:
+        top_products_query = top_products_query.filter(Sale.location_id == current_user.location_id)
+    top_products = top_products_query.group_by(Product.id).order_by(func.sum(SaleItem.quantity).desc()).limit(10).all()
 
-    # Hourly sales
-    hourly_sales = db.session.query(
+    # Hourly sales - filter by location
+    hourly_sales_query = db.session.query(
         extract('hour', Sale.sale_date).label('hour'),
         func.count(Sale.id).label('count'),
         func.sum(Sale.total).label('total')
     ).filter(
         func.date(Sale.sale_date) == report_date
-    ).group_by(extract('hour', Sale.sale_date)).all()
+    )
+    if not current_user.is_global_admin and current_user.location_id:
+        hourly_sales_query = hourly_sales_query.filter(Sale.location_id == current_user.location_id)
+    hourly_sales = hourly_sales_query.group_by(extract('hour', Sale.sale_date)).all()
 
-    # Low stock alerts
-    low_stock = Product.query.filter(Product.quantity <= Product.reorder_level).all()
-    out_of_stock = Product.query.filter(Product.quantity == 0).all()
+    # Low stock alerts - use LocationStock for per-location data
+    from app.models import LocationStock
+    if not current_user.is_global_admin and current_user.location_id:
+        # Get low stock for this location
+        location_stock = LocationStock.query.filter(
+            LocationStock.location_id == current_user.location_id,
+            LocationStock.quantity <= LocationStock.reorder_level,
+            LocationStock.quantity > 0
+        ).all()
+        low_stock = [ls.product for ls in location_stock if ls.product]
+        out_of_stock_ls = LocationStock.query.filter(
+            LocationStock.location_id == current_user.location_id,
+            LocationStock.quantity == 0
+        ).all()
+        out_of_stock = [ls.product for ls in out_of_stock_ls if ls.product]
+    else:
+        low_stock = Product.query.filter(Product.quantity <= Product.reorder_level).all()
+        out_of_stock = Product.query.filter(Product.quantity == 0).all()
 
     return render_template('reports/daily_report.html',
                          report_date=report_date,
@@ -90,7 +125,8 @@ def daily_report():
                          top_products=top_products,
                          hourly_sales=hourly_sales,
                          low_stock=low_stock,
-                         out_of_stock=out_of_stock)
+                         out_of_stock=out_of_stock,
+                         user_location=user_location)
 
 
 @bp.route('/weekly')

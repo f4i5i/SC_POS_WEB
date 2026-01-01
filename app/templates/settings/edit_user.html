@@ -43,8 +43,30 @@
                             <option value="stock_manager" {% if user.role == 'stock_manager' %}selected{% endif %}>Stock Manager</option>
                             <option value="accountant" {% if user.role == 'accountant' %}selected{% endif %}>Accountant</option>
                             <option value="manager" {% if user.role == 'manager' %}selected{% endif %}>Manager</option>
+                            <option value="warehouse_manager" {% if user.role == 'warehouse_manager' %}selected{% endif %}>Warehouse Manager</option>
                             <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
                         </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Assigned Location</label>
+                        <select class="form-select" name="location_id">
+                            <option value="">-- No Location --</option>
+                            {% for location in locations %}
+                            <option value="{{ location.id }}" {% if user.location_id == location.id %}selected{% endif %}>
+                                {{ location.name }} ({{ location.code }}) - {{ location.location_type|title }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Which kiosk or warehouse this user belongs to</small>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="is_global_admin" id="isGlobalAdmin"
+                               {% if user.is_global_admin %}checked{% endif %}>
+                        <label class="form-check-label" for="isGlobalAdmin">
+                            <strong>Global Admin</strong> - Can access all locations
+                        </label>
                     </div>
 
                     <div class="mb-3">

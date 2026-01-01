@@ -6,7 +6,7 @@ Handles application settings, user management, and system configuration
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for, current_app
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
-from app.models import db, User, Setting, Category, ActivityLog
+from app.models import db, User, Setting, Category, ActivityLog, Location
 from app.utils.helpers import has_permission
 from app.utils.permissions import permission_required, Permissions
 from datetime import datetime
@@ -56,11 +56,17 @@ def add_user():
                 flash('Username already exists', 'danger')
                 return redirect(url_for('settings.add_user'))
 
+            # Get location_id
+            location_id = request.form.get('location_id')
+            location_id = int(location_id) if location_id else None
+
             user = User(
                 username=request.form.get('username'),
                 email=request.form.get('email'),
                 full_name=request.form.get('full_name'),
                 role=request.form.get('role'),
+                location_id=location_id,
+                is_global_admin=request.form.get('is_global_admin') == 'on',
                 is_active=True
             )
             user.set_password(request.form.get('password'))
@@ -75,7 +81,9 @@ def add_user():
             db.session.rollback()
             flash(f'Error creating user: {str(e)}', 'danger')
 
-    return render_template('settings/add_user.html')
+    # Get all locations for dropdown
+    locations = Location.query.filter_by(is_active=True).order_by(Location.location_type, Location.name).all()
+    return render_template('settings/add_user.html', locations=locations)
 
 
 @bp.route('/users/edit/<int:user_id>', methods=['GET', 'POST'])
@@ -96,6 +104,13 @@ def edit_user(user_id):
             user.role = request.form.get('role')
             user.is_active = request.form.get('is_active') == 'true'
 
+            # Update location
+            location_id = request.form.get('location_id')
+            user.location_id = int(location_id) if location_id else None
+
+            # Update global admin status
+            user.is_global_admin = request.form.get('is_global_admin') == 'on'
+
             # Update password if provided
             new_password = request.form.get('password')
             if new_password:
@@ -109,7 +124,9 @@ def edit_user(user_id):
             db.session.rollback()
             flash(f'Error updating user: {str(e)}', 'danger')
 
-    return render_template('settings/edit_user.html', user=user)
+    # Get all locations for dropdown
+    locations = Location.query.filter_by(is_active=True).order_by(Location.location_type, Location.name).all()
+    return render_template('settings/edit_user.html', user=user, locations=locations)
 
 
 @bp.route('/users/delete/<int:user_id>', methods=['POST'])

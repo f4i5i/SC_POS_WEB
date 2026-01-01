@@ -105,11 +105,51 @@ def create_app(config_name='default'):
         """Redirect to dashboard or login"""
         from flask_login import current_user
         from datetime import datetime
-        from app.models import Product
+        from app.models import Product, Sale, LocationStock, Location
         if current_user.is_authenticated:
-            # Get all products for smart alerts
-            products = Product.query.filter_by(is_active=True).all()
-            return render_template('dashboard.html', now=datetime.now(), products=products)
+            # Get location context
+            user_location = None
+            if current_user.location_id:
+                user_location = Location.query.get(current_user.location_id)
+
+            today = datetime.now().date()
+
+            # Filter data based on user's location access
+            if current_user.is_global_admin:
+                # Global admin sees all data
+                products = Product.query.filter_by(is_active=True).all()
+                today_sales = Sale.query.filter(
+                    db.func.date(Sale.created_at) == today
+                ).all()
+            elif user_location:
+                # Store manager/user sees only their location's data
+                location_stock = LocationStock.query.filter_by(
+                    location_id=user_location.id
+                ).all()
+                product_ids = [ls.product_id for ls in location_stock]
+                products = Product.query.filter(
+                    Product.id.in_(product_ids) if product_ids else False,
+                    Product.is_active == True
+                ).all()
+                # Sales for this location today
+                today_sales = Sale.query.filter(
+                    db.func.date(Sale.created_at) == today,
+                    Sale.location_id == user_location.id
+                ).all()
+            else:
+                products = []
+                today_sales = []
+
+            # Calculate today's stats
+            today_total = sum(s.total_amount for s in today_sales)
+            today_count = len(today_sales)
+
+            return render_template('dashboard.html',
+                                   now=datetime.now(),
+                                   products=products,
+                                   user_location=user_location,
+                                   today_sales_amount=today_total,
+                                   today_sales_count=today_count)
         return render_template('index.html')
 
     # Error handlers

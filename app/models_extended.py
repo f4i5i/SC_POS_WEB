@@ -214,12 +214,16 @@ class Expense(db.Model):
     approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     status = db.Column(db.String(32), default='pending')  # pending, approved, rejected
 
+    # Multi-kiosk support
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'))
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     creator = db.relationship('User', foreign_keys=[created_by])
     approver = db.relationship('User', foreign_keys=[approved_by])
+    location = db.relationship('Location', foreign_keys=[location_id])
 
     def __repr__(self):
         return f'<Expense {self.expense_number} - Rs.{self.amount}>'
@@ -518,6 +522,9 @@ class Return(db.Model):
     processed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
 
+    # Multi-kiosk support
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'))
+
     return_date = db.Column(db.DateTime, default=datetime.utcnow)
     completed_at = db.Column(db.DateTime)
 
@@ -527,6 +534,7 @@ class Return(db.Model):
     exchange_sale = db.relationship('Sale', foreign_keys=[exchange_sale_id])
     processor = db.relationship('User', foreign_keys=[processed_by])
     approver = db.relationship('User', foreign_keys=[approved_by])
+    location = db.relationship('Location', foreign_keys=[location_id])
     items = db.relationship('ReturnItem', backref='return_order', lazy='dynamic', cascade='all, delete-orphan')
 
     def __repr__(self):

@@ -230,6 +230,17 @@ class Permissions:
     REPORT_VIEW_ALL_LOCATIONS = 'report.view_all_locations'
     REPORT_COMPARE_LOCATIONS = 'report.compare_locations'
 
+    # Expense Permissions
+    EXPENSE_VIEW = 'expense.view'
+    EXPENSE_CREATE = 'expense.create'
+    EXPENSE_EDIT = 'expense.edit'
+    EXPENSE_DELETE = 'expense.delete'
+
+    # Returns Permissions
+    RETURNS_VIEW = 'returns.view'
+    RETURNS_CREATE = 'returns.create'
+    RETURNS_APPROVE = 'returns.approve'
+
 
 def get_all_permissions():
     """Get all defined permissions as a list of tuples (name, display_name, module)"""
@@ -327,20 +338,35 @@ def get_default_roles():
         },
         'manager': {
             'display_name': 'Store Manager',
-            'description': 'Manage store operations, inventory, and view reports',
-            'permissions': all_pos + all_inventory + all_customer + all_reports + [
-                'pos.close_day', 'pos.void_sale', 'pos.refund', 'pos.apply_discount',
-                'inventory.delete', 'inventory.transfer',
-                'supplier.view', 'supplier.create', 'supplier.edit',
-                'purchase_order.view', 'purchase_order.create', 'purchase_order.approve',
-                'report.view_financial', 'settings.view'
+            'description': 'Manage store operations, process returns, view expenses (no financial/confidential data)',
+            'permissions': [
+                # POS - can sell, close day, apply discount, but NO void/refund (only returns)
+                'pos.view', 'pos.create_sale', 'pos.close_day', 'pos.hold_sale', 'pos.apply_discount',
+                # Inventory - view only, no direct stock updates (only through transfers)
+                'inventory.view',
+                # Customers - full access
+                'customer.view', 'customer.create', 'customer.edit', 'customer.view_history',
+                # Transfers - can request and receive stock
+                'transfer.view', 'transfer.request', 'transfer.receive',
+                # Location - view own location only
+                'location.view',
+                # Reports - sales only
+                'report.view_sales',
+                # Expenses - can view and add store expenses
+                'expense.view', 'expense.create',
+                # Returns - can process returns
+                'returns.view', 'returns.create'
             ],
             'is_system': True
         },
         'cashier': {
             'display_name': 'Cashier',
-            'description': 'Process sales and basic customer management',
-            'permissions': all_pos + ['customer.view', 'customer.create', 'customer.view_history'],
+            'description': 'Process sales, add customers (cannot edit)',
+            'permissions': [
+                'pos.view', 'pos.create_sale', 'pos.hold_sale',
+                'customer.view', 'customer.create', 'customer.view_history'
+                # NO customer.edit - only managers can update customer details
+            ],
             'is_system': True
         },
         'inventory_manager': {
@@ -377,15 +403,24 @@ def get_default_roles():
         },
         'kiosk_manager': {
             'display_name': 'Kiosk Manager',
-            'description': 'Manages a specific kiosk location',
+            'description': 'Manages a specific kiosk location (same as Store Manager)',
             'permissions': [
-                'pos.view', 'pos.create_sale', 'pos.void_sale', 'pos.refund', 'pos.close_day',
-                'pos.hold_sale', 'pos.apply_discount',
-                'inventory.view', 'inventory.adjust_stock',
+                # POS - can sell, close day, apply discount, but NO void/refund (only returns)
+                'pos.view', 'pos.create_sale', 'pos.close_day', 'pos.hold_sale', 'pos.apply_discount',
+                # Inventory - view only, no direct stock updates
+                'inventory.view',
+                # Customers - full access
                 'customer.view', 'customer.create', 'customer.edit', 'customer.view_history',
+                # Transfers - can request and receive stock
                 'transfer.view', 'transfer.request', 'transfer.receive',
+                # Location - view own location only
                 'location.view',
-                'report.view_sales', 'report.view_inventory'
+                # Reports - sales only
+                'report.view_sales',
+                # Expenses - can view and add store expenses
+                'expense.view', 'expense.create',
+                # Returns - can process returns
+                'returns.view', 'returns.create'
             ],
             'is_system': True
         },

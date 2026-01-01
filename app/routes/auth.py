@@ -41,11 +41,31 @@ def login():
 
         log_activity(user.id, 'login', 'user', user.id, 'User logged in')
 
-        # Redirect to next page or dashboard
+        # Set current location in session
+        if user.location_id:
+            session['current_location_id'] = user.location_id
+            location_name = user.location.name if user.location else 'Unknown'
+            flash(f'Welcome! You are logged in at: {location_name}', 'success')
+        elif user.is_global_admin:
+            flash('Welcome! You have Global Admin access to all locations.', 'success')
+        else:
+            flash('Welcome! No location assigned - please contact admin.', 'warning')
+
+        # Redirect to next page or role-based dashboard
         next_page = request.args.get('next')
         if next_page:
             return redirect(next_page)
-        return redirect(url_for('index'))
+
+        # Role-based redirect
+        if user.role == 'cashier':
+            return redirect(url_for('pos.index'))
+        elif user.role == 'warehouse_manager':
+            return redirect(url_for('warehouse.index'))
+        elif user.role in ['manager', 'kiosk_manager']:
+            # Store managers go to their store dashboard
+            return redirect(url_for('pos.sales'))
+        else:
+            return redirect(url_for('index'))
 
     return render_template('auth/login.html')
 

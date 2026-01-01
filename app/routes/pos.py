@@ -370,7 +370,7 @@ def print_receipt(sale_id):
 @login_required
 @permission_required(Permissions.POS_VIEW)
 def sales_list():
-    """List all sales"""
+    """List all sales - filtered by location for non-global admins"""
     page = request.args.get('page', 1, type=int)
     per_page = current_app.config['ITEMS_PER_PAGE']
 
@@ -380,6 +380,14 @@ def sales_list():
 
     query = Sale.query.order_by(Sale.sale_date.desc())
 
+    # Filter by location for non-global admins
+    if not current_user.is_global_admin:
+        if current_user.location_id:
+            query = query.filter(Sale.location_id == current_user.location_id)
+        else:
+            # No location assigned - show no sales
+            query = query.filter(False)
+
     if from_date:
         query = query.filter(Sale.sale_date >= from_date)
     if to_date:
@@ -387,7 +395,13 @@ def sales_list():
 
     sales = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    return render_template('pos/sales_list.html', sales=sales)
+    # Get location name for display
+    from app.models import Location
+    user_location = None
+    if current_user.location_id:
+        user_location = Location.query.get(current_user.location_id)
+
+    return render_template('pos/sales_list.html', sales=sales, user_location=user_location)
 
 
 @bp.route('/sale-details/<int:sale_id>')

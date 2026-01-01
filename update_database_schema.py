@@ -12,7 +12,7 @@ import sys
 from datetime import datetime
 
 # Database path
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'pos.db')
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'perfume_pos.db')
 
 def get_connection():
     """Get database connection"""

@@ -492,7 +492,9 @@
                         <th>Category</th>
                         <th>Brand</th>
                         <th>Size</th>
+                        {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
                         <th>Cost Price</th>
+                        {% endif %}
                         <th>Selling Price</th>
                         <th>Stock</th>
                         <th>Expiry</th>
@@ -529,7 +531,9 @@
                             </td>
                             <td>{{ product.brand or '-' }}</td>
                             <td>{{ product.size or '-' }}</td>
+                            {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
                             <td>Rs. {{ "{:,.2f}".format(product.cost_price) }}</td>
+                            {% endif %}
                             <td><strong>Rs. {{ "{:,.2f}".format(product.selling_price) }}</strong></td>
                             <td>
                                 <strong class="{% if product.quantity == 0 %}text-danger{% elif product.is_low_stock %}text-warning{% else %}text-success{% endif %}">

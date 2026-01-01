@@ -98,7 +98,8 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     """Production configuration"""
     DEBUG = False
-    SESSION_COOKIE_SECURE = True
+    # SESSION_COOKIE_SECURE inherited from Config (reads from env)
+    # Set to True only when using HTTPS
     SQLALCHEMY_ECHO = False
 
 

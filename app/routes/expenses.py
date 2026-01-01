@@ -35,7 +35,7 @@ def generate_expense_number():
 @login_required
 @feature_required(Features.EXPENSE_TRACKING)
 def index():
-    """Expense list with filters"""
+    """Expense list with filters - filtered by location for store managers"""
     page = request.args.get('page', 1, type=int)
     per_page = 20
 
@@ -47,6 +47,13 @@ def index():
     search = request.args.get('search', '')
 
     query = Expense.query
+
+    # Filter by location for store managers (not admin/accountant)
+    if not current_user.is_global_admin and current_user.role in ['manager', 'kiosk_manager']:
+        if current_user.location_id:
+            query = query.filter(Expense.location_id == current_user.location_id)
+        else:
+            query = query.filter(False)  # No location = no data
 
     if category_id:
         query = query.filter_by(category_id=category_id)
@@ -102,11 +109,12 @@ def add_expense():
                 vendor_name=request.form.get('vendor_name'),
                 notes=request.form.get('notes'),
                 created_by=current_user.id,
-                status='pending' if current_user.role == 'cashier' else 'approved'
+                location_id=current_user.location_id,  # Link to user's location
+                status='pending' if current_user.role in ['cashier', 'manager', 'kiosk_manager'] else 'approved'
             )
 
-            # Auto-approve for managers and admins
-            if current_user.role in ['admin', 'manager']:
+            # Auto-approve for admins only (store managers create pending expenses)
+            if current_user.role == 'admin' or current_user.is_global_admin:
                 expense.status = 'approved'
                 expense.approved_by = current_user.id
 
@@ -128,7 +136,12 @@ def add_expense():
 @login_required
 @feature_required(Features.EXPENSE_TRACKING)
 def edit_expense(expense_id):
-    """Edit expense"""
+    """Edit expense - Admin/Accountant only"""
+    # Store managers can only add, not edit expenses
+    if current_user.role in ['manager', 'kiosk_manager'] and not current_user.is_global_admin:
+        flash('You do not have permission to edit expenses.', 'danger')
+        return redirect(url_for('expenses.index'))
+
     expense = Expense.query.get_or_404(expense_id)
 
     if request.method == 'POST':
