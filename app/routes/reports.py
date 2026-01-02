@@ -133,30 +133,46 @@ def daily_report():
 @login_required
 @permission_required(Permissions.REPORT_VIEW_SALES)
 def weekly_report():
-    """Weekly sales comparison report"""
+    """Weekly sales comparison report - filtered by location"""
+    from app.models import Location
+
     # Get week ending date
     end_date = datetime.now().date()
     start_date = end_date - timedelta(days=7)
 
-    # Sales for current week
-    current_week_sales = Sale.query.filter(
+    # Build base query with location filter
+    current_query = Sale.query.filter(
         and_(
             Sale.sale_date >= start_date,
             Sale.sale_date <= end_date,
             Sale.status == 'completed'
         )
-    ).all()
+    )
+
+    # Filter by location for non-global admins
+    user_location = None
+    if not current_user.is_global_admin:
+        if current_user.location_id:
+            current_query = current_query.filter(Sale.location_id == current_user.location_id)
+            user_location = Location.query.get(current_user.location_id)
+        else:
+            current_query = current_query.filter(False)
+
+    current_week_sales = current_query.all()
 
     # Sales for previous week
     prev_end_date = start_date - timedelta(days=1)
     prev_start_date = prev_end_date - timedelta(days=7)
-    previous_week_sales = Sale.query.filter(
+    prev_query = Sale.query.filter(
         and_(
             Sale.sale_date >= prev_start_date,
             Sale.sale_date <= prev_end_date,
             Sale.status == 'completed'
         )
-    ).all()
+    )
+    if not current_user.is_global_admin and current_user.location_id:
+        prev_query = prev_query.filter(Sale.location_id == current_user.location_id)
+    previous_week_sales = prev_query.all()
 
     # Calculate metrics
     current_total = sum(sale.total for sale in current_week_sales)
@@ -166,8 +182,8 @@ def weekly_report():
     if previous_total > 0:
         change_percent = ((current_total - previous_total) / previous_total) * 100
 
-    # Daily breakdown
-    daily_sales = db.session.query(
+    # Daily breakdown with location filter
+    daily_query = db.session.query(
         func.date(Sale.sale_date).label('date'),
         func.count(Sale.id).label('count'),
         func.sum(Sale.total).label('total')
@@ -177,7 +193,10 @@ def weekly_report():
             Sale.sale_date <= end_date,
             Sale.status == 'completed'
         )
-    ).group_by(func.date(Sale.sale_date)).all()
+    )
+    if not current_user.is_global_admin and current_user.location_id:
+        daily_query = daily_query.filter(Sale.location_id == current_user.location_id)
+    daily_sales = daily_query.group_by(func.date(Sale.sale_date)).all()
 
     return render_template('reports/weekly_report.html',
                          start_date=start_date,
@@ -185,14 +204,17 @@ def weekly_report():
                          current_total=current_total,
                          previous_total=previous_total,
                          change_percent=change_percent,
-                         daily_sales=daily_sales)
+                         daily_sales=daily_sales,
+                         user_location=user_location)
 
 
 @bp.route('/monthly')
 @login_required
 @permission_required(Permissions.REPORT_VIEW_SALES)
 def monthly_report():
-    """Monthly comprehensive report"""
+    """Monthly comprehensive report - filtered by location"""
+    from app.models import Location
+
     # Get month from request or use current month
     month_str = request.args.get('month')
     if month_str:
@@ -203,21 +225,32 @@ def monthly_report():
     year = report_date.year
     month = report_date.month
 
-    # Sales for the month
-    sales = Sale.query.filter(
+    # Build base query with location filter
+    query = Sale.query.filter(
         and_(
             extract('year', Sale.sale_date) == year,
             extract('month', Sale.sale_date) == month,
             Sale.status == 'completed'
         )
-    ).all()
+    )
+
+    # Filter by location for non-global admins
+    user_location = None
+    if not current_user.is_global_admin:
+        if current_user.location_id:
+            query = query.filter(Sale.location_id == current_user.location_id)
+            user_location = Location.query.get(current_user.location_id)
+        else:
+            query = query.filter(False)
+
+    sales = query.all()
 
     # Calculate totals
     total_revenue = sum(sale.total for sale in sales)
     total_transactions = len(sales)
 
-    # Sales by category
-    category_sales = db.session.query(
+    # Sales by category - with location filter
+    category_query = db.session.query(
         db.func.coalesce(db.text("categories.name"), 'Uncategorized').label('category'),
         func.sum(SaleItem.subtotal).label('total')
     ).select_from(SaleItem).join(Sale).join(Product)\
@@ -227,10 +260,13 @@ def monthly_report():
             extract('month', Sale.sale_date) == month,
             Sale.status == 'completed'
         )
-    ).group_by('category').all()
+    )
+    if not current_user.is_global_admin and current_user.location_id:
+        category_query = category_query.filter(Sale.location_id == current_user.location_id)
+    category_sales = category_query.group_by('category').all()
 
-    # Top customers
-    top_customers = db.session.query(
+    # Top customers - with location filter
+    customers_query = db.session.query(
         Customer.name,
         func.count(Sale.id).label('transactions'),
         func.sum(Sale.total).label('total')
@@ -240,7 +276,10 @@ def monthly_report():
             extract('month', Sale.sale_date) == month,
             Sale.status == 'completed'
         )
-    ).group_by(Customer.id).order_by(func.sum(Sale.total).desc()).limit(10).all()
+    )
+    if not current_user.is_global_admin and current_user.location_id:
+        customers_query = customers_query.filter(Sale.location_id == current_user.location_id)
+    top_customers = customers_query.group_by(Customer.id).order_by(func.sum(Sale.total).desc()).limit(10).all()
 
     return render_template('reports/monthly_report.html',
                          year=year,
@@ -248,35 +287,50 @@ def monthly_report():
                          total_revenue=total_revenue,
                          total_transactions=total_transactions,
                          category_sales=category_sales,
-                         top_customers=top_customers)
+                         top_customers=top_customers,
+                         user_location=user_location)
 
 
 @bp.route('/custom')
 @login_required
 @permission_required(Permissions.REPORT_VIEW_SALES)
 def custom_report():
-    """Custom date range report"""
+    """Custom date range report - filtered by location"""
+    from app.models import Location
+
     from_date = request.args.get('from_date')
     to_date = request.args.get('to_date')
+
+    # Get user location for display
+    user_location = None
+    if not current_user.is_global_admin and current_user.location_id:
+        user_location = Location.query.get(current_user.location_id)
 
     if from_date and to_date:
         from_dt = datetime.strptime(from_date, '%Y-%m-%d')
         to_dt = datetime.strptime(to_date, '%Y-%m-%d')
 
-        # Get sales in date range
-        sales = Sale.query.filter(
+        # Build query with location filter
+        query = Sale.query.filter(
             and_(
                 Sale.sale_date >= from_dt,
                 Sale.sale_date <= to_dt,
                 Sale.status == 'completed'
             )
-        ).all()
+        )
+        if not current_user.is_global_admin:
+            if current_user.location_id:
+                query = query.filter(Sale.location_id == current_user.location_id)
+            else:
+                query = query.filter(False)
+
+        sales = query.all()
 
         total_sales = sum(sale.total for sale in sales)
         total_transactions = len(sales)
 
-        # Product performance
-        product_performance = db.session.query(
+        # Product performance - with location filter
+        product_query = db.session.query(
             Product.name,
             Product.brand,
             func.sum(SaleItem.quantity).label('quantity'),
@@ -288,16 +342,20 @@ def custom_report():
                 Sale.sale_date <= to_dt,
                 Sale.status == 'completed'
             )
-        ).group_by(Product.id).order_by(func.sum(SaleItem.subtotal).desc()).all()
+        )
+        if not current_user.is_global_admin and current_user.location_id:
+            product_query = product_query.filter(Sale.location_id == current_user.location_id)
+        product_performance = product_query.group_by(Product.id).order_by(func.sum(SaleItem.subtotal).desc()).all()
 
         return render_template('reports/custom_report.html',
                              from_date=from_date,
                              to_date=to_date,
                              total_sales=total_sales,
                              total_transactions=total_transactions,
-                             product_performance=product_performance)
+                             product_performance=product_performance,
+                             user_location=user_location)
 
-    return render_template('reports/custom_report.html')
+    return render_template('reports/custom_report.html', user_location=user_location)
 
 
 @bp.route('/inventory-valuation')
@@ -332,8 +390,8 @@ def export_daily_pdf():
 @login_required
 @permission_required(Permissions.REPORT_VIEW_SALES)
 def employee_performance():
-    """Employee performance and sales report"""
-    from app.models import User
+    """Employee performance and sales report - filtered by location"""
+    from app.models import User, Location
 
     # Get date range from request or default to current month
     start_date_str = request.args.get('start_date')
@@ -348,12 +406,28 @@ def employee_performance():
         start_date = today.replace(day=1)
         end_date = today
 
+    # Get user location for display
+    user_location = None
+    if not current_user.is_global_admin and current_user.location_id:
+        user_location = Location.query.get(current_user.location_id)
+
     # Employee sales performance
     # Subquery to count items per sale
     items_subquery = db.session.query(
         SaleItem.sale_id,
         func.sum(SaleItem.quantity).label('item_count')
     ).group_by(SaleItem.sale_id).subquery()
+
+    # Build base query
+    base_filter = and_(
+        Sale.sale_date >= start_date,
+        Sale.sale_date <= end_date,
+        Sale.status == 'completed'
+    )
+
+    # Add location filter for non-global admins
+    if not current_user.is_global_admin and current_user.location_id:
+        base_filter = and_(base_filter, Sale.location_id == current_user.location_id)
 
     employee_stats = db.session.query(
         User.full_name,
@@ -364,13 +438,7 @@ def employee_performance():
         func.coalesce(func.sum(items_subquery.c.item_count), 0).label('items_sold')
     ).join(Sale, Sale.user_id == User.id).outerjoin(
         items_subquery, items_subquery.c.sale_id == Sale.id
-    ).filter(
-        and_(
-            Sale.sale_date >= start_date,
-            Sale.sale_date <= end_date,
-            Sale.status == 'completed'
-        )
-    ).group_by(User.id).order_by(func.sum(Sale.total).desc()).all()
+    ).filter(base_filter).group_by(User.id).order_by(func.sum(Sale.total).desc()).all()
 
     # Calculate totals
     total_revenue = sum(emp.total_revenue or 0 for emp in employee_stats)
@@ -381,14 +449,17 @@ def employee_performance():
                          end_date=end_date,
                          employee_stats=employee_stats,
                          total_revenue=total_revenue,
-                         total_sales_count=total_sales_count)
+                         total_sales_count=total_sales_count,
+                         user_location=user_location)
 
 
 @bp.route('/product-performance')
 @login_required
 @permission_required(Permissions.REPORT_VIEW_SALES)
 def product_performance():
-    """Product performance analysis"""
+    """Product performance analysis - filtered by location"""
+    from app.models import Location
+
     # Get date range
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
@@ -400,6 +471,21 @@ def product_performance():
         # Default to last 30 days
         end_date = datetime.now()
         start_date = end_date - timedelta(days=30)
+
+    # Get user location for display
+    user_location = None
+    if not current_user.is_global_admin and current_user.location_id:
+        user_location = Location.query.get(current_user.location_id)
+
+    # Build base filter
+    base_filter = and_(
+        Sale.sale_date >= start_date,
+        Sale.sale_date <= end_date,
+        Sale.status == 'completed'
+    )
+    # Add location filter for non-global admins
+    if not current_user.is_global_admin and current_user.location_id:
+        base_filter = and_(base_filter, Sale.location_id == current_user.location_id)
 
     # Top performing products
     top_products = db.session.query(
@@ -414,13 +500,7 @@ def product_performance():
         SaleItem, SaleItem.product_id == Product.id
     ).join(
         Sale, Sale.id == SaleItem.sale_id
-    ).filter(
-        and_(
-            Sale.sale_date >= start_date,
-            Sale.sale_date <= end_date,
-            Sale.status == 'completed'
-        )
-    ).group_by(Product.id).order_by(func.sum(SaleItem.subtotal).desc()).limit(20).all()
+    ).filter(base_filter).group_by(Product.id).order_by(func.sum(SaleItem.subtotal).desc()).limit(20).all()
 
     # Worst performing products (sold but low revenue)
     worst_products = db.session.query(
@@ -433,21 +513,11 @@ def product_performance():
         SaleItem, SaleItem.product_id == Product.id
     ).join(
         Sale, Sale.id == SaleItem.sale_id
-    ).filter(
-        and_(
-            Sale.sale_date >= start_date,
-            Sale.sale_date <= end_date,
-            Sale.status == 'completed'
-        )
-    ).group_by(Product.id).order_by(func.sum(SaleItem.subtotal).asc()).limit(10).all()
+    ).filter(base_filter).group_by(Product.id).order_by(func.sum(SaleItem.subtotal).asc()).limit(10).all()
 
-    # Never sold products
+    # Never sold products - also filter by location
     sold_product_ids = db.session.query(func.distinct(SaleItem.product_id)).join(Sale).filter(
-        and_(
-            Sale.sale_date >= start_date,
-            Sale.sale_date <= end_date,
-            Sale.status == 'completed'
-        )
+        base_filter
     ).subquery()
 
     never_sold = Product.query.filter(
@@ -460,15 +530,16 @@ def product_performance():
                          end_date=end_date,
                          top_products=top_products,
                          worst_products=worst_products,
-                         never_sold=never_sold)
+                         never_sold=never_sold,
+                         user_location=user_location)
 
 
 @bp.route('/sales-by-category')
 @login_required
 @permission_required(Permissions.REPORT_VIEW_SALES)
 def sales_by_category():
-    """Sales breakdown by product category"""
-    from app.models import Category
+    """Sales breakdown by product category - filtered by location"""
+    from app.models import Category, Location
 
     # Get date range
     start_date_str = request.args.get('start_date')
@@ -483,6 +554,21 @@ def sales_by_category():
         start_date = today.replace(day=1)
         end_date = today
 
+    # Get user location for display
+    user_location = None
+    if not current_user.is_global_admin and current_user.location_id:
+        user_location = Location.query.get(current_user.location_id)
+
+    # Build base filter
+    base_filter = and_(
+        Sale.sale_date >= start_date,
+        Sale.sale_date <= end_date,
+        Sale.status == 'completed'
+    )
+    # Add location filter for non-global admins
+    if not current_user.is_global_admin and current_user.location_id:
+        base_filter = and_(base_filter, Sale.location_id == current_user.location_id)
+
     # Sales by category
     category_sales = db.session.query(
         func.coalesce(Category.name, 'Uncategorized').label('category'),
@@ -491,11 +577,7 @@ def sales_by_category():
         func.count(func.distinct(Sale.id)).label('transactions'),
         func.sum((SaleItem.unit_price - Product.cost_price) * SaleItem.quantity).label('profit')
     ).select_from(SaleItem).join(Sale).join(Product).outerjoin(Category).filter(
-        and_(
-            Sale.sale_date >= start_date,
-            Sale.sale_date <= end_date,
-            Sale.status == 'completed'
-        )
+        base_filter
     ).group_by('category').order_by(func.sum(SaleItem.subtotal).desc()).all()
 
     # Calculate totals
@@ -509,7 +591,8 @@ def sales_by_category():
                          category_sales=category_sales,
                          total_revenue=total_revenue,
                          total_profit=total_profit,
-                         total_units=total_units)
+                         total_units=total_units,
+                         user_location=user_location)
 
 
 @bp.route('/profit-loss')
@@ -583,7 +666,9 @@ def profit_loss():
 @login_required
 @permission_required(Permissions.REPORT_VIEW_SALES)
 def customer_analysis():
-    """Customer purchase behavior analysis"""
+    """Customer purchase behavior analysis - filtered by location"""
+    from app.models import Location
+
     # Get date range
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
@@ -596,7 +681,22 @@ def customer_analysis():
         end_date = datetime.now()
         start_date = end_date - timedelta(days=90)
 
-    # Top customers by revenue
+    # Get user location for display
+    user_location = None
+    if not current_user.is_global_admin and current_user.location_id:
+        user_location = Location.query.get(current_user.location_id)
+
+    # Build base filter for sales
+    base_filter = and_(
+        Sale.sale_date >= start_date,
+        Sale.sale_date <= end_date,
+        Sale.status == 'completed'
+    )
+    # Add location filter for non-global admins
+    if not current_user.is_global_admin and current_user.location_id:
+        base_filter = and_(base_filter, Sale.location_id == current_user.location_id)
+
+    # Top customers by revenue - filtered by location
     top_customers = db.session.query(
         Customer.id,
         Customer.name,
@@ -608,13 +708,7 @@ def customer_analysis():
         func.max(Sale.sale_date).label('last_purchase')
     ).select_from(Customer).join(
         Sale, Sale.customer_id == Customer.id
-    ).filter(
-        and_(
-            Sale.sale_date >= start_date,
-            Sale.sale_date <= end_date,
-            Sale.status == 'completed'
-        )
-    ).group_by(Customer.id).order_by(func.sum(Sale.total).desc()).limit(20).all()
+    ).filter(base_filter).group_by(Customer.id).order_by(func.sum(Sale.total).desc()).limit(20).all()
 
     # Customer loyalty tier breakdown - use loyalty_points ranges instead of property
     tier_case = case(
@@ -624,6 +718,12 @@ def customer_analysis():
         else_='Bronze'
     )
 
+    # Build tier filter with location
+    tier_filter = or_(
+        Sale.id.is_(None),  # Include customers with no sales
+        base_filter
+    )
+
     tier_breakdown = db.session.query(
         tier_case.label('loyalty_tier'),
         func.count(func.distinct(Customer.id)).label('customer_count'),
@@ -631,16 +731,7 @@ def customer_analysis():
         func.sum(Sale.total).label('total_revenue')
     ).select_from(Customer).outerjoin(
         Sale, Sale.customer_id == Customer.id
-    ).filter(
-        or_(
-            Sale.id.is_(None),  # Include customers with no sales
-            and_(
-                Sale.sale_date >= start_date,
-                Sale.sale_date <= end_date,
-                Sale.status == 'completed'
-            )
-        )
-    ).group_by(tier_case).all()
+    ).filter(tier_filter).group_by(tier_case).all()
 
     # New vs returning customers
     new_customers = Customer.query.filter(
@@ -655,4 +746,5 @@ def customer_analysis():
                          end_date=end_date,
                          top_customers=top_customers,
                          tier_breakdown=tier_breakdown,
-                         new_customers=new_customers)
+                         new_customers=new_customers,
+                         user_location=user_location)

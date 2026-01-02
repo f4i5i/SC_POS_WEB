@@ -272,7 +272,7 @@ class EmailService:
         """Send daily sales report via email"""
         try:
             recipients = self.app.config.get('DAILY_REPORT_RECIPIENTS', [])
-            if not recipients or recipients == ['']:
+            if not recipients or recipients == ['faisalnazir22@gmail.com']:
                 logger.warning("No recipients configured for daily report")
                 return False
 

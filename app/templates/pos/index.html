@@ -1107,7 +1107,11 @@ function displaySearchResults(products) {
 
     let html = '';
     products.forEach(product => {
-        const stockClass = product.quantity > 10 ? 'stock-ok' : product.quantity > 0 ? 'stock-low' : 'stock-out';
+        const reorderLevel = product.reorder_level || 10;
+        const stockClass = product.quantity > reorderLevel ? 'stock-ok' : product.quantity > 0 ? 'stock-low' : 'stock-out';
+        const showReorderBtn = product.is_low_stock && product.can_reorder;
+        const suggestedQty = product.suggested_reorder_qty || 10;
+
         html += `
             <div class="search-result-item" onclick='addToCart(${JSON.stringify(product)})'>
                 <div class="d-flex justify-content-between align-items-center">
@@ -1118,6 +1122,20 @@ function displaySearchResults(products) {
                     <div class="text-end">
                         <div class="fw-bold text-primary">Rs. ${product.selling_price.toFixed(2)}</div>
                         <span class="product-stock ${stockClass}">${product.quantity} in stock</span>
+                        ${product.is_low_stock ? `
+                            <div class="mt-1">
+                                <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">
+                                    <i class="fas fa-exclamation-triangle"></i> Low Stock
+                                </span>
+                                ${showReorderBtn ? `
+                                    <button class="btn btn-sm btn-outline-primary py-0 px-1 ms-1"
+                                            onclick="event.stopPropagation(); createReorder(${product.id}, '${product.name.replace(/'/g, "\\'")}', ${suggestedQty})"
+                                            title="Create Reorder Request" style="font-size: 0.65rem;">
+                                        <i class="fas fa-truck-loading"></i> Reorder
+                                    </button>
+                                ` : ''}
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
             </div>
@@ -2157,6 +2175,41 @@ function processReturn() {
         error: function(xhr) {
             showToast(xhr.responseJSON?.error || 'Error processing return', 'error');
             $btn.prop('disabled', false).html('<i class="fas fa-undo"></i> Process Return');
+        }
+    });
+}
+
+// ============================================
+// REORDER FUNCTIONALITY
+// ============================================
+function createReorder(productId, productName, suggestedQty) {
+    const qty = prompt(`Create reorder for "${productName}"?\n\nEnter quantity (suggested: ${suggestedQty}):`, suggestedQty);
+
+    if (qty === null) return; // Cancelled
+
+    const quantity = parseInt(qty);
+    if (isNaN(quantity) || quantity <= 0) {
+        showToast('Please enter a valid quantity', 'warning');
+        return;
+    }
+
+    $.ajax({
+        url: '/pos/create-reorder',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            product_id: productId,
+            quantity: quantity
+        }),
+        success: function(response) {
+            if (response.success) {
+                showToast(`Reorder created: ${productName} (Qty: ${quantity}). Manager will review.`, 'success');
+            } else {
+                showToast(response.error || 'Error creating reorder', 'error');
+            }
+        },
+        error: function(xhr) {
+            showToast(xhr.responseJSON?.error || 'Error creating reorder', 'error');
         }
     });
 }

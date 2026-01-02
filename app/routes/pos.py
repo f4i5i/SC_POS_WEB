@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, flash, redirect,
 from flask_login import login_required, current_user
 from datetime import datetime, date
 from decimal import Decimal
-from app.models import db, Product, Sale, SaleItem, Customer, StockMovement, Payment, SyncQueue, Setting, DayClose, LocationStock
+from app.models import db, Product, Sale, SaleItem, Customer, StockMovement, Payment, SyncQueue, Setting, DayClose, LocationStock, StockTransfer, StockTransferItem, Location
 from app.utils.helpers import generate_sale_number, has_permission
 from app.utils.pdf_utils import generate_receipt_pdf
 from app.utils.permissions import permission_required, Permissions
@@ -58,6 +58,11 @@ def search_products():
     # Get current location for stock lookup
     location = get_current_location()
 
+    # Check if reorders can be created from this location
+    can_reorder = False
+    if location and location.location_type == 'kiosk' and location.parent_warehouse_id:
+        can_reorder = True
+
     # Search by code, barcode, name, or brand
     if location:
         # Location-aware query with stock from LocationStock
@@ -80,6 +85,8 @@ def search_products():
         results = []
         for product, stock in products:
             qty = stock.available_quantity if stock else 0
+            reorder_level = stock.reorder_level if stock else product.reorder_level
+            is_low = stock.is_low_stock if stock else (qty <= reorder_level)
             results.append({
                 'id': product.id,
                 'code': product.code,
@@ -89,7 +96,10 @@ def search_products():
                 'size': product.size,
                 'selling_price': float(product.selling_price),
                 'quantity': qty,
-                'is_low_stock': stock.is_low_stock if stock else (qty <= 10),
+                'is_low_stock': is_low,
+                'reorder_level': reorder_level,
+                'suggested_reorder_qty': product.suggested_reorder_quantity if hasattr(product, 'suggested_reorder_quantity') else 10,
+                'can_reorder': can_reorder,
                 'image_url': product.image_url
             })
     else:
@@ -118,6 +128,9 @@ def search_products():
                 'selling_price': float(product.selling_price),
                 'quantity': product.quantity,
                 'is_low_stock': product.is_low_stock,
+                'reorder_level': product.reorder_level,
+                'suggested_reorder_qty': product.suggested_reorder_quantity if hasattr(product, 'suggested_reorder_quantity') else 10,
+                'can_reorder': False,  # No reorder without location
                 'image_url': product.image_url
             })
 
@@ -158,6 +171,120 @@ def get_product(product_id):
         'is_low_stock': is_low_stock,
         'image_url': product.image_url
     })
+
+
+def generate_transfer_number():
+    """Generate unique transfer number for reorders"""
+    today = date.today().strftime('%Y%m%d')
+    last_transfer = StockTransfer.query.filter(
+        StockTransfer.transfer_number.like(f'TRF-{today}%')
+    ).order_by(StockTransfer.transfer_number.desc()).first()
+
+    if last_transfer:
+        last_num = int(last_transfer.transfer_number.split('-')[-1])
+        new_num = last_num + 1
+    else:
+        new_num = 1
+
+    return f'TRF-{today}-{new_num:04d}'
+
+
+@bp.route('/create-reorder', methods=['POST'])
+@login_required
+@permission_required(Permissions.POS_VIEW)
+def create_reorder():
+    """Create a draft reorder request from POS for low-stock product"""
+    try:
+        data = request.get_json()
+        product_id = data.get('product_id')
+        quantity = data.get('quantity', 10)
+
+        if not product_id:
+            return jsonify({'success': False, 'error': 'Product ID required'}), 400
+
+        location = get_current_location()
+        if not location:
+            return jsonify({'success': False, 'error': 'No location assigned'}), 400
+
+        # Only kiosks can create reorders
+        if location.location_type != 'kiosk':
+            return jsonify({'success': False, 'error': 'Reorders can only be created from kiosks'}), 400
+
+        # Get source warehouse
+        if not location.parent_warehouse_id:
+            return jsonify({'success': False, 'error': 'No warehouse configured for this location'}), 400
+
+        # Check if a draft reorder already exists for this location
+        existing = StockTransfer.query.filter_by(
+            destination_location_id=location.id,
+            status='draft'
+        ).first()
+
+        if existing:
+            # Check if this product is already in the draft
+            existing_item = StockTransferItem.query.filter_by(
+                transfer_id=existing.id,
+                product_id=product_id
+            ).first()
+
+            if existing_item:
+                # Update quantity
+                existing_item.quantity_requested = quantity
+                db.session.commit()
+                return jsonify({
+                    'success': True,
+                    'transfer_id': existing.id,
+                    'transfer_number': existing.transfer_number,
+                    'message': 'Reorder quantity updated'
+                })
+            else:
+                # Add to existing draft
+                item = StockTransferItem(
+                    transfer_id=existing.id,
+                    product_id=product_id,
+                    quantity_requested=quantity
+                )
+                db.session.add(item)
+                db.session.commit()
+                return jsonify({
+                    'success': True,
+                    'transfer_id': existing.id,
+                    'transfer_number': existing.transfer_number,
+                    'message': 'Product added to existing draft reorder'
+                })
+
+        # Create new draft transfer
+        transfer = StockTransfer(
+            transfer_number=generate_transfer_number(),
+            source_location_id=location.parent_warehouse_id,
+            destination_location_id=location.id,
+            status='draft',
+            priority='normal',
+            requested_by=current_user.id,
+            request_notes='Auto-created from POS low-stock alert'
+        )
+        db.session.add(transfer)
+        db.session.flush()
+
+        # Add the item
+        item = StockTransferItem(
+            transfer_id=transfer.id,
+            product_id=product_id,
+            quantity_requested=quantity
+        )
+        db.session.add(item)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'transfer_id': transfer.id,
+            'transfer_number': transfer.transfer_number,
+            'message': 'Reorder request created. Manager will review.'
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @bp.route('/complete-sale', methods=['POST'])

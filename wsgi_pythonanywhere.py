@@ -20,7 +20,7 @@ USERNAME = 'f4i5i'  # <-- CHANGE THIS!
 # ============================================
 
 # Project path
-project_home = f'/home/{USERNAME}/SOC_WEB_APP'
+project_home = f'/home/{USERNAME}/SC_POS_WEB'
 
 # Add to path
 if project_home not in sys.path:
@@ -29,7 +29,7 @@ if project_home not in sys.path:
 # Set environment variables
 os.environ['FLASK_ENV'] = 'production'
 os.environ['SECRET_KEY'] = 'sc-pos-2024-xK9mN3pQ7vR2wY5zA8bC1dE4fG6hJ0kL'
-os.environ['DATABASE_URL'] = f'sqlite:////home/{USERNAME}/SOC_WEB_APP/instance/pos.db'
+os.environ['DATABASE_URL'] = f'sqlite:////home/{USERNAME}/SC_POS_WEB/instance/perfume_pos.db'
 
 # Business Configuration
 os.environ['BUSINESS_NAME'] = 'Sunnat Collection'

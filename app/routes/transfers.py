@@ -528,3 +528,177 @@ def api_search_products():
             })
 
     return jsonify({'products': results})
+
+
+# ============================================
+# REORDER MANAGEMENT ROUTES (for Store Managers)
+# ============================================
+
+@bp.route('/reorders')
+@login_required
+@permission_required(Permissions.TRANSFER_REQUEST)
+def reorders():
+    """Manager view: List draft and submitted reorders for current location"""
+    location = get_current_location()
+
+    if not location:
+        flash('You must be assigned to a location.', 'warning')
+        return redirect(url_for('index'))
+
+    # Get draft reorders (pending manager review)
+    draft_transfers = StockTransfer.query.filter_by(
+        destination_location_id=location.id,
+        status='draft'
+    ).order_by(StockTransfer.created_at.desc()).all()
+
+    # Get submitted reorders (awaiting warehouse)
+    submitted_transfers = StockTransfer.query.filter(
+        StockTransfer.destination_location_id == location.id,
+        StockTransfer.status.in_(['requested', 'approved', 'dispatched'])
+    ).order_by(StockTransfer.requested_at.desc()).all()
+
+    return render_template('transfers/reorders.html',
+                           draft_transfers=draft_transfers,
+                           submitted_transfers=submitted_transfers,
+                           current_location=location)
+
+
+@bp.route('/reorders/submit/<int:id>', methods=['POST'])
+@login_required
+@permission_required(Permissions.TRANSFER_REQUEST)
+def submit_reorder(id):
+    """Manager submits a draft reorder to warehouse"""
+    transfer = StockTransfer.query.get_or_404(id)
+
+    location = get_current_location()
+    if not location or transfer.destination_location_id != location.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('transfers.reorders'))
+
+    if transfer.status != 'draft':
+        flash('Only draft reorders can be submitted.', 'warning')
+        return redirect(url_for('transfers.reorders'))
+
+    try:
+        transfer.status = 'requested'
+        transfer.requested_at = datetime.utcnow()
+        transfer.requested_by = current_user.id
+
+        # Get notes and priority from form
+        notes = request.form.get('notes', '')
+        if notes:
+            transfer.request_notes = notes
+        transfer.priority = request.form.get('priority', 'normal')
+
+        db.session.commit()
+        flash(f'Reorder {transfer.transfer_number} submitted to warehouse.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error submitting reorder: {str(e)}', 'danger')
+
+    return redirect(url_for('transfers.reorders'))
+
+
+@bp.route('/reorders/add-item/<int:id>', methods=['POST'])
+@login_required
+@permission_required(Permissions.TRANSFER_REQUEST)
+def add_reorder_item(id):
+    """Add item to a draft reorder"""
+    transfer = StockTransfer.query.get_or_404(id)
+
+    location = get_current_location()
+    if not location or transfer.destination_location_id != location.id:
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+
+    if transfer.status != 'draft':
+        return jsonify({'success': False, 'error': 'Can only modify draft reorders'}), 400
+
+    try:
+        data = request.get_json()
+        product_id = data.get('product_id')
+        quantity = data.get('quantity', 1)
+
+        if not product_id:
+            return jsonify({'success': False, 'error': 'Product ID required'}), 400
+
+        # Check if item already exists
+        existing_item = StockTransferItem.query.filter_by(
+            transfer_id=id,
+            product_id=product_id
+        ).first()
+
+        if existing_item:
+            existing_item.quantity_requested = quantity
+        else:
+            item = StockTransferItem(
+                transfer_id=id,
+                product_id=product_id,
+                quantity_requested=quantity
+            )
+            db.session.add(item)
+
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Item added'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/reorders/remove-item/<int:id>/<int:item_id>', methods=['POST'])
+@login_required
+@permission_required(Permissions.TRANSFER_REQUEST)
+def remove_reorder_item(id, item_id):
+    """Remove item from a draft reorder"""
+    transfer = StockTransfer.query.get_or_404(id)
+
+    location = get_current_location()
+    if not location or transfer.destination_location_id != location.id:
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+
+    if transfer.status != 'draft':
+        return jsonify({'success': False, 'error': 'Can only modify draft reorders'}), 400
+
+    try:
+        item = StockTransferItem.query.get_or_404(item_id)
+        if item.transfer_id != id:
+            return jsonify({'success': False, 'error': 'Item not in this transfer'}), 400
+
+        db.session.delete(item)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Item removed'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/reorders/delete/<int:id>', methods=['POST'])
+@login_required
+@permission_required(Permissions.TRANSFER_REQUEST)
+def delete_reorder(id):
+    """Delete a draft reorder"""
+    transfer = StockTransfer.query.get_or_404(id)
+
+    location = get_current_location()
+    if not location or transfer.destination_location_id != location.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('transfers.reorders'))
+
+    if transfer.status != 'draft':
+        flash('Only draft reorders can be deleted.', 'warning')
+        return redirect(url_for('transfers.reorders'))
+
+    try:
+        # Delete items first
+        StockTransferItem.query.filter_by(transfer_id=id).delete()
+        db.session.delete(transfer)
+        db.session.commit()
+        flash('Reorder deleted.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error: {str(e)}', 'danger')
+
+    return redirect(url_for('transfers.reorders'))

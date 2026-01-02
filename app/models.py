@@ -45,20 +45,31 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
     def has_permission(self, permission):
-        """Check if user has specific permission based on role (legacy support)"""
-        # First check new RBAC system
-        if self.has_rbac_permission(permission):
+        """Check if user has specific permission based on role"""
+        from app.utils.permissions import get_default_roles
+
+        # Global admin has all permissions
+        if self.is_global_admin:
             return True
 
-        # Fallback to legacy role-based permissions
-        permissions = {
-            'admin': ['all'],
-            'manager': ['pos', 'inventory', 'customers', 'suppliers', 'reports'],
-            'cashier': ['pos'],
-            'stock_manager': ['inventory'],
-            'accountant': ['reports']
-        }
-        return 'all' in permissions.get(self.role, []) or permission in permissions.get(self.role, [])
+        # Admin role has all permissions
+        if self.role == 'admin':
+            return True
+
+        # Try RBAC system first (may not be set up)
+        try:
+            if self.has_rbac_permission(permission):
+                return True
+        except Exception:
+            pass  # RBAC tables may not exist
+
+        # Check permission against role's default permissions
+        default_roles = get_default_roles()
+        if self.role in default_roles:
+            role_permissions = default_roles[self.role].get('permissions', [])
+            return permission in role_permissions
+
+        return False
 
     def has_rbac_permission(self, permission_name):
         """Check if user has permission through RBAC roles"""

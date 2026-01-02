@@ -399,3 +399,87 @@ def stock_movements(product_id):
     movements = StockMovement.query.filter_by(product_id=product_id)\
         .order_by(StockMovement.timestamp.desc()).all()
     return render_template('inventory/stock_movements.html', product=product, movements=movements)
+
+
+@bp.route('/print-stock-report')
+@login_required
+@permission_required(Permissions.INVENTORY_VIEW)
+def print_stock_report():
+    """Print stock report for current location"""
+    from app.models import Location, LocationStock
+    from app.utils.location_context import get_current_location
+
+    location = get_current_location()
+    report_type = request.args.get('type', 'all')  # 'all' or 'low'
+
+    stock_items = []
+    total_items = 0
+    total_quantity = 0
+    total_value = 0
+    low_stock_count = 0
+
+    if location:
+        # Get stock for this location
+        query = db.session.query(LocationStock, Product).join(
+            Product, LocationStock.product_id == Product.id
+        ).filter(
+            LocationStock.location_id == location.id,
+            Product.is_active == True
+        )
+
+        if report_type == 'low':
+            query = query.filter(LocationStock.quantity <= LocationStock.reorder_level)
+
+        results = query.order_by(Product.name).all()
+
+        for stock, product in results:
+            is_low = stock.quantity <= stock.reorder_level
+            stock_items.append({
+                'stock': stock,
+                'product': product,
+                'quantity': stock.quantity,
+                'reorder_level': stock.reorder_level,
+                'is_low': is_low,
+                'value': stock.quantity * float(product.cost_price)
+            })
+            total_quantity += stock.quantity
+            total_value += stock.quantity * float(product.cost_price)
+            if is_low:
+                low_stock_count += 1
+
+        total_items = len(stock_items)
+    else:
+        # Fallback: global stock from Product table
+        query = Product.query.filter_by(is_active=True)
+
+        if report_type == 'low':
+            query = query.filter(Product.quantity <= Product.reorder_level)
+
+        products = query.order_by(Product.name).all()
+
+        for product in products:
+            is_low = product.quantity <= product.reorder_level
+            stock_items.append({
+                'stock': None,
+                'product': product,
+                'quantity': product.quantity,
+                'reorder_level': product.reorder_level,
+                'is_low': is_low,
+                'value': product.quantity * float(product.cost_price)
+            })
+            total_quantity += product.quantity
+            total_value += product.quantity * float(product.cost_price)
+            if is_low:
+                low_stock_count += 1
+
+        total_items = len(stock_items)
+
+    return render_template('inventory/print_stock_report.html',
+                           location=location,
+                           stock_items=stock_items,
+                           report_type=report_type,
+                           total_items=total_items,
+                           total_quantity=total_quantity,
+                           total_value=total_value,
+                           low_stock_count=low_stock_count,
+                           print_date=datetime.now())

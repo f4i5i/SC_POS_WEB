@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Store-wise Reorders - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-store me-2"></i>Store-wise Reorders</h2>
+            <p class="text-muted mb-0">
+                Pending reorder requests from all stores
+                {% if warehouse %} - <strong>{{ warehouse.name }}</strong>{% endif %}
+            </p>
+        </div>
+        <div>
+            <a href="{{ url_for('warehouse.requests') }}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-list me-1"></i>All Requests
+            </a>
+            <a href="{{ url_for('warehouse.index') }}" class="btn btn-outline-primary">
+                <i class="fas fa-tachometer-alt me-1"></i>Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h2 class="mb-0">{{ total_pending }}</h2>
+                    <small>Pending Approval</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h2 class="mb-0">{{ total_approved }}</h2>
+                    <small>Ready to Dispatch</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h2 class="mb-0">{{ store_reorders|length }}</h2>
+                    <small>Total Stores</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Store Cards Grid -->
+    <div class="row g-4">
+        {% for item in store_reorders %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 {% if item.pending_count > 0 %}border-warning{% elif item.approved_count > 0 %}border-primary{% endif %}">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-store text-primary me-2"></i>{{ item.kiosk.name }}
+                    </h5>
+                    <span class="badge bg-secondary">{{ item.kiosk.code }}</span>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center mb-3">
+                        <div class="col-3">
+                            <h4 class="mb-0 {% if item.pending_count > 0 %}text-warning{% else %}text-muted{% endif %}">
+                                {{ item.pending_count }}
+                            </h4>
+                            <small class="text-muted">Pending</small>
+                        </div>
+                        <div class="col-3">
+                            <h4 class="mb-0 {% if item.approved_count > 0 %}text-primary{% else %}text-muted{% endif %}">
+                                {{ item.approved_count }}
+                            </h4>
+                            <small class="text-muted">Approved</small>
+                        </div>
+                        <div class="col-3">
+                            <h4 class="mb-0 {% if item.dispatched_count > 0 %}text-info{% else %}text-muted{% endif %}">
+                                {{ item.dispatched_count }}
+                            </h4>
+                            <small class="text-muted">In Transit</small>
+                        </div>
+                        <div class="col-3">
+                            <h4 class="mb-0 {% if item.low_stock_count > 5 %}text-danger{% else %}text-muted{% endif %}">
+                                {{ item.low_stock_count }}
+                            </h4>
+                            <small class="text-muted">Low Stock</small>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        {% if item.pending_count > 0 %}
+                        <a href="{{ url_for('warehouse.requests') }}?kiosk_id={{ item.kiosk.id }}"
+                           class="btn btn-warning">
+                            <i class="fas fa-eye me-1"></i>Review {{ item.pending_count }} Pending
+                        </a>
+                        {% endif %}
+                        {% if item.approved_count > 0 %}
+                        <a href="{{ url_for('transfers.index') }}?status=approved&destination={{ item.kiosk.id }}"
+                           class="btn btn-primary">
+                            <i class="fas fa-truck me-1"></i>Dispatch {{ item.approved_count }} Ready
+                        </a>
+                        {% endif %}
+                        {% if item.pending_count == 0 and item.approved_count == 0 %}
+                        <button class="btn btn-outline-secondary" disabled>
+                            <i class="fas fa-check me-1"></i>No Pending Requests
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-footer text-muted small">
+                    <i class="fas fa-map-marker-alt me-1"></i>{{ item.kiosk.city or 'No city' }}
+                    {% if item.kiosk.manager %}
+                    <span class="float-end">
+                        <i class="fas fa-user me-1"></i>{{ item.kiosk.manager.full_name }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12">
+            <div class="alert alert-info text-center py-5">
+                <i class="fas fa-info-circle fa-3x mb-3"></i>
+                <h5>No Stores Found</h5>
+                <p class="mb-0">No kiosks are linked to this warehouse yet.</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

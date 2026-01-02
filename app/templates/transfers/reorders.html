@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Reorders - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-clipboard-list me-2"></i>Stock Reorders</h2>
+            <p class="text-muted mb-0">
+                Manage reorder requests for: <strong>{{ current_location.name }}</strong>
+            </p>
+        </div>
+        <div>
+            <a href="{{ url_for('transfers.create') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>New Transfer Request
+            </a>
+        </div>
+    </div>
+
+    <!-- Draft Reorders - Pending Manager Review -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-edit me-2"></i>Draft Reorders (Pending Review)
+                <span class="badge bg-light text-dark ms-2">{{ draft_transfers|length }}</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if draft_transfers %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Transfer #</th>
+                            <th>Items</th>
+                            <th>Total Qty</th>
+                            <th>Created</th>
+                            <th>Notes</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transfer in draft_transfers %}
+                        <tr>
+                            <td>
+                                <strong>{{ transfer.transfer_number }}</strong>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ transfer.items|length }} items</span>
+                            </td>
+                            <td>{{ transfer.total_quantity_requested }}</td>
+                            <td>
+                                <small>{{ transfer.created_at.strftime('%Y-%m-%d %H:%M') if transfer.created_at else '-' }}</small>
+                            </td>
+                            <td>
+                                <small class="text-muted">{{ transfer.request_notes or 'Auto-created from POS' }}</small>
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('transfers.view', id=transfer.id) }}"
+                                       class="btn btn-outline-primary" title="View/Edit">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <button class="btn btn-success"
+                                            onclick="submitReorder({{ transfer.id }}, '{{ transfer.transfer_number }}')"
+                                            title="Submit to Warehouse">
+                                        <i class="fas fa-paper-plane"></i> Submit
+                                    </button>
+                                    <button class="btn btn-outline-danger"
+                                            onclick="deleteReorder({{ transfer.id }})"
+                                            title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- Expandable items row -->
+                        <tr class="table-light">
+                            <td colspan="6" class="p-2">
+                                <div class="ms-4">
+                                    <small class="text-muted">Items: </small>
+                                    {% for item in transfer.items[:5] %}
+                                    <span class="badge bg-light text-dark border me-1">
+                                        {{ item.product.name }} ({{ item.quantity_requested }})
+                                    </span>
+                                    {% endfor %}
+                                    {% if transfer.items|length > 5 %}
+                                    <span class="badge bg-secondary">+{{ transfer.items|length - 5 }} more</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-inbox fa-3x mb-3"></i>
+                <p>No draft reorders pending review.</p>
+                <p class="small">Reorders are created from POS when products are low on stock.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Submitted Reorders - Awaiting Warehouse -->
+    <div class="card">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-clock me-2"></i>Submitted Reorders (Awaiting Warehouse)
+                <span class="badge bg-light text-dark ms-2">{{ submitted_transfers|length }}</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if submitted_transfers %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Transfer #</th>
+                            <th>Items</th>
+                            <th>Priority</th>
+                            <th>Submitted</th>
+                            <th>Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transfer in submitted_transfers %}
+                        <tr>
+                            <td><strong>{{ transfer.transfer_number }}</strong></td>
+                            <td>
+                                <span class="badge bg-info">{{ transfer.items|length }} items</span>
+                            </td>
+                            <td>
+                                {% if transfer.priority == 'urgent' %}
+                                <span class="badge bg-danger">Urgent</span>
+                                {% elif transfer.priority == 'high' %}
+                                <span class="badge bg-warning text-dark">High</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ transfer.priority|title }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small>{{ transfer.requested_at.strftime('%Y-%m-%d %H:%M') if transfer.requested_at else '-' }}</small>
+                            </td>
+                            <td>
+                                {% if transfer.status == 'requested' %}
+                                <span class="badge bg-warning text-dark">Pending Approval</span>
+                                {% elif transfer.status == 'approved' %}
+                                <span class="badge bg-primary">Approved</span>
+                                {% elif transfer.status == 'dispatched' %}
+                                <span class="badge bg-info">In Transit</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ transfer.status|title }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ url_for('transfers.view', id=transfer.id) }}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                                {% if transfer.status == 'dispatched' %}
+                                <a href="{{ url_for('transfers.receive', id=transfer.id) }}"
+                                   class="btn btn-sm btn-success">
+                                    <i class="fas fa-check"></i> Receive
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted">
+                <p class="mb-0">No pending requests with warehouse.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Submit Reorder Modal -->
+<div class="modal fade" id="submitReorderModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="submitReorderForm" method="POST">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="fas fa-paper-plane me-2"></i>Submit Reorder to Warehouse</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>You are about to submit reorder <strong id="submitTransferNumber"></strong> to the warehouse for fulfillment.</p>
+
+                    <div class="mb-3">
+                        <label class="form-label">Priority</label>
+                        <select name="priority" class="form-select">
+                            <option value="normal">Normal</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes (Optional)</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="Any additional notes for the warehouse..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-paper-plane me-2"></i>Submit to Warehouse
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function submitReorder(id, transferNumber) {
+    document.getElementById('submitReorderForm').action = `/transfers/reorders/submit/${id}`;
+    document.getElementById('submitTransferNumber').textContent = transferNumber;
+    new bootstrap.Modal(document.getElementById('submitReorderModal')).show();
+}
+
+function deleteReorder(id) {
+    if (confirm('Delete this draft reorder? This action cannot be undone.')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/transfers/reorders/delete/${id}`;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

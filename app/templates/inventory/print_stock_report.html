@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ 'Low Stock Report' if report_type == 'low' else 'Stock Report' }} - {{ location.name if location else 'All Locations' }}</title>
+    <style>
+        @media print {
+            body { margin: 0; padding: 15px; }
+            .no-print { display: none !important; }
+            @page { size: A4; margin: 10mm; }
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+            color: #1a1a1a;
+        }
+        .header p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .summary {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .summary-item {
+            text-align: center;
+            padding: 12px 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            min-width: 120px;
+        }
+        .summary-item h3 {
+            margin: 0;
+            font-size: 24px;
+            color: #333;
+        }
+        .summary-item.warning h3 { color: #f0ad4e; }
+        .summary-item.success h3 { color: #28a745; }
+        .summary-item p {
+            margin: 5px 0 0 0;
+            color: #666;
+            font-size: 11px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px 10px;
+            text-align: left;
+        }
+        th {
+            background: #343a40;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) { background: #f9f9f9; }
+        tr:hover { background: #f1f1f1; }
+        .low-stock { background: #fff3cd !important; }
+        .out-of-stock { background: #f8d7da !important; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        .status-ok { background: #d4edda; color: #155724; }
+        .status-low { background: #fff3cd; color: #856404; }
+        .status-out { background: #f8d7da; color: #721c24; }
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 10px;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+        }
+        .action-bar {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .action-bar button, .action-bar a {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 12px;
+        }
+        .btn-print { background: #28a745; color: white; }
+        .btn-print:hover { background: #218838; }
+        .btn-back { background: #6c757d; color: white; }
+        .btn-back:hover { background: #5a6268; }
+        .btn-low { background: #ffc107; color: #333; }
+        .btn-low:hover { background: #e0a800; }
+        .btn-all { background: #17a2b8; color: white; }
+        .btn-all:hover { background: #138496; }
+    </style>
+</head>
+<body>
+    <div class="no-print action-bar">
+        <button onclick="window.print()" class="btn-print">
+            <i class="fas fa-print"></i> Print Report
+        </button>
+        {% if report_type == 'all' %}
+        <a href="{{ url_for('inventory.print_stock_report', type='low') }}" class="btn-low">
+            Low Stock Only
+        </a>
+        {% else %}
+        <a href="{{ url_for('inventory.print_stock_report', type='all') }}" class="btn-all">
+            Full Stock Report
+        </a>
+        {% endif %}
+        <a href="{{ url_for('inventory.index') }}" class="btn-back">
+            Back to Inventory
+        </a>
+    </div>
+
+    <div class="header">
+        <h1>{{ 'Low Stock Report' if report_type == 'low' else 'Stock Report' }}</h1>
+        <p>
+            <strong>Location:</strong> {{ location.name if location else 'All Locations' }}
+            {% if location %} ({{ location.code }}){% endif %}
+        </p>
+        <p><strong>Generated:</strong> {{ print_date.strftime('%Y-%m-%d %H:%M') }}</p>
+    </div>
+
+    <div class="summary">
+        <div class="summary-item">
+            <h3>{{ total_items }}</h3>
+            <p>Total Products</p>
+        </div>
+        <div class="summary-item success">
+            <h3>{{ "{:,}".format(total_quantity) }}</h3>
+            <p>Total Units</p>
+        </div>
+        <div class="summary-item warning">
+            <h3>{{ low_stock_count }}</h3>
+            <p>Low Stock Items</p>
+        </div>
+        <div class="summary-item">
+            <h3>Rs. {{ "{:,.2f}".format(total_value) }}</h3>
+            <p>Total Value (Cost)</p>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 80px;">Code</th>
+                <th>Product Name</th>
+                <th style="width: 100px;">Brand</th>
+                <th class="text-right" style="width: 70px;">Qty</th>
+                <th class="text-right" style="width: 70px;">Reorder</th>
+                <th class="text-right" style="width: 90px;">Cost Price</th>
+                <th class="text-right" style="width: 100px;">Value</th>
+                <th class="text-center" style="width: 80px;">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in stock_items %}
+            <tr class="{% if item.quantity == 0 %}out-of-stock{% elif item.is_low %}low-stock{% endif %}">
+                <td>{{ item.product.code }}</td>
+                <td>{{ item.product.name }}</td>
+                <td>{{ item.product.brand or '-' }}</td>
+                <td class="text-right">{{ item.quantity }}</td>
+                <td class="text-right">{{ item.reorder_level }}</td>
+                <td class="text-right">Rs. {{ "{:,.2f}".format(item.product.cost_price) }}</td>
+                <td class="text-right">Rs. {{ "{:,.2f}".format(item.value) }}</td>
+                <td class="text-center">
+                    {% if item.quantity == 0 %}
+                    <span class="status-badge status-out">OUT</span>
+                    {% elif item.is_low %}
+                    <span class="status-badge status-low">LOW</span>
+                    {% else %}
+                    <span class="status-badge status-ok">OK</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="8" class="text-center" style="padding: 40px; color: #666;">
+                    No products found for this report.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        {% if stock_items %}
+        <tfoot>
+            <tr style="background: #f0f0f0; font-weight: bold;">
+                <td colspan="3">TOTAL</td>
+                <td class="text-right">{{ "{:,}".format(total_quantity) }}</td>
+                <td></td>
+                <td></td>
+                <td class="text-right">Rs. {{ "{:,.2f}".format(total_value) }}</td>
+                <td></td>
+            </tr>
+        </tfoot>
+        {% endif %}
+    </table>
+
+    <div class="footer">
+        <p>Generated by {{ business_name }} Inventory System | {{ print_date.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+    </div>
+</body>
+</html>

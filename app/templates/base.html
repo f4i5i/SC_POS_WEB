@@ -1243,6 +1243,62 @@
             transition: background 0.3s ease;
         }
 
+        .sidebar-menu {
+            padding: 0.5rem 0;
+            overflow-y: auto;
+            max-height: calc(100vh - 100px);
+        }
+
+        .sidebar-menu::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .sidebar-menu::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        /* Category Toggle Styles */
+        .nav-category-toggle {
+            font-weight: 600 !important;
+            text-transform: uppercase;
+            font-size: 0.8rem !important;
+            letter-spacing: 0.5px;
+            opacity: 0.9;
+        }
+
+        .nav-category-toggle .toggle-icon {
+            font-size: 0.7rem;
+            transition: transform 0.3s ease;
+            margin-top: 4px;
+        }
+
+        .nav-category-toggle[aria-expanded="true"] .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        .nav-category-toggle:not(.collapsed) .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Submenu Styles */
+        .nav-submenu {
+            padding-left: 0.5rem;
+            margin-left: 1rem;
+            border-left: 2px solid rgba(128, 128, 128, 0.2);
+        }
+
+        .nav-submenu .nav-link {
+            padding: 0.6rem 1rem !important;
+            margin: 0.1rem 0.5rem !important;
+            font-size: 0.9rem;
+        }
+
+        .nav-submenu .nav-link i {
+            font-size: 0.85rem;
+            width: 20px;
+        }
+
         .sidebar::-webkit-scrollbar {
             width: 6px;
         }
@@ -1578,36 +1634,113 @@
         <div class="sidebar-logo">
             <img src="{{ url_for('static', filename='images/SC - Main.png') }}" alt="{{ business_name }}">
         </div>
-        <div class="pt-3">
+        <div class="sidebar-menu">
             <ul class="nav flex-column">
+                <!-- Dashboard - Always visible -->
                 <li class="nav-item">
                     <a class="nav-link" href="/">
                         <i class="fas fa-home"></i> Dashboard
                     </a>
                 </li>
 
-                {% if current_user.has_permission('pos') %}
-                <li class="nav-item">
-                    <a class="nav-link" href="/pos">
-                        <i class="fas fa-cash-register"></i> POS
+                <!-- SALES SECTION -->
+                {% if current_user.has_permission('pos.view') %}
+                <li class="nav-item nav-category">
+                    <a class="nav-link nav-category-toggle" data-bs-toggle="collapse" href="#salesMenu" role="button">
+                        <i class="fas fa-shopping-cart"></i> Sales
+                        <i class="fas fa-chevron-down float-end toggle-icon"></i>
                     </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/pos/sales">
-                        <i class="fas fa-receipt"></i> Sales
-                    </a>
+                    <div class="collapse show" id="salesMenu">
+                        <ul class="nav flex-column nav-submenu">
+                            <li class="nav-item">
+                                <a class="nav-link" href="/pos">
+                                    <i class="fas fa-cash-register"></i> POS
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/pos/sales">
+                                    <i class="fas fa-receipt"></i> Sales List
+                                </a>
+                            </li>
+                            {% if is_feature_enabled('returns_management') and current_user.role in ['admin', 'manager', 'kiosk_manager'] or current_user.is_global_admin %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="/returns">
+                                    <i class="fas fa-undo"></i> Returns
+                                </a>
+                            </li>
+                            {% endif %}
+                            {% if is_feature_enabled('quotations') %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="/quotations">
+                                    <i class="fas fa-file-invoice"></i> Quotations
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
                 </li>
                 {% endif %}
 
-                {% if current_user.has_permission('inventory') %}
-                <li class="nav-item">
-                    <a class="nav-link" href="/inventory">
+                <!-- INVENTORY SECTION -->
+                {% if current_user.has_permission('inventory.view') %}
+                <li class="nav-item nav-category">
+                    <a class="nav-link nav-category-toggle" data-bs-toggle="collapse" href="#inventoryMenu" role="button">
                         <i class="fas fa-boxes"></i> Inventory
+                        <i class="fas fa-chevron-down float-end toggle-icon"></i>
                     </a>
+                    <div class="collapse show" id="inventoryMenu">
+                        <ul class="nav flex-column nav-submenu">
+                            <li class="nav-item">
+                                <a class="nav-link" href="/inventory">
+                                    <i class="fas fa-box"></i> Products
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/transfers">
+                                    <i class="fas fa-exchange-alt"></i> Transfers
+                                </a>
+                            </li>
+                            {% if current_user.has_permission('transfer.request') %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="/transfers/reorders">
+                                    <i class="fas fa-clipboard-list"></i> Reorders
+                                </a>
+                            </li>
+                            {% endif %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="/inventory/print-stock-report?type=all">
+                                    <i class="fas fa-print"></i> Print Stock
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/inventory/print-stock-report?type=low">
+                                    <i class="fas fa-exclamation-triangle"></i> Low Stock Report
+                                </a>
+                            </li>
+                            {% if current_user.role in ['admin', 'warehouse_manager'] or current_user.is_global_admin %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="/warehouse">
+                                    <i class="fas fa-warehouse"></i> Warehouse
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/warehouse/reorders-by-store">
+                                    <i class="fas fa-store"></i> Store Reorders
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/locations">
+                                    <i class="fas fa-map-marker-alt"></i> Locations
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
                 </li>
                 {% endif %}
 
-                {% if current_user.has_permission('customers') %}
+                <!-- CUSTOMERS SECTION -->
+                {% if current_user.has_permission('customer.view') %}
                 <li class="nav-item">
                     <a class="nav-link" href="/customers">
                         <i class="fas fa-users"></i> Customers
@@ -1615,95 +1748,90 @@
                 </li>
                 {% endif %}
 
-                {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
-                <li class="nav-item">
-                    <a class="nav-link" href="/suppliers">
-                        <i class="fas fa-truck"></i> Suppliers
+                <!-- FINANCE SECTION -->
+                {% if current_user.has_permission('report.view_sales') or current_user.has_permission('expense.view') or current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
+                <li class="nav-item nav-category">
+                    <a class="nav-link nav-category-toggle" data-bs-toggle="collapse" href="#financeMenu" role="button">
+                        <i class="fas fa-chart-pie"></i> Finance
+                        <i class="fas fa-chevron-down float-end toggle-icon"></i>
                     </a>
+                    <div class="collapse" id="financeMenu">
+                        <ul class="nav flex-column nav-submenu">
+                            {% if current_user.has_permission('report.view_sales') %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="/reports">
+                                    <i class="fas fa-chart-bar"></i> Reports
+                                </a>
+                            </li>
+                            {% endif %}
+                            {% if is_feature_enabled('expense_tracking') and (current_user.role in ['admin', 'accountant', 'manager', 'kiosk_manager'] or current_user.is_global_admin) %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="/expenses">
+                                    <i class="fas fa-wallet"></i> Expenses
+                                </a>
+                            </li>
+                            {% endif %}
+                            {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="/suppliers">
+                                    <i class="fas fa-truck"></i> Suppliers
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
                 </li>
                 {% endif %}
 
-                {% if current_user.has_permission('reports') %}
-                <li class="nav-item">
-                    <a class="nav-link" href="/reports">
-                        <i class="fas fa-chart-bar"></i> Reports
+                <!-- MARKETING SECTION -->
+                {% if is_feature_enabled('promotions') or is_feature_enabled('sms_notifications') or is_feature_enabled('whatsapp_notifications') %}
+                <li class="nav-item nav-category">
+                    <a class="nav-link nav-category-toggle" data-bs-toggle="collapse" href="#marketingMenu" role="button">
+                        <i class="fas fa-bullhorn"></i> Marketing
+                        <i class="fas fa-chevron-down float-end toggle-icon"></i>
                     </a>
+                    <div class="collapse" id="marketingMenu">
+                        <ul class="nav flex-column nav-submenu">
+                            {% if is_feature_enabled('promotions') %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="/promotions">
+                                    <i class="fas fa-percent"></i> Promotions
+                                </a>
+                            </li>
+                            {% endif %}
+                            {% if is_feature_enabled('sms_notifications') or is_feature_enabled('whatsapp_notifications') %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="/notifications/sms">
+                                    <i class="fas fa-bell"></i> Notifications
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
                 </li>
                 {% endif %}
 
-                <!-- Expenses - Admin, Accountant, and Store Managers can view/add -->
-                {% if is_feature_enabled('expense_tracking') and (current_user.role in ['admin', 'accountant', 'manager', 'kiosk_manager'] or current_user.is_global_admin) %}
-                <li class="nav-item">
-                    <a class="nav-link" href="/expenses">
-                        <i class="fas fa-wallet"></i> Expenses
+                <!-- ADMIN SECTION -->
+                {% if current_user.role == 'admin' or current_user.is_global_admin %}
+                <li class="nav-item nav-category">
+                    <a class="nav-link nav-category-toggle" data-bs-toggle="collapse" href="#adminMenu" role="button">
+                        <i class="fas fa-cogs"></i> Admin
+                        <i class="fas fa-chevron-down float-end toggle-icon"></i>
                     </a>
-                </li>
-                {% endif %}
-
-                {% if is_feature_enabled('promotions') %}
-                <li class="nav-item">
-                    <a class="nav-link" href="/promotions">
-                        <i class="fas fa-percent"></i> Promotions
-                    </a>
-                </li>
-                {% endif %}
-
-                {% if is_feature_enabled('quotations') %}
-                <li class="nav-item">
-                    <a class="nav-link" href="/quotations">
-                        <i class="fas fa-file-invoice"></i> Quotations
-                    </a>
-                </li>
-                {% endif %}
-
-                {% if is_feature_enabled('returns_management') and current_user.role in ['admin', 'manager', 'kiosk_manager'] or current_user.is_global_admin %}
-                <li class="nav-item">
-                    <a class="nav-link" href="/returns">
-                        <i class="fas fa-undo"></i> Returns
-                    </a>
-                </li>
-                {% endif %}
-
-                {% if is_feature_enabled('sms_notifications') or is_feature_enabled('whatsapp_notifications') %}
-                <li class="nav-item">
-                    <a class="nav-link" href="/notifications/sms">
-                        <i class="fas fa-bell"></i> Notifications
-                    </a>
-                </li>
-                {% endif %}
-
-                {% if current_user.role in ['admin', 'warehouse_manager'] or current_user.is_global_admin %}
-                <li class="nav-item">
-                    <a class="nav-link" href="/locations">
-                        <i class="fas fa-map-marker-alt"></i> Locations
-                    </a>
-                </li>
-                {% endif %}
-
-                {% if current_user.role in ['admin', 'warehouse_manager'] or current_user.is_global_admin %}
-                <li class="nav-item">
-                    <a class="nav-link" href="/warehouse">
-                        <i class="fas fa-warehouse"></i> Warehouse
-                    </a>
-                </li>
-                {% endif %}
-
-                <li class="nav-item">
-                    <a class="nav-link" href="/transfers">
-                        <i class="fas fa-exchange-alt"></i> Transfers
-                    </a>
-                </li>
-
-                {% if current_user.role == 'admin' %}
-                <li class="nav-item">
-                    <a class="nav-link" href="/features">
-                        <i class="fas fa-toggle-on"></i> Features
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/settings">
-                        <i class="fas fa-cog"></i> Settings
-                    </a>
+                    <div class="collapse" id="adminMenu">
+                        <ul class="nav flex-column nav-submenu">
+                            <li class="nav-item">
+                                <a class="nav-link" href="/features">
+                                    <i class="fas fa-toggle-on"></i> Features
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/settings">
+                                    <i class="fas fa-cog"></i> Settings
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                 </li>
                 {% endif %}
             </ul>

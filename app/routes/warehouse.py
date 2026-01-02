@@ -818,3 +818,78 @@ def dispatch_request(id):
     return render_template('warehouse/dispatch_form.html',
                            transfer=transfer,
                            items=items)
+
+
+@bp.route('/reorders-by-store')
+@login_required
+@permission_required(Permissions.WAREHOUSE_APPROVE_REQUESTS)
+def reorders_by_store():
+    """View reorder requests grouped by store/kiosk"""
+    location = get_current_location()
+
+    if location and location.is_warehouse:
+        warehouse = location
+    elif current_user.is_global_admin:
+        warehouse = Location.query.filter_by(location_type='warehouse', is_active=True).first()
+    else:
+        flash('Warehouse access required.', 'warning')
+        return redirect(url_for('index'))
+
+    # Get all child kiosks
+    if warehouse:
+        kiosks = Location.query.filter_by(
+            parent_warehouse_id=warehouse.id,
+            is_active=True
+        ).order_by(Location.name).all()
+    else:
+        kiosks = Location.query.filter_by(
+            location_type='kiosk',
+            is_active=True
+        ).order_by(Location.name).all()
+
+    # Build store-wise reorder summary
+    store_reorders = []
+    total_pending = 0
+    total_approved = 0
+
+    for kiosk in kiosks:
+        # Count pending (requested) transfers
+        pending = StockTransfer.query.filter_by(
+            destination_location_id=kiosk.id,
+            status='requested'
+        ).count()
+
+        # Count approved (ready to dispatch)
+        approved = StockTransfer.query.filter_by(
+            destination_location_id=kiosk.id,
+            status='approved'
+        ).count()
+
+        # Count dispatched (in transit)
+        dispatched = StockTransfer.query.filter_by(
+            destination_location_id=kiosk.id,
+            status='dispatched'
+        ).count()
+
+        # Get low stock count for this kiosk
+        low_stock = LocationStock.query.filter(
+            LocationStock.location_id == kiosk.id,
+            LocationStock.quantity <= LocationStock.reorder_level
+        ).count()
+
+        store_reorders.append({
+            'kiosk': kiosk,
+            'pending_count': pending,
+            'approved_count': approved,
+            'dispatched_count': dispatched,
+            'low_stock_count': low_stock
+        })
+
+        total_pending += pending
+        total_approved += approved
+
+    return render_template('warehouse/reorders_by_store.html',
+                           warehouse=warehouse,
+                           store_reorders=store_reorders,
+                           total_pending=total_pending,
+                           total_approved=total_approved)
