@@ -153,19 +153,39 @@ def add_product():
 def view_product(product_id):
     """View product details"""
     from datetime import datetime
+    from app.models import SaleItem, LocationStock, Location
+    from app.utils.location_context import get_current_location
+
     product = Product.query.get_or_404(product_id)
+    location = get_current_location()
 
-    # Get recent stock movements
-    stock_movements = StockMovement.query.filter_by(product_id=product_id)\
-        .order_by(StockMovement.timestamp.desc()).limit(10).all()
+    # Get location-specific stock
+    location_stock = None
+    store_quantity = product.quantity  # Fallback to global quantity
 
-    # Get recent sales for this product
-    from app.models import SaleItem
-    recent_sales = db.session.query(SaleItem).filter_by(product_id=product_id)\
-        .order_by(SaleItem.id.desc()).limit(10).all()
+    if location:
+        location_stock = LocationStock.query.filter_by(
+            location_id=location.id,
+            product_id=product_id
+        ).first()
+        if location_stock:
+            store_quantity = location_stock.quantity
+
+    # Get recent stock movements (filtered by location for non-admins)
+    movements_query = StockMovement.query.filter_by(product_id=product_id)
+    if location and not current_user.is_global_admin:
+        movements_query = movements_query.filter_by(location_id=location.id)
+    stock_movements = movements_query.order_by(StockMovement.timestamp.desc()).limit(10).all()
+
+    # Get recent sales for this product (filtered by location for non-admins)
+    sales_query = db.session.query(SaleItem).filter_by(product_id=product_id)
+    recent_sales = sales_query.order_by(SaleItem.id.desc()).limit(10).all()
 
     return render_template('inventory/view_product.html',
                           product=product,
+                          location=location,
+                          location_stock=location_stock,
+                          store_quantity=store_quantity,
                           stock_movements=stock_movements,
                           recent_sales=recent_sales,
                           now=datetime.now().date())
@@ -272,28 +292,83 @@ def delete_product(product_id):
 @login_required
 @permission_required(Permissions.INVENTORY_ADJUST)
 def adjust_stock(product_id):
-    """Adjust product stock"""
+    """Adjust product stock for current location"""
+    from app.models import LocationStock
+    from app.utils.location_context import get_current_location
+
     try:
         data = request.get_json()
         product = Product.query.get_or_404(product_id)
+        location = get_current_location()
 
-        old_quantity = product.quantity
-        adjustment = int(data.get('adjustment', 0))
+        # Get adjustment parameters from frontend
+        adjustment_type = data.get('adjustment_type', 'add')
+        quantity = int(data.get('quantity', 0))
         reason = data.get('reason', 'Manual adjustment')
 
-        product.quantity += adjustment
+        # Also support legacy 'adjustment' parameter
+        if 'adjustment' in data:
+            adjustment = int(data.get('adjustment', 0))
+        else:
+            # Calculate adjustment based on type
+            if adjustment_type == 'add':
+                adjustment = quantity
+            elif adjustment_type == 'remove':
+                adjustment = -quantity
+            elif adjustment_type == 'set':
+                # For 'set', we need to calculate the difference
+                if location:
+                    location_stock = LocationStock.query.filter_by(
+                        location_id=location.id, product_id=product_id
+                    ).first()
+                    current_qty = location_stock.quantity if location_stock else 0
+                else:
+                    current_qty = product.quantity
+                adjustment = quantity - current_qty
+            else:
+                adjustment = quantity
 
-        if product.quantity < 0:
-            return jsonify({'success': False, 'error': 'Stock cannot be negative'}), 400
+        # Update location-specific stock if user has a location
+        if location:
+            location_stock = LocationStock.query.filter_by(
+                location_id=location.id, product_id=product_id
+            ).first()
+
+            if not location_stock:
+                location_stock = LocationStock(
+                    location_id=location.id,
+                    product_id=product_id,
+                    quantity=0,
+                    reorder_level=product.reorder_level
+                )
+                db.session.add(location_stock)
+
+            old_quantity = location_stock.quantity
+            location_stock.quantity += adjustment
+
+            if location_stock.quantity < 0:
+                return jsonify({'success': False, 'error': 'Stock cannot be negative'}), 400
+
+            new_quantity = location_stock.quantity
+        else:
+            # Fallback to global product quantity
+            old_quantity = product.quantity
+            product.quantity += adjustment
+
+            if product.quantity < 0:
+                return jsonify({'success': False, 'error': 'Stock cannot be negative'}), 400
+
+            new_quantity = product.quantity
 
         # Create stock movement
         stock_movement = StockMovement(
             product_id=product.id,
             user_id=current_user.id,
+            location_id=location.id if location else None,
             movement_type='adjustment',
             quantity=adjustment,
             reference='STOCK_ADJUSTMENT',
-            notes=f'{reason} (Old: {old_quantity}, New: {product.quantity})'
+            notes=f'{reason} (Old: {old_quantity}, New: {new_quantity})'
         )
         db.session.add(stock_movement)
 
@@ -301,7 +376,7 @@ def adjust_stock(product_id):
 
         return jsonify({
             'success': True,
-            'new_quantity': product.quantity,
+            'new_quantity': new_quantity,
             'message': 'Stock adjusted successfully'
         })
 
@@ -419,31 +494,41 @@ def print_stock_report():
     low_stock_count = 0
 
     if location:
-        # Get stock for this location
-        query = db.session.query(LocationStock, Product).join(
-            Product, LocationStock.product_id == Product.id
+        # Get ALL active products with LEFT JOIN to LocationStock
+        # This includes products that don't have a LocationStock entry (0 stock)
+        from sqlalchemy import outerjoin, and_
+
+        query = db.session.query(Product, LocationStock).outerjoin(
+            LocationStock, and_(
+                LocationStock.product_id == Product.id,
+                LocationStock.location_id == location.id
+            )
         ).filter(
-            LocationStock.location_id == location.id,
             Product.is_active == True
         )
 
-        if report_type == 'low':
-            query = query.filter(LocationStock.quantity <= LocationStock.reorder_level)
-
         results = query.order_by(Product.name).all()
 
-        for stock, product in results:
-            is_low = stock.quantity <= stock.reorder_level
+        for product, stock in results:
+            # If no LocationStock entry, quantity is 0
+            qty = stock.quantity if stock else 0
+            reorder = stock.reorder_level if stock else product.reorder_level
+            is_low = qty <= reorder
+
+            # For low stock report, only include items at or below reorder level
+            if report_type == 'low' and not is_low:
+                continue
+
             stock_items.append({
                 'stock': stock,
                 'product': product,
-                'quantity': stock.quantity,
-                'reorder_level': stock.reorder_level,
+                'quantity': qty,
+                'reorder_level': reorder,
                 'is_low': is_low,
-                'value': stock.quantity * float(product.cost_price)
+                'value': qty * float(product.cost_price)
             })
-            total_quantity += stock.quantity
-            total_value += stock.quantity * float(product.cost_price)
+            total_quantity += qty
+            total_value += qty * float(product.cost_price)
             if is_low:
                 low_stock_count += 1
 
@@ -474,6 +559,9 @@ def print_stock_report():
 
         total_items = len(stock_items)
 
+    # Only admin, warehouse_manager, accountant, inventory_manager can see cost prices
+    can_see_cost = current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin
+
     return render_template('inventory/print_stock_report.html',
                            location=location,
                            stock_items=stock_items,
@@ -482,4 +570,5 @@ def print_stock_report():
                            total_quantity=total_quantity,
                            total_value=total_value,
                            low_stock_count=low_stock_count,
+                           can_see_cost=can_see_cost,
                            print_date=datetime.now())

@@ -30,6 +30,7 @@
                 </div>
             </div>
         </div>
+        {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
         <div class="col-md-4">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
@@ -38,6 +39,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
         <div class="col-md-4">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
@@ -66,8 +68,10 @@
                                     <th>Category</th>
                                     <th class="text-end">Units</th>
                                     <th class="text-end">Revenue</th>
+                                    {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
                                     <th class="text-end">Profit</th>
                                     <th class="text-end">Margin</th>
+                                    {% endif %}
                                 </tr>
                             </thead>
                             <tbody>
@@ -76,6 +80,7 @@
                                     <td class="fw-bold">{{ cat.category }}</td>
                                     <td class="text-end">{{ cat.units_sold }}</td>
                                     <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(cat.revenue) }}</td>
+                                    {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
                                     <td class="text-end text-success">Rs. {{ "{:,.2f}".format(cat.profit) }}</td>
                                     <td class="text-end">
                                         {% set margin = (cat.profit / cat.revenue * 100) if cat.revenue > 0 else 0 %}
@@ -83,6 +88,7 @@
                                             {{ "{:.1f}".format(margin) }}%
                                         </span>
                                     </td>
+                                    {% endif %}
                                 </tr>
                                 {% endfor %}
                             </tbody>

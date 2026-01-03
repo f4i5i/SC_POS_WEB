@@ -62,8 +62,8 @@ def login():
         elif user.role == 'warehouse_manager':
             return redirect(url_for('warehouse.index'))
         elif user.role in ['manager', 'kiosk_manager']:
-            # Store managers go to their store dashboard
-            return redirect(url_for('pos.sales'))
+            # Store managers go to their store dashboard (sales list)
+            return redirect(url_for('pos.sales_list'))
         else:
             return redirect(url_for('index'))
 

@@ -342,8 +342,8 @@ def get_default_roles():
             'permissions': [
                 # POS - can sell, close day, apply discount, but NO void/refund (only returns)
                 'pos.view', 'pos.create_sale', 'pos.close_day', 'pos.hold_sale', 'pos.apply_discount',
-                # Inventory - view only, no direct stock updates (only through transfers)
-                'inventory.view',
+                # Inventory - view and adjust stock for own store
+                'inventory.view', 'inventory.adjust_stock',
                 # Customers - full access
                 'customer.view', 'customer.create', 'customer.edit', 'customer.view_history',
                 # Transfers - can request and receive stock

@@ -163,10 +163,12 @@
             <h3>{{ low_stock_count }}</h3>
             <p>Low Stock Items</p>
         </div>
+        {% if can_see_cost %}
         <div class="summary-item">
             <h3>Rs. {{ "{:,.2f}".format(total_value) }}</h3>
             <p>Total Value (Cost)</p>
         </div>
+        {% endif %}
     </div>
 
     <table>
@@ -177,8 +179,10 @@
                 <th style="width: 100px;">Brand</th>
                 <th class="text-right" style="width: 70px;">Qty</th>
                 <th class="text-right" style="width: 70px;">Reorder</th>
+                {% if can_see_cost %}
                 <th class="text-right" style="width: 90px;">Cost Price</th>
                 <th class="text-right" style="width: 100px;">Value</th>
+                {% endif %}
                 <th class="text-center" style="width: 80px;">Status</th>
             </tr>
         </thead>
@@ -190,8 +194,10 @@
                 <td>{{ item.product.brand or '-' }}</td>
                 <td class="text-right">{{ item.quantity }}</td>
                 <td class="text-right">{{ item.reorder_level }}</td>
+                {% if can_see_cost %}
                 <td class="text-right">Rs. {{ "{:,.2f}".format(item.product.cost_price) }}</td>
                 <td class="text-right">Rs. {{ "{:,.2f}".format(item.value) }}</td>
+                {% endif %}
                 <td class="text-center">
                     {% if item.quantity == 0 %}
                     <span class="status-badge status-out">OUT</span>
@@ -204,7 +210,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="8" class="text-center" style="padding: 40px; color: #666;">
+                <td colspan="{% if can_see_cost %}8{% else %}6{% endif %}" class="text-center" style="padding: 40px; color: #666;">
                     No products found for this report.
                 </td>
             </tr>
@@ -216,8 +222,10 @@
                 <td colspan="3">TOTAL</td>
                 <td class="text-right">{{ "{:,}".format(total_quantity) }}</td>
                 <td></td>
+                {% if can_see_cost %}
                 <td></td>
                 <td class="text-right">Rs. {{ "{:,.2f}".format(total_value) }}</td>
+                {% endif %}
                 <td></td>
             </tr>
         </tfoot>

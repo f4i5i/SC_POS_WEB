@@ -4,6 +4,21 @@
 
 {% block extra_css %}
 <style>
+    /* Fix modal z-index issue */
+    #stockAdjustModal {
+        z-index: 1055 !important;
+    }
+    #stockAdjustModal .modal-dialog {
+        z-index: 1056 !important;
+    }
+    #stockAdjustModal .modal-content {
+        z-index: 1057 !important;
+        position: relative;
+    }
+    .modal-backdrop {
+        z-index: 1050 !important;
+    }
+
     /* Glassmorphism Stat Cards */
     .stat-card {
         background: rgba(255, 255, 255, 0.95);
@@ -387,9 +402,11 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="fas fa-boxes"></i> Inventory Management</h2>
     <div>
+        {% if current_user.has_permission('inventory.create') %}
         <a href="{{ url_for('inventory.add_product') }}" class="btn btn-primary">
             <i class="fas fa-plus-circle"></i> Add New Product
         </a>
+        {% endif %}
     </div>
 </div>
 
@@ -584,21 +601,27 @@
                                         title="View Details">
                                     <i class="fas fa-eye"></i>
                                 </button>
+                                {% if current_user.has_permission('inventory.edit') %}
                                 <a href="{{ url_for('inventory.edit_product', product_id=product.id) }}"
                                    class="action-btn btn-sm btn-warning text-white"
                                    title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </a>
+                                {% endif %}
+                                {% if current_user.has_permission('inventory.adjust_stock') %}
                                 <button class="action-btn btn-sm btn-primary"
-                                        onclick="adjustStock({{ product.id }}, '{{ product.name }}')"
+                                        onclick="adjustStock({{ product.id }}, '{{ product.name | replace("'", "\\'") | replace('"', '\\"') }}')"
                                         title="Adjust Stock">
                                     <i class="fas fa-boxes"></i>
                                 </button>
+                                {% endif %}
+                                {% if current_user.has_permission('inventory.delete') %}
                                 <button class="action-btn btn-sm btn-danger"
                                         onclick="deleteProduct({{ product.id }}, '{{ product.name }}')"
                                         title="Delete">
                                     <i class="fas fa-trash"></i>
                                 </button>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -607,9 +630,11 @@
                             <td colspan="11" class="text-center py-5">
                                 <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
                                 <p class="text-muted">No products found</p>
+                                {% if current_user.has_permission('inventory.create') %}
                                 <a href="{{ url_for('inventory.add_product') }}" class="btn btn-primary">
                                     <i class="fas fa-plus"></i> Add Your First Product
                                 </a>
+                                {% endif %}
                             </td>
                         </tr>
                     {% endif %}
@@ -653,9 +678,9 @@
 {% endif %}
 
 <!-- Stock Adjustment Modal -->
-<div class="modal fade" id="stockAdjustModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
+<div class="modal fade" id="stockAdjustModal" tabindex="-1" data-bs-backdrop="true" data-bs-keyboard="true" aria-labelledby="stockAdjustModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="z-index: 1060;">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="fas fa-boxes"></i> Adjust Stock</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -702,7 +727,15 @@
 let stockAdjustModal;
 
 $(document).ready(function() {
-    stockAdjustModal = new bootstrap.Modal(document.getElementById('stockAdjustModal'));
+    // Initialize modal
+    const modalEl = document.getElementById('stockAdjustModal');
+    if (modalEl) {
+        stockAdjustModal = new bootstrap.Modal(modalEl, {
+            backdrop: true,
+            keyboard: true,
+            focus: true
+        });
+    }
 
     // Auto-submit search after typing
     let searchTimeout;
@@ -719,8 +752,27 @@ $(document).ready(function() {
 
         const productId = $('#adjust_product_id').val();
         const adjustmentType = $('#adjustment_type').val();
-        const quantity = parseInt($('#adjust_quantity').val());
+        const quantityVal = $('#adjust_quantity').val();
         const reason = $('#adjust_reason').val();
+
+        // Validate quantity
+        if (!quantityVal || quantityVal === '') {
+            alert('Please enter a quantity');
+            $('#adjust_quantity').focus();
+            return false;
+        }
+
+        const quantity = parseInt(quantityVal);
+        if (isNaN(quantity) || quantity < 0) {
+            alert('Please enter a valid quantity');
+            $('#adjust_quantity').focus();
+            return false;
+        }
+
+        // Disable button during submission
+        const submitBtn = $(this).find('button[type="submit"]');
+        const originalText = submitBtn.html();
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
 
         $.ajax({
             url: `/inventory/adjust-stock/${productId}`,
@@ -737,22 +789,38 @@ $(document).ready(function() {
                     location.reload();
                 } else {
                     alert('Error: ' + response.error);
+                    submitBtn.prop('disabled', false).html(originalText);
                 }
             },
             error: function(xhr) {
-                alert('Error adjusting stock: ' + xhr.responseJSON.error);
+                let errorMsg = 'Error adjusting stock';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg += ': ' + xhr.responseJSON.error;
+                }
+                alert(errorMsg);
+                submitBtn.prop('disabled', false).html(originalText);
             }
         });
     });
 });
 
 function adjustStock(productId, productName) {
+    if (!stockAdjustModal) {
+        const modalEl = document.getElementById('stockAdjustModal');
+        stockAdjustModal = new bootstrap.Modal(modalEl);
+    }
     $('#adjust_product_id').val(productId);
     $('#adjust_product_name').val(productName);
     $('#adjust_quantity').val('');
     $('#adjust_reason').val('');
     $('#adjustment_type').val('add');
+    // Re-enable submit button
+    $('#stockAdjustForm button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save"></i> Save Adjustment');
     stockAdjustModal.show();
+    // Focus on quantity field after modal is shown
+    setTimeout(function() {
+        $('#adjust_quantity').focus();
+    }, 500);
 }
 
 function viewProduct(productId) {

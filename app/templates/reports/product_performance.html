@@ -39,7 +39,9 @@
                             <th>Brand</th>
                             <th class="text-end">Units Sold</th>
                             <th class="text-end">Revenue</th>
+                            {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
                             <th class="text-end">Profit</th>
+                            {% endif %}
                             <th class="text-end">Transactions</th>
                         </tr>
                     </thead>
@@ -58,7 +60,9 @@
                             <td>{{ product.brand or '-' }}</td>
                             <td class="text-end">{{ product.units_sold }}</td>
                             <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(product.revenue) }}</td>
+                            {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
                             <td class="text-end text-success">Rs. {{ "{:,.2f}".format(product.profit) }}</td>
+                            {% endif %}
                             <td class="text-end">{{ product.transactions }}</td>
                         </tr>
                         {% endfor %}
@@ -122,7 +126,9 @@
                                 <tr>
                                     <th>Product</th>
                                     <th class="text-end">Stock</th>
+                                    {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
                                     <th class="text-end">Value</th>
+                                    {% endif %}
                                 </tr>
                             </thead>
                             <tbody>
@@ -133,7 +139,9 @@
                                         <small class="text-muted">{{ product.code }}</small>
                                     </td>
                                     <td class="text-end">{{ product.quantity }}</td>
+                                    {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
                                     <td class="text-end">Rs. {{ "{:,.2f}".format(product.cost_price * product.quantity) }}</td>
+                                    {% endif %}
                                 </tr>
                                 {% endfor %}
                                 {% if not never_sold %}

@@ -131,15 +131,20 @@
 
                 <hr class="my-4">
 
-                <div class="stock-display {% if product.current_stock <= 0 %}stock-out{% elif product.is_low_stock %}stock-low{% else %}stock-good{% endif %}">
-                    {{ product.current_stock }}
+                {% set reorder_level = location_stock.reorder_level if location_stock else product.reorder_level %}
+                {% set is_low = store_quantity <= reorder_level %}
+                <div class="stock-display {% if store_quantity <= 0 %}stock-out{% elif is_low %}stock-low{% else %}stock-good{% endif %}">
+                    {{ store_quantity }}
                 </div>
-                <p class="text-muted mb-0">Units in Stock</p>
+                <p class="text-muted mb-0">
+                    Units in Stock
+                    {% if location %}<br><small class="text-info">@ {{ location.name }}</small>{% endif %}
+                </p>
 
-                {% if product.current_stock <= 0 %}
+                {% if store_quantity <= 0 %}
                 <span class="badge bg-danger mt-2">Out of Stock</span>
-                {% elif product.is_low_stock %}
-                <span class="badge bg-warning mt-2">Low Stock (Min: {{ product.min_stock_level }})</span>
+                {% elif is_low %}
+                <span class="badge bg-warning mt-2">Low Stock (Min: {{ reorder_level }})</span>
                 {% else %}
                 <span class="badge bg-success mt-2">In Stock</span>
                 {% endif %}
@@ -185,19 +190,19 @@
                     <div class="info-card">
                         <h5 class="mb-4"><i class="fas fa-boxes text-success me-2"></i>Stock Information</h5>
 
-                        <div class="detail-label">Current Stock</div>
-                        <div class="detail-value">{{ product.current_stock }} {{ product.unit or 'units' }}</div>
+                        <div class="detail-label">Current Stock{% if location %} ({{ location.name }}){% endif %}</div>
+                        <div class="detail-value">{{ store_quantity }} {{ product.unit or 'units' }}</div>
 
-                        <div class="detail-label">Minimum Stock Level</div>
-                        <div class="detail-value">{{ product.min_stock_level }} {{ product.unit or 'units' }}</div>
+                        <div class="detail-label">Reorder Level</div>
+                        <div class="detail-value">{{ reorder_level }} {{ product.unit or 'units' }}</div>
 
                         {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
                         <div class="detail-label">Stock Value</div>
-                        <div class="detail-value">Rs. {{ "{:,.2f}".format(product.current_stock * product.cost_price) }}</div>
+                        <div class="detail-value">Rs. {{ "{:,.2f}".format(store_quantity * product.cost_price) }}</div>
                         {% endif %}
 
                         <div class="detail-label">Potential Revenue</div>
-                        <div class="detail-value">Rs. {{ "{:,.2f}".format(product.current_stock * product.selling_price) }}</div>
+                        <div class="detail-value">Rs. {{ "{:,.2f}".format(store_quantity * product.selling_price) }}</div>
 
                         <div class="detail-label">Status</div>
                         <div class="detail-value">

@@ -90,7 +90,9 @@
                             <th>Brand</th>
                             <th class="text-end">Quantity</th>
                             <th class="text-end">Revenue</th>
+                            {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
                             <th class="text-end">Profit</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -101,12 +103,14 @@
                             <td>{{ product.brand or '-' }}</td>
                             <td class="text-end">{{ product.quantity }}</td>
                             <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(product.revenue) }}</td>
+                            {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
                             <td class="text-end text-success">Rs. {{ "{:,.2f}".format(product.profit) }}</td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                         {% if not product_performance %}
                         <tr>
-                            <td colspan="6" class="text-center text-muted py-4">
+                            <td colspan="{% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}6{% else %}5{% endif %}" class="text-center text-muted py-4">
                                 No sales data for the selected date range
                             </td>
                         </tr>

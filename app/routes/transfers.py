@@ -538,18 +538,44 @@ def api_search_products():
 @login_required
 @permission_required(Permissions.TRANSFER_REQUEST)
 def reorders():
-    """Manager view: List draft and submitted reorders for current location"""
+    """Manager view: Show low stock items and pending reorders"""
+    from app.models import LocationStock
+    from sqlalchemy import and_
+
     location = get_current_location()
 
     if not location:
         flash('You must be assigned to a location.', 'warning')
         return redirect(url_for('index'))
 
-    # Get draft reorders (pending manager review)
-    draft_transfers = StockTransfer.query.filter_by(
-        destination_location_id=location.id,
-        status='draft'
-    ).order_by(StockTransfer.created_at.desc()).all()
+    # Get ALL low stock items for this location (auto-suggested reorders)
+    # Include products without LocationStock entries (treated as 0 stock)
+    low_stock_items = []
+
+    query = db.session.query(Product, LocationStock).outerjoin(
+        LocationStock, and_(
+            LocationStock.product_id == Product.id,
+            LocationStock.location_id == location.id
+        )
+    ).filter(
+        Product.is_active == True
+    ).order_by(Product.name)
+
+    for product, stock in query.all():
+        qty = stock.quantity if stock else 0
+        reorder_level = stock.reorder_level if stock else product.reorder_level
+
+        if qty <= reorder_level:
+            suggested_qty = (reorder_level * 2) - qty  # Suggest enough to reach 2x reorder level
+            if suggested_qty < 1:
+                suggested_qty = reorder_level if reorder_level > 0 else 10
+
+            low_stock_items.append({
+                'product': product,
+                'current_stock': qty,
+                'reorder_level': reorder_level,
+                'suggested_qty': suggested_qty
+            })
 
     # Get submitted reorders (awaiting warehouse)
     submitted_transfers = StockTransfer.query.filter(
@@ -557,8 +583,12 @@ def reorders():
         StockTransfer.status.in_(['requested', 'approved', 'dispatched'])
     ).order_by(StockTransfer.requested_at.desc()).all()
 
+    # Convert items to list for template (fix AppenderQuery issue)
+    for transfer in submitted_transfers:
+        transfer.items_list = list(transfer.items)
+
     return render_template('transfers/reorders.html',
-                           draft_transfers=draft_transfers,
+                           low_stock_items=low_stock_items,
                            submitted_transfers=submitted_transfers,
                            current_location=location)
 
@@ -700,5 +730,81 @@ def delete_reorder(id):
     except Exception as e:
         db.session.rollback()
         flash(f'Error: {str(e)}', 'danger')
+
+    return redirect(url_for('transfers.reorders'))
+
+
+@bp.route('/reorders/create-from-selection', methods=['POST'])
+@login_required
+@permission_required(Permissions.TRANSFER_REQUEST)
+def create_reorder_from_selection():
+    """Create a transfer request from selected low stock items"""
+    location = get_current_location()
+
+    if not location:
+        flash('You must be assigned to a location.', 'warning')
+        return redirect(url_for('index'))
+
+    try:
+        # Get selected items from form
+        product_ids = request.form.getlist('product_ids[]')
+        quantities = request.form.getlist('quantities[]')
+        priority = request.form.get('priority', 'normal')
+        notes = request.form.get('notes', '')
+
+        if not product_ids:
+            flash('Please select at least one item.', 'warning')
+            return redirect(url_for('transfers.reorders'))
+
+        # Get warehouse (source location)
+        if location.parent_warehouse_id:
+            source_location_id = location.parent_warehouse_id
+        else:
+            # Find default warehouse
+            from app.models import Location
+            warehouse = Location.query.filter_by(location_type='warehouse', is_active=True).first()
+            if not warehouse:
+                flash('No warehouse configured.', 'danger')
+                return redirect(url_for('transfers.reorders'))
+            source_location_id = warehouse.id
+
+        # Create transfer
+        transfer = StockTransfer(
+            transfer_number=generate_transfer_number(),
+            source_location_id=source_location_id,
+            destination_location_id=location.id,
+            status='requested',
+            priority=priority,
+            requested_by=current_user.id,
+            requested_at=datetime.utcnow(),
+            request_notes=notes
+        )
+        db.session.add(transfer)
+        db.session.flush()  # Get transfer ID
+
+        # Add items
+        items_added = 0
+        for i, product_id in enumerate(product_ids):
+            qty = int(quantities[i]) if i < len(quantities) and quantities[i] else 1
+            if qty > 0:
+                item = StockTransferItem(
+                    transfer_id=transfer.id,
+                    product_id=int(product_id),
+                    quantity_requested=qty
+                )
+                db.session.add(item)
+                items_added += 1
+
+        if items_added == 0:
+            db.session.rollback()
+            flash('No valid items selected.', 'warning')
+            return redirect(url_for('transfers.reorders'))
+
+        db.session.commit()
+        flash(f'Reorder {transfer.transfer_number} created with {items_added} items and submitted to warehouse.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error creating reorder: {str(e)}', 'danger')
 
     return redirect(url_for('transfers.reorders'))
