@@ -144,7 +144,7 @@ def create_app(config_name='default'):
                 today_sales = []
 
             # Calculate today's stats
-            today_total = sum(s.total_amount for s in today_sales)
+            today_total = sum((s.total or 0) for s in today_sales)
             today_count = len(today_sales)
 
             # Get low stock alerts for user's location
