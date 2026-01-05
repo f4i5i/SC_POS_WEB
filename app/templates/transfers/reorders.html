@@ -87,28 +87,53 @@
                                     <th style="width: 40px;"></th>
                                     <th>Product</th>
                                     <th class="text-center">Stock</th>
-                                    <th class="text-center">Reorder Level</th>
+                                    <th class="text-center">Days Left</th>
+                                    <th class="text-center">Avg/Day</th>
                                     <th class="text-center">Order Qty</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for item in low_stock_items %}
-                                <tr class="item-row">
+                                <tr class="item-row {% if item.urgency == 'critical' %}table-danger{% elif item.urgency == 'high' %}table-warning{% endif %}">
                                     <td>
                                         <input type="checkbox" class="form-check-input item-checkbox"
                                                name="product_ids[]" value="{{ item.product.id }}"
                                                data-suggested="{{ item.suggested_qty }}">
                                     </td>
                                     <td>
-                                        <strong>{{ item.product.code }}</strong>
-                                        <div class="small text-muted">{{ item.product.name }}</div>
+                                        <div class="d-flex align-items-center">
+                                            {% if item.urgency == 'critical' %}
+                                            <span class="badge bg-danger me-2" style="font-size: 0.65rem;">CRITICAL</span>
+                                            {% elif item.urgency == 'high' %}
+                                            <span class="badge bg-warning text-dark me-2" style="font-size: 0.65rem;">URGENT</span>
+                                            {% endif %}
+                                            <div>
+                                                <strong>{{ item.product.code }}</strong>
+                                                <div class="small text-muted">{{ item.product.name[:35] }}{% if item.product.name|length > 35 %}...{% endif %}</div>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td class="text-center">
                                         <span class="badge {% if item.current_stock == 0 %}stock-out{% else %}stock-low{% endif %}">
                                             {{ item.current_stock }}
                                         </span>
                                     </td>
-                                    <td class="text-center">{{ item.reorder_level }}</td>
+                                    <td class="text-center">
+                                        {% if item.days_of_stock is not none %}
+                                        <span class="{% if item.days_of_stock <= 3 %}text-danger fw-bold{% elif item.days_of_stock <= 7 %}text-warning{% else %}text-muted{% endif %}">
+                                            {{ item.days_of_stock }}d
+                                        </span>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if item.avg_daily_sales > 0 %}
+                                        <small>{{ item.avg_daily_sales }}</small>
+                                        {% else %}
+                                        <small class="text-muted">-</small>
+                                        {% endif %}
+                                    </td>
                                     <td class="text-center">
                                         <input type="number" class="form-control form-control-sm qty-input"
                                                name="quantities[]" value="{{ item.suggested_qty }}" min="1" disabled>

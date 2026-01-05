@@ -538,7 +538,7 @@ def api_search_products():
 @login_required
 @permission_required(Permissions.TRANSFER_REQUEST)
 def reorders():
-    """Manager view: Show low stock items and pending reorders"""
+    """Manager view: Show low stock items and pending reorders with smart forecasting"""
     from app.models import LocationStock
     from sqlalchemy import and_
 
@@ -547,6 +547,18 @@ def reorders():
     if not location:
         flash('You must be assigned to a location.', 'warning')
         return redirect(url_for('index'))
+
+    # Import forecasting utilities
+    try:
+        from app.utils.inventory_forecast import (
+            get_product_sales_stats,
+            calculate_suggested_reorder_qty,
+            calculate_days_of_stock,
+            calculate_safety_stock
+        )
+        use_forecasting = True
+    except ImportError:
+        use_forecasting = False
 
     # Get ALL low stock items for this location (auto-suggested reorders)
     # Include products without LocationStock entries (treated as 0 stock)
@@ -566,16 +578,54 @@ def reorders():
         reorder_level = stock.reorder_level if stock else product.reorder_level
 
         if qty <= reorder_level:
-            suggested_qty = (reorder_level * 2) - qty  # Suggest enough to reach 2x reorder level
-            if suggested_qty < 1:
-                suggested_qty = reorder_level if reorder_level > 0 else 10
+            # Use smart forecasting if available
+            if use_forecasting:
+                try:
+                    sales_stats = get_product_sales_stats(product.id, location.id, days=30)
+                    suggested_qty = calculate_suggested_reorder_qty(product.id, location.id, target_days=14)
+                    days_of_stock = calculate_days_of_stock(product.id, location.id)
+                    safety_stock = calculate_safety_stock(product.id, location.id)
+
+                    # Determine urgency
+                    if qty == 0:
+                        urgency = 'critical'
+                    elif qty <= safety_stock:
+                        urgency = 'high'
+                    elif days_of_stock and days_of_stock <= 3:
+                        urgency = 'high'
+                    elif days_of_stock and days_of_stock <= 7:
+                        urgency = 'medium'
+                    else:
+                        urgency = 'low'
+                except Exception:
+                    # Fallback if forecasting fails
+                    sales_stats = {'avg_daily_sales': 0, 'total_sold': 0}
+                    suggested_qty = max((reorder_level * 2) - qty, 10)
+                    days_of_stock = None
+                    safety_stock = 5
+                    urgency = 'high' if qty == 0 else 'medium'
+            else:
+                # Fallback: Simple calculation
+                sales_stats = {'avg_daily_sales': 0, 'total_sold': 0}
+                suggested_qty = max((reorder_level * 2) - qty, 10)
+                days_of_stock = None
+                safety_stock = 5
+                urgency = 'high' if qty == 0 else 'medium'
 
             low_stock_items.append({
                 'product': product,
                 'current_stock': qty,
                 'reorder_level': reorder_level,
-                'suggested_qty': suggested_qty
+                'suggested_qty': suggested_qty,
+                'days_of_stock': days_of_stock,
+                'avg_daily_sales': sales_stats.get('avg_daily_sales', 0),
+                'safety_stock': safety_stock,
+                'urgency': urgency
             })
+
+    # Sort by urgency (critical first, then high, medium, low)
+    urgency_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}
+    low_stock_items.sort(key=lambda x: (urgency_order.get(x['urgency'], 4), -x['suggested_qty']))
 
     # Get submitted reorders (awaiting warehouse)
     submitted_transfers = StockTransfer.query.filter(

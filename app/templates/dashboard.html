@@ -617,19 +617,54 @@
 
     <div class="col-lg-6">
         <div class="activity-card">
-            <div class="card-header">
-                <i class="fas fa-exclamation-triangle me-2"></i>Stock Alerts
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-exclamation-triangle me-2"></i>Stock Alerts</span>
+                {% if low_stock_alerts %}
+                <span class="badge bg-danger">{{ low_stock_alerts|length }}</span>
+                {% endif %}
             </div>
-            <div class="card-body">
-                <div class="empty-state">
-                    <div class="empty-state-icon">
-                        <i class="fas fa-check-circle"></i>
+            <div class="card-body" style="max-height: 250px; overflow-y: auto;">
+                {% if low_stock_alerts %}
+                <div class="list-group list-group-flush">
+                    {% for alert in low_stock_alerts[:8] %}
+                    <div class="list-group-item px-0 py-2 border-0">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge {% if alert.urgency == 'critical' %}bg-danger{% elif alert.urgency == 'high' %}bg-warning text-dark{% else %}bg-info{% endif %} me-2" style="font-size: 0.65rem;">
+                                    {% if alert.alert_type == 'out_of_stock' %}OUT{% elif alert.alert_type == 'critical_low' %}CRITICAL{% else %}LOW{% endif %}
+                                </span>
+                                <strong style="font-size: 0.8rem;">{{ alert.product.code }}</strong>
+                                <div class="text-muted" style="font-size: 0.7rem;">{{ alert.product.name[:30] }}{% if alert.product.name|length > 30 %}...{% endif %}</div>
+                            </div>
+                            <div class="text-end">
+                                <div class="{% if alert.current_stock == 0 %}text-danger{% else %}text-warning{% endif %}" style="font-size: 0.85rem; font-weight: 600;">
+                                    {{ alert.current_stock }} units
+                                </div>
+                                {% if alert.days_of_stock is not none %}
+                                <small class="text-muted" style="font-size: 0.65rem;">~{{ alert.days_of_stock }} days left</small>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
-                    <h5>All stock levels healthy</h5>
-                    <a href="/inventory" class="btn btn-success btn-sm">
-                        <i class="fas fa-boxes me-1"></i>Inventory
+                    {% endfor %}
+                </div>
+                <div class="text-center mt-2">
+                    <a href="{{ url_for('transfers.reorders') }}" class="btn btn-danger btn-sm">
+                        <i class="fas fa-shopping-cart me-1"></i>Reorder Now
                     </a>
                 </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <i class="fas fa-check-circle text-success"></i>
+                    </div>
+                    <h5>All stock levels healthy</h5>
+                    <p class="text-muted mb-2">No items need restocking</p>
+                    <a href="/inventory" class="btn btn-success btn-sm">
+                        <i class="fas fa-boxes me-1"></i>View Inventory
+                    </a>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

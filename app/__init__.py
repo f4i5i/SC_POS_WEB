@@ -144,12 +144,25 @@ def create_app(config_name='default'):
             today_total = sum(s.total_amount for s in today_sales)
             today_count = len(today_sales)
 
+            # Get low stock alerts for user's location
+            low_stock_alerts = []
+            stock_summary = None
+            if user_location:
+                try:
+                    from app.utils.inventory_forecast import get_low_stock_alerts, get_location_stock_summary
+                    low_stock_alerts = get_low_stock_alerts(user_location.id, include_forecasting=True)[:10]  # Top 10 alerts
+                    stock_summary = get_location_stock_summary(user_location.id)
+                except Exception as e:
+                    app.logger.error(f"Error getting stock alerts: {e}")
+
             return render_template('dashboard.html',
                                    now=datetime.now(),
                                    products=products,
                                    user_location=user_location,
                                    today_sales_amount=today_total,
-                                   today_sales_count=today_count)
+                                   today_sales_count=today_count,
+                                   low_stock_alerts=low_stock_alerts,
+                                   stock_summary=stock_summary)
         return render_template('index.html')
 
     # Error handlers

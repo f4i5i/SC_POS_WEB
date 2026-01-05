@@ -22,9 +22,14 @@ bp = Blueprint('inventory', __name__)
 @login_required
 @permission_required(Permissions.INVENTORY_VIEW)
 def index():
-    """List all products"""
+    """List all products with location-specific stock"""
+    from app.models import LocationStock
+    from app.utils.location_context import get_current_location
+    from sqlalchemy import and_
+
     page = request.args.get('page', 1, type=int)
     per_page = current_app.config['ITEMS_PER_PAGE']
+    location = get_current_location()
 
     # Filters
     category_id = request.args.get('category')
@@ -32,7 +37,7 @@ def index():
     search = request.args.get('search', '').strip()
     stock_status = request.args.get('stock_status')  # low, out, all
 
-    query = Product.query
+    query = Product.query.filter(Product.is_active == True)
 
     if category_id:
         query = query.filter_by(category_id=category_id)
@@ -46,12 +51,47 @@ def index():
                 Product.brand.ilike(f'%{search}%')
             )
         )
-    if stock_status == 'low':
-        query = query.filter(Product.quantity <= Product.reorder_level)
-    elif stock_status == 'out':
-        query = query.filter(Product.quantity == 0)
+
+    # For location-specific stock filtering, we need to join with LocationStock
+    if location and stock_status:
+        query = query.outerjoin(
+            LocationStock,
+            and_(LocationStock.product_id == Product.id, LocationStock.location_id == location.id)
+        )
+        if stock_status == 'low_stock':
+            query = query.filter(
+                db.or_(
+                    LocationStock.quantity <= LocationStock.reorder_level,
+                    LocationStock.quantity == None
+                )
+            )
+        elif stock_status == 'out_of_stock':
+            query = query.filter(
+                db.or_(
+                    LocationStock.quantity == 0,
+                    LocationStock.quantity == None
+                )
+            )
+        elif stock_status == 'in_stock':
+            query = query.filter(LocationStock.quantity > LocationStock.reorder_level)
 
     products = query.order_by(Product.name).paginate(page=page, per_page=per_page, error_out=False)
+
+    # Add location-specific stock data to each product
+    if location:
+        location_stocks = {ls.product_id: ls for ls in LocationStock.query.filter_by(location_id=location.id).all()}
+        for product in products.items:
+            ls = location_stocks.get(product.id)
+            # Store location-specific values (use _loc_ prefix to avoid conflicts with model properties)
+            product._loc_quantity = ls.quantity if ls else 0
+            product._loc_reorder_level = ls.reorder_level if ls else product.reorder_level
+            product._loc_is_low_stock = product._loc_quantity <= product._loc_reorder_level
+    else:
+        # No location - use product's own values
+        for product in products.items:
+            product._loc_quantity = product.quantity
+            product._loc_reorder_level = product.reorder_level
+            product._loc_is_low_stock = product.quantity <= product.reorder_level
 
     # Get categories and suppliers for filters
     categories = Category.query.all()
@@ -60,7 +100,8 @@ def index():
     return render_template('inventory/index.html',
                          products=products,
                          categories=categories,
-                         suppliers=suppliers)
+                         suppliers=suppliers,
+                         location=location)
 
 
 @bp.route('/add', methods=['GET', 'POST'])
@@ -385,6 +426,102 @@ def adjust_stock(product_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@bp.route('/adjust-stock-page/<int:product_id>', methods=['GET', 'POST'])
+@login_required
+@permission_required(Permissions.INVENTORY_ADJUST)
+def adjust_stock_page(product_id):
+    """Dedicated page for adjusting product stock"""
+    from app.models import LocationStock
+    from app.utils.location_context import get_current_location
+
+    product = Product.query.get_or_404(product_id)
+    location = get_current_location()
+
+    # Get current stock for this location
+    if location:
+        location_stock = LocationStock.query.filter_by(
+            location_id=location.id, product_id=product_id
+        ).first()
+        current_stock = location_stock.quantity if location_stock else 0
+    else:
+        current_stock = product.quantity
+
+    if request.method == 'POST':
+        try:
+            adjustment_type = request.form.get('adjustment_type', 'add')
+            quantity = int(request.form.get('quantity', 0))
+            reason = request.form.get('reason', 'Manual adjustment')
+
+            # Calculate adjustment based on type
+            if adjustment_type == 'add':
+                adjustment = quantity
+            elif adjustment_type == 'remove':
+                adjustment = -quantity
+            elif adjustment_type == 'set':
+                adjustment = quantity - current_stock
+            else:
+                adjustment = quantity
+
+            # Update location-specific stock if user has a location
+            if location:
+                location_stock = LocationStock.query.filter_by(
+                    location_id=location.id, product_id=product_id
+                ).first()
+
+                if not location_stock:
+                    location_stock = LocationStock(
+                        location_id=location.id,
+                        product_id=product_id,
+                        quantity=0,
+                        reorder_level=product.reorder_level
+                    )
+                    db.session.add(location_stock)
+
+                old_quantity = location_stock.quantity
+                location_stock.quantity += adjustment
+
+                if location_stock.quantity < 0:
+                    flash('Stock cannot be negative', 'danger')
+                    return redirect(url_for('inventory.adjust_stock_page', product_id=product_id))
+
+                new_quantity = location_stock.quantity
+            else:
+                old_quantity = product.quantity
+                product.quantity += adjustment
+
+                if product.quantity < 0:
+                    flash('Stock cannot be negative', 'danger')
+                    return redirect(url_for('inventory.adjust_stock_page', product_id=product_id))
+
+                new_quantity = product.quantity
+
+            # Create stock movement
+            stock_movement = StockMovement(
+                product_id=product_id,
+                location_id=location.id if location else None,
+                quantity=adjustment,
+                movement_type='adjustment',
+                notes=reason,
+                reference=f"ADJ-{product_id}-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                user_id=current_user.id
+            )
+            db.session.add(stock_movement)
+            db.session.commit()
+
+            flash(f'Stock adjusted successfully. New quantity: {new_quantity}', 'success')
+            return redirect(url_for('inventory.index'))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adjusting stock: {str(e)}', 'danger')
+            return redirect(url_for('inventory.adjust_stock_page', product_id=product_id))
+
+    return render_template('inventory/adjust_stock.html',
+                         product=product,
+                         current_stock=current_stock,
+                         location=location)
+
+
 @bp.route('/import-csv', methods=['POST'])
 @login_required
 @permission_required(Permissions.INVENTORY_CREATE)
@@ -470,10 +607,36 @@ def low_stock_alert():
 @permission_required(Permissions.INVENTORY_VIEW)
 def stock_movements(product_id):
     """View stock movement history for a product"""
+    from app.models import LocationStock
+    from app.utils.location_context import get_current_location
+
     product = Product.query.get_or_404(product_id)
-    movements = StockMovement.query.filter_by(product_id=product_id)\
-        .order_by(StockMovement.timestamp.desc()).all()
-    return render_template('inventory/stock_movements.html', product=product, movements=movements)
+    location = get_current_location()
+
+    # Get location-specific stock
+    if location:
+        location_stock = LocationStock.query.filter_by(
+            location_id=location.id, product_id=product_id
+        ).first()
+        current_stock = location_stock.quantity if location_stock else 0
+        reorder_level = location_stock.reorder_level if location_stock else product.reorder_level
+
+        # Filter movements by location
+        movements = StockMovement.query.filter_by(
+            product_id=product_id, location_id=location.id
+        ).order_by(StockMovement.timestamp.desc()).all()
+    else:
+        current_stock = product.quantity
+        reorder_level = product.reorder_level
+        movements = StockMovement.query.filter_by(product_id=product_id)\
+            .order_by(StockMovement.timestamp.desc()).all()
+
+    return render_template('inventory/stock_movements.html',
+                         product=product,
+                         movements=movements,
+                         current_stock=current_stock,
+                         reorder_level=reorder_level,
+                         location=location)
 
 
 @bp.route('/print-stock-report')

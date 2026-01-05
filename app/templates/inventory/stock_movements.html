@@ -100,17 +100,17 @@
 
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <span>Current Stock:</span>
-                    <strong class="fs-4">{{ product.quantity }}</strong>
+                    <strong class="fs-4">{{ current_stock }}</strong>
                 </div>
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <span>Reorder Level:</span>
-                    <span>{{ product.reorder_level }}</span>
+                    <span>{{ reorder_level }}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <span>Status:</span>
-                    {% if product.quantity == 0 %}
+                    {% if current_stock == 0 %}
                     <span class="badge bg-danger">Out of Stock</span>
-                    {% elif product.is_low_stock %}
+                    {% elif current_stock <= reorder_level %}
                     <span class="badge bg-warning">Low Stock</span>
                     {% else %}
                     <span class="badge bg-success">In Stock</span>
@@ -126,9 +126,9 @@
                         <a href="{{ url_for('inventory.edit_product', product_id=product.id) }}" class="btn btn-outline-primary">
                             <i class="fas fa-edit"></i> Edit Product
                         </a>
-                        <button class="btn btn-outline-success" onclick="adjustStock()">
+                        <a href="{{ url_for('inventory.adjust_stock_page', product_id=product.id) }}" class="btn btn-outline-success">
                             <i class="fas fa-plus-circle"></i> Adjust Stock
-                        </button>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -214,72 +214,4 @@
     </div>
 </div>
 
-<!-- Adjust Stock Modal -->
-<div class="modal fade" id="adjustStockModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-sliders-h"></i> Adjust Stock
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-info">
-                    <strong>Current Stock:</strong> {{ product.quantity }} units
-                </div>
-                <div class="mb-3">
-                    <label for="adjustmentQty" class="form-label">Adjustment Quantity</label>
-                    <input type="number" class="form-control" id="adjustmentQty" placeholder="Use negative number to decrease">
-                    <small class="text-muted">Example: +10 to add, -5 to remove</small>
-                </div>
-                <div class="mb-3">
-                    <label for="adjustmentReason" class="form-label">Reason</label>
-                    <input type="text" class="form-control" id="adjustmentReason" placeholder="e.g., Damaged goods, Found extra stock">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveAdjustment()">
-                    <i class="fas fa-save"></i> Save Adjustment
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-function adjustStock() {
-    $('#adjustStockModal').modal('show');
-}
-
-function saveAdjustment() {
-    const adjustment = parseInt($('#adjustmentQty').val());
-    const reason = $('#adjustmentReason').val();
-
-    if (!adjustment || adjustment === 0) {
-        alert('Please enter a valid adjustment quantity');
-        return;
-    }
-
-    $.ajax({
-        url: `/inventory/adjust-stock/{{ product.id }}`,
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({
-            adjustment: adjustment,
-            reason: reason || 'Manual adjustment'
-        }),
-        success: function(response) {
-            $('#adjustStockModal').modal('hide');
-            location.reload();
-        },
-        error: function(xhr) {
-            alert('Error: ' + (xhr.responseJSON?.error || 'Failed to adjust stock'));
-        }
-    });
-}
-</script>
 {% endblock %}
