@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Receive Transfer {{ transfer.transfer_number }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-box-open text-success me-2"></i>Receive Stock Transfer</h2>
+            <p class="text-muted mb-0">{{ transfer.transfer_number }}</p>
+        </div>
+        <a href="{{ url_for('transfers.incoming') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Incoming
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <!-- Transfer Details -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-truck me-2"></i>Shipment Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="text-muted">Transfer #</td>
+                            <td class="fw-bold">{{ transfer.transfer_number }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">From</td>
+                            <td>
+                                <span class="badge bg-info">{{ transfer.source_location.code }}</span>
+                                {{ transfer.source_location.name }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Dispatched</td>
+                            <td>{{ transfer.dispatched_at.strftime('%d %b %Y %H:%M') if transfer.dispatched_at else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Dispatched By</td>
+                            <td>{{ transfer.dispatcher.full_name if transfer.dispatcher else '-' }}</td>
+                        </tr>
+                        {% if transfer.dispatch_notes %}
+                        <tr>
+                            <td class="text-muted">Dispatch Notes</td>
+                            <td>{{ transfer.dispatch_notes }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            <!-- Help Card -->
+            <div class="card shadow-sm mt-4 border-0 bg-light">
+                <div class="card-body">
+                    <h6><i class="fas fa-info-circle text-info me-2"></i>How to Receive</h6>
+                    <ol class="small text-muted mb-0 ps-3">
+                        <li>Verify each item against the shipment</li>
+                        <li>Enter the actual quantity received</li>
+                        <li>If any quantity differs, note it in the notes field</li>
+                        <li>Click "Confirm Receipt" to update stock</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <!-- Items to Receive -->
+        <div class="col-lg-8">
+            <form method="POST" action="{{ url_for('transfers.receive', id=transfer.id) }}">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>Items to Receive</h5>
+                        <span class="badge bg-primary">{{ items|length }} items</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Product</th>
+                                        <th class="text-center">Sent Qty</th>
+                                        <th class="text-center">Receive Qty</th>
+                                        <th class="text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in items %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ row.product.code }}</strong>
+                                            <div class="small text-muted">{{ row.product.name }}</div>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge bg-secondary fs-6">{{ row.item.quantity_dispatched or row.item.quantity_approved or row.item.quantity_requested }}</span>
+                                        </td>
+                                        <td class="text-center">
+                                            <input type="number"
+                                                   name="received_qty_{{ row.item.id }}"
+                                                   class="form-control form-control-sm text-center receive-qty"
+                                                   style="width: 80px; display: inline-block;"
+                                                   value="{{ row.item.quantity_dispatched or row.item.quantity_approved or row.item.quantity_requested }}"
+                                                   min="0"
+                                                   data-sent="{{ row.item.quantity_dispatched or row.item.quantity_approved or row.item.quantity_requested }}"
+                                                   onchange="checkQty(this)">
+                                        </td>
+                                        <td class="text-center qty-status" id="status_{{ row.item.id }}">
+                                            <span class="badge bg-success"><i class="fas fa-check"></i> OK</span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label small">Receipt Notes</label>
+                                <input type="text" name="notes" class="form-control"
+                                       placeholder="Any discrepancies or notes about this shipment...">
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button type="submit" class="btn btn-success w-100">
+                                    <i class="fas fa-check-circle me-2"></i>Confirm Receipt
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function checkQty(input) {
+    const sent = parseInt(input.dataset.sent);
+    const received = parseInt(input.value) || 0;
+    const itemId = input.name.replace('received_qty_', '');
+    const statusCell = document.getElementById('status_' + itemId);
+
+    if (received === sent) {
+        statusCell.innerHTML = '<span class="badge bg-success"><i class="fas fa-check"></i> OK</span>';
+    } else if (received < sent) {
+        statusCell.innerHTML = '<span class="badge bg-warning text-dark"><i class="fas fa-exclamation-triangle"></i> Short</span>';
+    } else {
+        statusCell.innerHTML = '<span class="badge bg-info"><i class="fas fa-plus"></i> Extra</span>';
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Recipes - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-book text-success me-2"></i>Recipes</h2>
+            <p class="text-muted mb-0">Attar and perfume formulas</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('production.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Production
+            </a>
+            {% if current_user.has_permission('recipe.create') %}
+            <a href="{{ url_for('production.add_recipe') }}" class="btn btn-success">
+                <i class="fas fa-plus me-2"></i>New Recipe
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Type Filter -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body py-2">
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{{ url_for('production.recipes') }}"
+                   class="btn btn-sm {% if not current_type %}btn-success{% else %}btn-outline-success{% endif %}">
+                    All Recipes
+                </a>
+                <a href="{{ url_for('production.recipes', type='single_oil') }}"
+                   class="btn btn-sm {% if current_type == 'single_oil' %}btn-success{% else %}btn-outline-success{% endif %}">
+                    <i class="fas fa-tint me-1"></i> Single Oil Attars
+                </a>
+                <a href="{{ url_for('production.recipes', type='blended') }}"
+                   class="btn btn-sm {% if current_type == 'blended' %}btn-success{% else %}btn-outline-success{% endif %}">
+                    <i class="fas fa-blender me-1"></i> Blended Attars
+                </a>
+                <a href="{{ url_for('production.recipes', type='perfume') }}"
+                   class="btn btn-sm {% if current_type == 'perfume' %}btn-success{% else %}btn-outline-success{% endif %}">
+                    <i class="fas fa-spray-can me-1"></i> Perfumes
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% if recipes %}
+    <div class="row g-4">
+        {% for recipe in recipes %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header
+                    {% if recipe.recipe_type == 'single_oil' %}bg-primary
+                    {% elif recipe.recipe_type == 'blended' %}bg-warning text-dark
+                    {% else %}bg-info{% endif %} d-flex justify-content-between align-items-center">
+                    <strong>{{ recipe.code }}</strong>
+                    <span class="badge bg-light text-dark">
+                        {% if recipe.recipe_type == 'single_oil' %}Single Oil
+                        {% elif recipe.recipe_type == 'blended' %}Blended
+                        {% else %}Perfume{% endif %}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ recipe.name }}</h5>
+
+                    <div class="mb-3">
+                        <small class="text-muted">Output Size</small>
+                        <div class="fw-bold">{{ recipe.output_size_ml }}ml</div>
+                    </div>
+
+                    {% if recipe.recipe_type == 'perfume' %}
+                    <div class="mb-3">
+                        <small class="text-muted">Oil/Ethanol Ratio</small>
+                        <div>
+                            <span class="badge bg-warning text-dark">{{ recipe.oil_percentage }}% oil</span>
+                            <span class="badge bg-info">{{ 100 - recipe.oil_percentage }}% ethanol</span>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <small class="text-muted">Ingredients</small>
+                        <div>
+                            {% for ing in recipe.ingredients_list[:3] %}
+                            <span class="badge bg-light text-dark me-1 mb-1">
+                                {{ ing.raw_material.code }}
+                                {% if ing.percentage %}({{ ing.percentage }}%){% endif %}
+                            </span>
+                            {% endfor %}
+                            {% if recipe.ingredients.count() > 3 %}
+                            <span class="badge bg-secondary">+{{ recipe.ingredients.count() - 3 }} more</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <small class="text-muted">Can produce at:</small>
+                        <div>
+                            {% if recipe.can_produce_at_warehouse %}
+                            <span class="badge bg-success"><i class="fas fa-warehouse"></i> Warehouse</span>
+                            {% endif %}
+                            {% if recipe.can_produce_at_kiosk %}
+                            <span class="badge bg-primary"><i class="fas fa-store"></i> Kiosk</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-light">
+                    <a href="{{ url_for('production.view_recipe', id=recipe.id) }}" class="btn btn-outline-primary btn-sm w-100">
+                        <i class="fas fa-eye me-1"></i> View Details
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-book-open text-muted fa-4x mb-3"></i>
+            <h4>No Recipes Found</h4>
+            <p class="text-muted">Create your first recipe to start production.</p>
+            {% if current_user.has_permission('recipe.create') %}
+            <a href="{{ url_for('production.add_recipe') }}" class="btn btn-success">
+                <i class="fas fa-plus me-2"></i>Create Recipe
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

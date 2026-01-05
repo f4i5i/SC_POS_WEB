@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+
+{% block title %}{{ recipe.name }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                {% if recipe.recipe_type == 'single_oil' %}
+                <i class="fas fa-tint text-primary me-2"></i>
+                {% elif recipe.recipe_type == 'blended' %}
+                <i class="fas fa-blender text-warning me-2"></i>
+                {% else %}
+                <i class="fas fa-spray-can text-info me-2"></i>
+                {% endif %}
+                {{ recipe.name }}
+            </h2>
+            <p class="text-muted mb-0">{{ recipe.code }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('production.recipes') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+            {% if current_user.has_permission('production.create_order') %}
+            <a href="{{ url_for('production.create_order') }}?recipe_id={{ recipe.id }}" class="btn btn-success">
+                <i class="fas fa-play me-2"></i>Create Production Order
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Recipe Details -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header
+                    {% if recipe.recipe_type == 'single_oil' %}bg-primary
+                    {% elif recipe.recipe_type == 'blended' %}bg-warning text-dark
+                    {% else %}bg-info{% endif %} text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Recipe Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="text-muted">Code</td>
+                            <td class="fw-bold">{{ recipe.code }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Type</td>
+                            <td>
+                                {% if recipe.recipe_type == 'single_oil' %}
+                                <span class="badge bg-primary">Single Oil Attar</span>
+                                {% elif recipe.recipe_type == 'blended' %}
+                                <span class="badge bg-warning text-dark">Blended Attar</span>
+                                {% else %}
+                                <span class="badge bg-info">Perfume</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Output Size</td>
+                            <td>{{ recipe.output_size_ml }}ml</td>
+                        </tr>
+                        {% if recipe.recipe_type == 'perfume' %}
+                        <tr>
+                            <td class="text-muted">Oil %</td>
+                            <td>{{ recipe.oil_percentage }}%</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Ethanol %</td>
+                            <td>{{ 100 - recipe.oil_percentage }}%</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td class="text-muted">Product</td>
+                            <td>{{ recipe.product.name if recipe.product else 'Not linked' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Produce At</td>
+                            <td>
+                                {% if recipe.can_produce_at_warehouse %}
+                                <span class="badge bg-success"><i class="fas fa-warehouse"></i></span>
+                                {% endif %}
+                                {% if recipe.can_produce_at_kiosk %}
+                                <span class="badge bg-primary"><i class="fas fa-store"></i></span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Ingredients -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-list me-2"></i>Ingredients</h5>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        {% for ing in recipe.ingredients_list %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ ing.raw_material.code }}</strong>
+                                <div class="small text-muted">{{ ing.raw_material.name }}</div>
+                            </div>
+                            <div class="text-end">
+                                {% if ing.is_packaging %}
+                                <span class="badge bg-secondary">Bottle</span>
+                                {% else %}
+                                <span class="badge bg-primary">{{ ing.percentage }}%</span>
+                                {% endif %}
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Material Calculator -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Material Calculator</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="me-2">Quantity:</label>
+                        <input type="number" id="calc-qty" class="form-control form-control-sm" style="width: 80px;"
+                               value="{{ sample_qty }}" min="1" onchange="calculateMaterials()">
+                        <span>units</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Initial calculation display -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card bg-light border-0">
+                                <div class="card-body text-center">
+                                    <h6 class="text-muted">Total Output</h6>
+                                    <h4 id="total-output">{{ "%.2f"|format(requirements.total_output_ml or 0) }}ml</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-warning bg-opacity-25 border-0">
+                                <div class="card-body text-center">
+                                    <h6 class="text-muted">Oil Required</h6>
+                                    <h4 id="oil-output">{{ "%.2f"|format(requirements.oil_amount_ml or 0) }}ml</h4>
+                                </div>
+                            </div>
+                        </div>
+                        {% if recipe.recipe_type == 'perfume' %}
+                        <div class="col-md-4">
+                            <div class="card bg-info bg-opacity-25 border-0">
+                                <div class="card-body text-center">
+                                    <h6 class="text-muted">Ethanol Required</h6>
+                                    <h4 id="ethanol-output">{{ "%.2f"|format(requirements.ethanol_amount_ml or 0) }}ml</h4>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <h6 class="mb-3">Materials Needed:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="materials-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Material</th>
+                                    <th class="text-end">Required</th>
+                                    {% if availability %}
+                                    <th class="text-end">Available</th>
+                                    <th>Status</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mat in requirements.materials %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ mat.code }}</strong>
+                                        <div class="small text-muted">{{ mat.name }}</div>
+                                    </td>
+                                    <td class="text-end">
+                                        {{ "%.2f"|format(mat.quantity_required) }} {{ mat.unit }}
+                                    </td>
+                                    {% if availability %}
+                                    {% set avail_mat = availability.materials | selectattr('raw_material_id', 'eq', mat.raw_material_id) | first %}
+                                    <td class="text-end">
+                                        {{ "%.2f"|format(avail_mat.available_quantity if avail_mat else 0) }}
+                                    </td>
+                                    <td>
+                                        {% if avail_mat and avail_mat.is_available %}
+                                        <span class="badge bg-success"><i class="fas fa-check"></i> OK</span>
+                                        {% else %}
+                                        <span class="badge bg-danger"><i class="fas fa-times"></i> Short</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if availability and not availability.all_available %}
+                    <div class="alert alert-danger mt-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Insufficient Materials!</strong> Some materials are not available in required quantities.
+                    </div>
+                    {% elif availability %}
+                    <div class="alert alert-success mt-3">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>All materials available!</strong> Ready to produce {{ sample_qty }} units.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Recent Productions -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Production Orders</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if recipe.production_orders.count() > 0 %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Order #</th>
+                                    <th>Location</th>
+                                    <th class="text-center">Quantity</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in recipe.production_orders.order_by(db.desc('created_at')).limit(5).all() %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('production.view_order', id=order.id) }}">
+                                            {{ order.order_number }}
+                                        </a>
+                                    </td>
+                                    <td>{{ order.location.code if order.location else '-' }}</td>
+                                    <td class="text-center">{{ order.quantity_ordered }}</td>
+                                    <td><span class="badge bg-{{ order.status_badge_class }}">{{ order.status|title }}</span></td>
+                                    <td>{{ order.created_at.strftime('%d %b %Y') }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <p class="mb-0">No production orders for this recipe yet</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function calculateMaterials() {
+    const qty = document.getElementById('calc-qty').value;
+    const recipeId = {{ recipe.id }};
+
+    fetch(`{{ url_for('production.api_calculate_requirements') }}?recipe_id=${recipeId}&quantity=${qty}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+
+            document.getElementById('total-output').textContent = data.total_output_ml.toFixed(2) + 'ml';
+            document.getElementById('oil-output').textContent = data.oil_amount_ml.toFixed(2) + 'ml';
+
+            const ethanolEl = document.getElementById('ethanol-output');
+            if (ethanolEl) {
+                ethanolEl.textContent = data.ethanol_amount_ml.toFixed(2) + 'ml';
+            }
+
+            // Update table (simplified - just update required column)
+            const tbody = document.querySelector('#materials-table tbody');
+            tbody.innerHTML = '';
+
+            data.materials.forEach(mat => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <strong>${mat.code}</strong>
+                        <div class="small text-muted">${mat.name}</div>
+                    </td>
+                    <td class="text-end">${mat.quantity_required.toFixed(2)} ${mat.unit}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        })
+        .catch(err => console.error('Error:', err));
+}
+</script>
+{% endblock %}

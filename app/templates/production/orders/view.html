@@ -1,0 +1,426 @@
+{% extends "base.html" %}
+
+{% block title %}{{ order.order_number }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                <i class="fas fa-clipboard-list text-{{ order.status_badge_class }} me-2"></i>
+                {{ order.order_number }}
+            </h2>
+            <p class="text-muted mb-0">
+                <span class="badge bg-{{ order.status_badge_class }} fs-6">{{ order.status|replace('_', ' ')|title }}</span>
+                {% if order.priority in ['urgent', 'high'] %}
+                <span class="badge bg-{% if order.priority == 'urgent' %}danger{% else %}warning text-dark{% endif %} ms-2">
+                    <i class="fas fa-{% if order.priority == 'urgent' %}exclamation-circle{% else %}arrow-up{% endif %}"></i>
+                    {{ order.priority|title }} Priority
+                </span>
+                {% endif %}
+            </p>
+        </div>
+        <a href="{{ url_for('production.orders') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <!-- Order Details -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Order Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="text-muted">Order #</td>
+                            <td class="fw-bold">{{ order.order_number }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Product</td>
+                            <td>{{ order.product.name if order.product else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Recipe</td>
+                            <td>
+                                <a href="{{ url_for('production.view_recipe', id=order.recipe.id) }}">
+                                    {{ order.recipe.code }}
+                                </a>
+                                {% if order.recipe.recipe_type == 'single_oil' %}
+                                <span class="badge bg-primary">Single Oil</span>
+                                {% elif order.recipe.recipe_type == 'blended' %}
+                                <span class="badge bg-warning text-dark">Blended</span>
+                                {% else %}
+                                <span class="badge bg-info">Perfume</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Location</td>
+                            <td>
+                                <span class="badge bg-secondary">{{ order.location.code if order.location else '-' }}</span>
+                                {{ order.location.name if order.location else '' }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Quantity</td>
+                            <td>
+                                <strong>{{ order.quantity_ordered }}</strong> units
+                                {% if order.status == 'completed' %}
+                                <br><small class="text-muted">({{ order.quantity_produced }} produced)</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Output Size</td>
+                            <td>{{ order.recipe.output_size_ml }}ml each</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Total Output</td>
+                            <td>{{ order.quantity_ordered * order.recipe.output_size_ml }}ml</td>
+                        </tr>
+                        {% if order.due_date %}
+                        <tr>
+                            <td class="text-muted">Due Date</td>
+                            <td>{{ order.due_date.strftime('%d %b %Y') }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>Timeline</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-3">
+                            <div class="d-flex">
+                                <div class="me-3"><i class="fas fa-circle text-secondary"></i></div>
+                                <div>
+                                    <strong>Created</strong>
+                                    <div class="small text-muted">
+                                        {{ order.created_at.strftime('%d %b %Y %H:%M') }}
+                                        {% if order.requester %}<br>by {{ order.requester.full_name }}{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                        {% if order.requested_at %}
+                        <li class="mb-3">
+                            <div class="d-flex">
+                                <div class="me-3"><i class="fas fa-circle text-info"></i></div>
+                                <div>
+                                    <strong>Submitted</strong>
+                                    <div class="small text-muted">{{ order.requested_at.strftime('%d %b %Y %H:%M') }}</div>
+                                </div>
+                            </div>
+                        </li>
+                        {% endif %}
+                        {% if order.approved_at %}
+                        <li class="mb-3">
+                            <div class="d-flex">
+                                <div class="me-3"><i class="fas fa-circle text-{% if order.status == 'rejected' %}danger{% else %}primary{% endif %}"></i></div>
+                                <div>
+                                    <strong>{% if order.status == 'rejected' %}Rejected{% else %}Approved{% endif %}</strong>
+                                    <div class="small text-muted">
+                                        {{ order.approved_at.strftime('%d %b %Y %H:%M') }}
+                                        {% if order.approver %}<br>by {{ order.approver.full_name }}{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                        {% endif %}
+                        {% if order.started_at %}
+                        <li class="mb-3">
+                            <div class="d-flex">
+                                <div class="me-3"><i class="fas fa-circle text-warning"></i></div>
+                                <div>
+                                    <strong>Started</strong>
+                                    <div class="small text-muted">
+                                        {{ order.started_at.strftime('%d %b %Y %H:%M') }}
+                                        {% if order.producer %}<br>by {{ order.producer.full_name }}{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                        {% endif %}
+                        {% if order.completed_at %}
+                        <li>
+                            <div class="d-flex">
+                                <div class="me-3"><i class="fas fa-circle text-success"></i></div>
+                                <div>
+                                    <strong>Completed</strong>
+                                    <div class="small text-muted">{{ order.completed_at.strftime('%d %b %Y %H:%M') }}</div>
+                                </div>
+                            </div>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Materials & Actions -->
+        <div class="col-lg-8">
+            <!-- Materials Required -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>Materials Required</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Material</th>
+                                    <th class="text-end">Required</th>
+                                    {% if availability %}
+                                    <th class="text-end">Available</th>
+                                    <th>Status</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mat in requirements.materials %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ mat.code }}</strong>
+                                        <div class="small text-muted">{{ mat.name }}</div>
+                                    </td>
+                                    <td class="text-end">{{ "%.2f"|format(mat.quantity_required) }} {{ mat.unit }}</td>
+                                    {% if availability %}
+                                    {% set avail_mat = availability.materials | selectattr('raw_material_id', 'eq', mat.raw_material_id) | first %}
+                                    <td class="text-end">{{ "%.2f"|format(avail_mat.available_quantity if avail_mat else 0) }}</td>
+                                    <td>
+                                        {% if avail_mat and avail_mat.is_available %}
+                                        <span class="badge bg-success"><i class="fas fa-check"></i> OK</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times"></i> Short by {{ "%.2f"|format(avail_mat.shortage if avail_mat else mat.quantity_required) }}
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Availability Alert -->
+            {% if availability %}
+                {% if not availability.all_available and order.status in ['pending', 'approved'] %}
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Material Shortage!</strong> Some materials are not available in required quantities.
+                    Production cannot be completed until materials are restocked.
+                </div>
+                {% elif availability.all_available and order.status in ['pending', 'approved', 'in_progress'] %}
+                <div class="alert alert-success mt-3">
+                    <i class="fas fa-check-circle me-2"></i>
+                    All materials are available for this production run.
+                </div>
+                {% endif %}
+            {% endif %}
+
+            <!-- Action Buttons -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Actions</h5>
+                </div>
+                <div class="card-body">
+                    {% if order.status == 'pending' and current_user.has_permission('production.approve_order') %}
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <form method="POST" action="{{ url_for('production.approve_order', id=order.id) }}">
+                                <input type="hidden" name="action" value="approve">
+                                <button type="submit" class="btn btn-success w-100"
+                                        {% if not availability.all_available %}disabled{% endif %}>
+                                    <i class="fas fa-check me-2"></i>Approve Order
+                                </button>
+                            </form>
+                        </div>
+                        <div class="col-md-6">
+                            <button type="button" class="btn btn-danger w-100" data-bs-toggle="modal" data-bs-target="#rejectModal">
+                                <i class="fas fa-times me-2"></i>Reject Order
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if order.status == 'approved' and current_user.has_permission('production.execute') %}
+                    <form method="POST" action="{{ url_for('production.start_order', id=order.id) }}">
+                        <button type="submit" class="btn btn-warning w-100">
+                            <i class="fas fa-play me-2"></i>Start Production
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    {% if order.status == 'in_progress' and current_user.has_permission('production.execute') %}
+                    <form method="POST" action="{{ url_for('production.complete_order', id=order.id) }}">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Quantity Actually Produced</label>
+                                <input type="number" name="quantity_produced" class="form-control"
+                                       value="{{ order.quantity_ordered }}" min="0" max="{{ order.quantity_ordered * 2 }}">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="fas fa-check-circle me-2"></i>Complete Production
+                        </button>
+                        <small class="text-muted d-block mt-2">
+                            This will deduct materials and add {{ order.quantity_ordered }} {{ order.product.name if order.product else 'products' }} to inventory.
+                        </small>
+                    </form>
+                    {% endif %}
+
+                    {% if order.can_cancel and current_user.has_permission('production.create_order') %}
+                    <hr>
+                    <button type="button" class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#cancelModal">
+                        <i class="fas fa-ban me-2"></i>Cancel Order
+                    </button>
+                    {% endif %}
+
+                    {% if order.status == 'completed' %}
+                    <div class="alert alert-success mb-0">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Production Complete!</strong><br>
+                        {{ order.quantity_produced }} units of {{ order.product.name if order.product else 'product' }} added to inventory.
+                    </div>
+                    {% endif %}
+
+                    {% if order.status == 'rejected' %}
+                    <div class="alert alert-danger mb-0">
+                        <i class="fas fa-times-circle me-2"></i>
+                        <strong>Order Rejected</strong><br>
+                        {% if order.rejection_reason %}
+                        Reason: {{ order.rejection_reason }}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if order.status == 'cancelled' %}
+                    <div class="alert alert-secondary mb-0">
+                        <i class="fas fa-ban me-2"></i>
+                        <strong>Order Cancelled</strong><br>
+                        {% if order.rejection_reason %}
+                        Reason: {{ order.rejection_reason }}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Notes -->
+            {% if order.notes %}
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Notes</h5>
+                </div>
+                <div class="card-body">
+                    {{ order.notes }}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Material Consumptions (for completed orders) -->
+            {% if order.status == 'completed' and order.material_consumptions.count() > 0 %}
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-check-double me-2"></i>Materials Consumed</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Material</th>
+                                    <th class="text-end">Quantity Used</th>
+                                    <th>Unit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for consumption in order.material_consumptions %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ consumption.raw_material.code }}</strong>
+                                        <div class="small text-muted">{{ consumption.raw_material.name }}</div>
+                                    </td>
+                                    <td class="text-end">{{ "%.2f"|format(consumption.quantity_consumed) }}</td>
+                                    <td>{{ consumption.unit }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('production.approve_order', id=order.id) }}">
+                <input type="hidden" name="action" value="reject">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="fas fa-times-circle me-2"></i>Reject Order</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to reject this production order?</p>
+                    <div class="mb-3">
+                        <label class="form-label">Reason for Rejection</label>
+                        <textarea name="reason" class="form-control" rows="3" required
+                                  placeholder="Please provide a reason..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-times me-1"></i>Reject
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Modal -->
+<div class="modal fade" id="cancelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('production.cancel_order', id=order.id) }}">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="fas fa-ban me-2"></i>Cancel Order</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to cancel this production order?</p>
+                    <div class="mb-3">
+                        <label class="form-label">Reason (optional)</label>
+                        <textarea name="reason" class="form-control" rows="2"
+                                  placeholder="Reason for cancellation..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep Order</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-ban me-1"></i>Cancel Order
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

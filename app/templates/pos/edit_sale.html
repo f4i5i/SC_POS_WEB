@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Sale #{{ sale.sale_number }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-edit text-warning me-2"></i>Edit Sale</h2>
+            <p class="text-muted mb-0">Transaction #{{ sale.sale_number }}</p>
+        </div>
+        <a href="{{ url_for('pos.sale_details', sale_id=sale.id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Sale
+        </a>
+    </div>
+
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <strong>Admin Edit Mode:</strong> Changes will be logged with your name and timestamp. Stock will be adjusted if quantities change.
+    </div>
+
+    <form method="POST">
+        <div class="row g-4">
+            <!-- Left Column - Sale Details -->
+            <div class="col-lg-8">
+                <!-- Basic Info -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-info-circle text-primary me-2"></i>Sale Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Sale Number</label>
+                                <input type="text" class="form-control" value="{{ sale.sale_number }}" disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Sale Date</label>
+                                <input type="text" class="form-control" value="{{ sale.sale_date.strftime('%Y-%m-%d %H:%M') }}" disabled>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Customer</label>
+                                <select name="customer_id" class="form-select">
+                                    <option value="">Walk-in Customer</option>
+                                    {% for customer in customers %}
+                                    <option value="{{ customer.id }}" {% if sale.customer_id == customer.id %}selected{% endif %}>
+                                        {{ customer.name }} {% if customer.phone %}({{ customer.phone }}){% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Cashier</label>
+                                <input type="text" class="form-control" value="{{ sale.user.full_name if sale.user else 'N/A' }}" disabled>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Items -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-shopping-cart text-primary me-2"></i>Sale Items</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Product</th>
+                                        <th class="text-center" style="width: 100px;">Quantity</th>
+                                        <th class="text-end" style="width: 150px;">Unit Price</th>
+                                        <th class="text-end" style="width: 120px;">Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in sale.items %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ item.product.name }}</strong>
+                                            <div class="small text-muted">{{ item.product.code }}</div>
+                                        </td>
+                                        <td>
+                                            <input type="number" name="item_qty_{{ item.id }}"
+                                                   class="form-control form-control-sm text-center item-qty"
+                                                   value="{{ item.quantity }}" min="1"
+                                                   data-original="{{ item.quantity }}"
+                                                   data-price="{{ item.unit_price }}">
+                                        </td>
+                                        <td>
+                                            <input type="number" name="item_price_{{ item.id }}"
+                                                   class="form-control form-control-sm text-end item-price"
+                                                   value="{{ item.unit_price }}" min="0" step="0.01"
+                                                   data-original="{{ item.unit_price }}">
+                                        </td>
+                                        <td class="text-end fw-bold item-subtotal">
+                                            Rs. {{ "{:,.2f}".format(item.subtotal) }}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot class="table-light">
+                                    <tr>
+                                        <td colspan="3" class="text-end"><strong>Subtotal:</strong></td>
+                                        <td class="text-end fw-bold" id="calc-subtotal">Rs. {{ "{:,.2f}".format(sale.subtotal) }}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-sticky-note text-warning me-2"></i>Notes</h5>
+                    </div>
+                    <div class="card-body">
+                        <textarea name="notes" class="form-control" rows="3" placeholder="Add notes...">{{ sale.notes or '' }}</textarea>
+                        <small class="text-muted">Edit history will be appended automatically</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column - Payment -->
+            <div class="col-lg-4">
+                <!-- Payment Details -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-credit-card me-2"></i>Payment Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Payment Method</label>
+                            <select name="payment_method" class="form-select">
+                                <option value="cash" {% if sale.payment_method == 'cash' %}selected{% endif %}>Cash</option>
+                                <option value="card" {% if sale.payment_method == 'card' %}selected{% endif %}>Card</option>
+                                <option value="bank_transfer" {% if sale.payment_method == 'bank_transfer' %}selected{% endif %}>Bank Transfer</option>
+                                <option value="easypaisa" {% if sale.payment_method == 'easypaisa' %}selected{% endif %}>Easypaisa</option>
+                                <option value="jazzcash" {% if sale.payment_method == 'jazzcash' %}selected{% endif %}>JazzCash</option>
+                                <option value="credit" {% if sale.payment_method == 'credit' %}selected{% endif %}>Credit</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Payment Status</label>
+                            <select name="payment_status" class="form-select">
+                                <option value="paid" {% if sale.payment_status == 'paid' %}selected{% endif %}>Paid</option>
+                                <option value="partial" {% if sale.payment_status == 'partial' %}selected{% endif %}>Partial</option>
+                                <option value="pending" {% if sale.payment_status == 'pending' %}selected{% endif %}>Pending</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Discount -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-tags text-danger me-2"></i>Discount</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-2">
+                            <div class="col-7">
+                                <label class="form-label">Amount</label>
+                                <input type="number" name="discount" class="form-control"
+                                       value="{{ sale.discount }}" min="0" step="0.01" id="discount-input">
+                            </div>
+                            <div class="col-5">
+                                <label class="form-label">Type</label>
+                                <select name="discount_type" class="form-select" id="discount-type">
+                                    <option value="amount" {% if sale.discount_type == 'amount' %}selected{% endif %}>Rs.</option>
+                                    <option value="percentage" {% if sale.discount_type == 'percentage' %}selected{% endif %}>%</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary -->
+                <div class="card shadow-sm mb-4 border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Original Total:</span>
+                            <span class="text-muted">Rs. {{ "{:,.2f}".format(sale.total) }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Amount Paid:</span>
+                            <span>Rs. {{ "{:,.2f}".format(sale.amount_paid) }}</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between">
+                            <strong>Current Status:</strong>
+                            <span class="badge bg-{% if sale.status == 'completed' %}success{% elif sale.status == 'refunded' %}danger{% else %}warning{% endif %}">
+                                {{ sale.status|title }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-save me-2"></i>Save Changes
+                    </button>
+                    <a href="{{ url_for('pos.sale_details', sale_id=sale.id) }}" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+// Real-time subtotal calculation
+document.querySelectorAll('.item-qty, .item-price').forEach(input => {
+    input.addEventListener('input', function() {
+        const row = this.closest('tr');
+        const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+        const price = parseFloat(row.querySelector('.item-price').value) || 0;
+        const subtotal = qty * price;
+        row.querySelector('.item-subtotal').textContent = 'Rs. ' + subtotal.toLocaleString('en-US', {minimumFractionDigits: 2});
+        updateTotal();
+    });
+});
+
+document.getElementById('discount-input').addEventListener('input', updateTotal);
+document.getElementById('discount-type').addEventListener('change', updateTotal);
+
+function updateTotal() {
+    let subtotal = 0;
+    document.querySelectorAll('.item-qty').forEach(input => {
+        const row = input.closest('tr');
+        const qty = parseFloat(input.value) || 0;
+        const price = parseFloat(row.querySelector('.item-price').value) || 0;
+        subtotal += qty * price;
+    });
+
+    document.getElementById('calc-subtotal').textContent = 'Rs. ' + subtotal.toLocaleString('en-US', {minimumFractionDigits: 2});
+}
+</script>
+{% endblock %}

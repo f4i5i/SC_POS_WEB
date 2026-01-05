@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Production Orders - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-clipboard-list text-warning me-2"></i>Production Orders</h2>
+            <p class="text-muted mb-0">Manufacturing work orders</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('production.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Production
+            </a>
+            {% if current_user.has_permission('production.create_order') %}
+            <a href="{{ url_for('production.create_order') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>New Order
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if current_location %}
+    <div class="alert alert-info mb-4">
+        <i class="fas fa-map-marker-alt me-2"></i>
+        Location: <strong>{{ current_location.name }}</strong>
+    </div>
+    {% endif %}
+
+    <!-- Status Filter -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body py-2">
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{{ url_for('production.orders') }}"
+                   class="btn btn-sm {% if not current_status %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                    All Orders
+                </a>
+                <a href="{{ url_for('production.orders', status='pending') }}"
+                   class="btn btn-sm {% if current_status == 'pending' %}btn-info{% else %}btn-outline-info{% endif %}">
+                    <i class="fas fa-clock me-1"></i> Pending
+                </a>
+                <a href="{{ url_for('production.orders', status='approved') }}"
+                   class="btn btn-sm {% if current_status == 'approved' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                    <i class="fas fa-check me-1"></i> Approved
+                </a>
+                <a href="{{ url_for('production.orders', status='in_progress') }}"
+                   class="btn btn-sm {% if current_status == 'in_progress' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+                    <i class="fas fa-cogs me-1"></i> In Progress
+                </a>
+                <a href="{{ url_for('production.orders', status='completed') }}"
+                   class="btn btn-sm {% if current_status == 'completed' %}btn-success{% else %}btn-outline-success{% endif %}">
+                    <i class="fas fa-check-circle me-1"></i> Completed
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% if orders %}
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Order #</th>
+                            <th>Product</th>
+                            <th>Recipe Type</th>
+                            <th class="text-center">Quantity</th>
+                            <th>Location</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr class="{% if order.priority == 'urgent' %}table-danger{% elif order.priority == 'high' %}table-warning{% endif %}">
+                            <td>
+                                <a href="{{ url_for('production.view_order', id=order.id) }}" class="fw-bold">
+                                    {{ order.order_number }}
+                                </a>
+                            </td>
+                            <td>
+                                <div>{{ order.product.name[:30] }}{% if order.product.name|length > 30 %}...{% endif %}</div>
+                                <small class="text-muted">{{ order.recipe.code if order.recipe else '-' }}</small>
+                            </td>
+                            <td>
+                                {% if order.recipe %}
+                                    {% if order.recipe.recipe_type == 'single_oil' %}
+                                    <span class="badge bg-primary">Single Oil</span>
+                                    {% elif order.recipe.recipe_type == 'blended' %}
+                                    <span class="badge bg-warning text-dark">Blended</span>
+                                    {% else %}
+                                    <span class="badge bg-info">Perfume</span>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <strong>{{ order.quantity_ordered }}</strong>
+                                {% if order.status == 'completed' and order.quantity_produced != order.quantity_ordered %}
+                                <br><small class="text-muted">({{ order.quantity_produced }} produced)</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ order.location.code if order.location else '-' }}</span>
+                            </td>
+                            <td>
+                                {% if order.priority == 'urgent' %}
+                                <span class="badge bg-danger"><i class="fas fa-exclamation-circle"></i> Urgent</span>
+                                {% elif order.priority == 'high' %}
+                                <span class="badge bg-warning text-dark"><i class="fas fa-arrow-up"></i> High</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ order.priority|title }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ order.status_badge_class }}">{{ order.status|replace('_', ' ')|title }}</span>
+                            </td>
+                            <td>
+                                <span title="{{ order.created_at.strftime('%Y-%m-%d %H:%M') }}">
+                                    {{ order.created_at.strftime('%d %b %H:%M') }}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('production.view_order', id=order.id) }}"
+                                   class="btn btn-sm btn-outline-primary" title="View">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-clipboard text-muted fa-4x mb-3"></i>
+            <h4>No Production Orders</h4>
+            <p class="text-muted">
+                {% if current_status %}
+                No orders with status "{{ current_status }}" found.
+                {% else %}
+                Start by creating a new production order.
+                {% endif %}
+            </p>
+            {% if current_user.has_permission('production.create_order') %}
+            <a href="{{ url_for('production.create_order') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Create Order
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1313,7 +1313,7 @@
         }
 
         .sidebar-logo {
-            padding: 2rem 1.5rem;
+            padding: 1rem 1rem;
             text-align: center;
             border-bottom: 2px solid rgba(59, 130, 246, 0.1);
             background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05));
@@ -1338,7 +1338,7 @@
         }
 
         .sidebar-logo img {
-            max-width: 200px;
+            max-width: 140px;
             height: auto;
             position: relative;
             z-index: 1;
@@ -1692,7 +1692,7 @@
                         <i class="fas fa-shopping-cart"></i> Sales
                         <i class="fas fa-chevron-down float-end toggle-icon"></i>
                     </a>
-                    <div class="collapse show" id="salesMenu">
+                    <div class="collapse" id="salesMenu">
                         <ul class="nav flex-column nav-submenu">
                             <li class="nav-item">
                                 <a class="nav-link" href="/pos">
@@ -1730,7 +1730,7 @@
                         <i class="fas fa-boxes"></i> Inventory
                         <i class="fas fa-chevron-down float-end toggle-icon"></i>
                     </a>
-                    <div class="collapse show" id="inventoryMenu">
+                    <div class="collapse" id="inventoryMenu">
                         <ul class="nav flex-column nav-submenu">
                             <li class="nav-item">
                                 <a class="nav-link" href="/inventory">
@@ -1776,6 +1776,40 @@
                                 </a>
                             </li>
                             {% endif %}
+                        </ul>
+                    </div>
+                </li>
+                {% endif %}
+
+                <!-- PRODUCTION SECTION -->
+                {% if current_user.has_permission('production.view') %}
+                <li class="nav-item nav-category">
+                    <a class="nav-link nav-category-toggle" data-bs-toggle="collapse" href="#productionMenu" role="button">
+                        <i class="fas fa-industry"></i> Production
+                        <i class="fas fa-chevron-down float-end toggle-icon"></i>
+                    </a>
+                    <div class="collapse" id="productionMenu">
+                        <ul class="nav flex-column nav-submenu">
+                            <li class="nav-item">
+                                <a class="nav-link" href="/production">
+                                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/production/raw-materials">
+                                    <i class="fas fa-flask"></i> Raw Materials
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/production/recipes">
+                                    <i class="fas fa-book"></i> Recipes
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/production/orders">
+                                    <i class="fas fa-clipboard-list"></i> Orders
+                                </a>
+                            </li>
                         </ul>
                     </div>
                 </li>

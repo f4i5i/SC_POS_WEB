@@ -99,6 +99,9 @@ def create_app(config_name='default'):
     from app.routes.warehouse import bp as warehouse_bp
     app.register_blueprint(warehouse_bp, url_prefix='/warehouse')
 
+    from app.routes.production import bp as production_bp
+    app.register_blueprint(production_bp, url_prefix='/production')
+
     # Register main routes
     @app.route('/')
     def index():

@@ -241,6 +241,22 @@ class Permissions:
     RETURNS_CREATE = 'returns.create'
     RETURNS_APPROVE = 'returns.approve'
 
+    # Production Permissions
+    PRODUCTION_VIEW = 'production.view'
+    PRODUCTION_CREATE = 'production.create_order'
+    PRODUCTION_APPROVE = 'production.approve_order'
+    PRODUCTION_EXECUTE = 'production.execute'
+
+    # Raw Material Permissions
+    RAW_MATERIAL_VIEW = 'raw_material.view'
+    RAW_MATERIAL_CREATE = 'raw_material.create'
+    RAW_MATERIAL_ADJUST = 'raw_material.adjust_stock'
+
+    # Recipe Permissions
+    RECIPE_VIEW = 'recipe.view'
+    RECIPE_CREATE = 'recipe.create'
+    RECIPE_EDIT = 'recipe.edit'
+
 
 def get_all_permissions():
     """Get all defined permissions as a list of tuples (name, display_name, module)"""
@@ -317,6 +333,22 @@ def get_all_permissions():
         # Multi-Location Reports
         ('report.view_all_locations', 'View All Location Reports', 'reports'),
         ('report.compare_locations', 'Compare Location Reports', 'reports'),
+
+        # Production
+        ('production.view', 'View Production', 'production'),
+        ('production.create_order', 'Create Production Orders', 'production'),
+        ('production.approve_order', 'Approve Production Orders', 'production'),
+        ('production.execute', 'Execute Production', 'production'),
+
+        # Raw Materials
+        ('raw_material.view', 'View Raw Materials', 'production'),
+        ('raw_material.create', 'Create Raw Materials', 'production'),
+        ('raw_material.adjust_stock', 'Adjust Raw Material Stock', 'production'),
+
+        # Recipes
+        ('recipe.view', 'View Recipes', 'production'),
+        ('recipe.create', 'Create Recipes', 'production'),
+        ('recipe.edit', 'Edit Recipes', 'production'),
     ]
 
     return permissions
@@ -391,19 +423,23 @@ def get_default_roles():
         },
         'warehouse_manager': {
             'display_name': 'Warehouse Manager',
-            'description': 'Manages central warehouse operations and approves stock transfers',
+            'description': 'Manages central warehouse operations, approves stock transfers, and production',
             'permissions': [
                 'warehouse.view', 'warehouse.manage_stock', 'warehouse.approve_requests',
                 'inventory.view', 'inventory.create', 'inventory.edit', 'inventory.adjust_stock',
                 'transfer.view', 'transfer.approve', 'transfer.dispatch', 'transfer.view_all',
                 'location.view', 'location.view_all',
-                'report.view_inventory', 'report.view_all_locations'
+                'report.view_inventory', 'report.view_all_locations',
+                # Production - full access
+                'production.view', 'production.create_order', 'production.approve_order', 'production.execute',
+                'raw_material.view', 'raw_material.create', 'raw_material.adjust_stock',
+                'recipe.view', 'recipe.create', 'recipe.edit'
             ],
             'is_system': True
         },
         'kiosk_manager': {
             'display_name': 'Kiosk Manager',
-            'description': 'Manages a specific kiosk location (same as Store Manager)',
+            'description': 'Manages a specific kiosk location with attar production capability',
             'permissions': [
                 # POS - can sell, close day, apply discount, but NO void/refund (only returns)
                 'pos.view', 'pos.create_sale', 'pos.close_day', 'pos.hold_sale', 'pos.apply_discount',
@@ -420,7 +456,11 @@ def get_default_roles():
                 # Expenses - can view and add store expenses
                 'expense.view', 'expense.create',
                 # Returns - can process returns
-                'returns.view', 'returns.create'
+                'returns.view', 'returns.create',
+                # Production - can view, create orders, and execute attar production
+                'production.view', 'production.create_order', 'production.execute',
+                'raw_material.view', 'raw_material.adjust_stock',
+                'recipe.view'
             ],
             'is_system': True
         },

@@ -236,6 +236,11 @@ class Product(db.Model):
     expiry_date = db.Column(db.Date)
     is_active = db.Column(db.Boolean, default=True)
 
+    # Manufacturing fields
+    product_type = db.Column(db.String(32), default='retail')  # 'retail', 'manufactured'
+    is_manufactured = db.Column(db.Boolean, default=False)  # True for attars/perfumes made in-house
+    can_be_reordered = db.Column(db.Boolean, default=True)  # False for manufactured products
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -525,17 +530,26 @@ class Sale(db.Model):
 
     def calculate_totals(self):
         """Calculate sale totals from items"""
-        self.subtotal = sum(item.subtotal for item in self.items)
+        from decimal import Decimal
+
+        # Sum item subtotals, ensure Decimal
+        self.subtotal = sum((item.subtotal or Decimal('0')) for item in self.items)
+        if not isinstance(self.subtotal, Decimal):
+            self.subtotal = Decimal(str(self.subtotal))
+
+        # Ensure discount is Decimal
+        discount = self.discount if isinstance(self.discount, Decimal) else Decimal(str(self.discount or 0))
 
         # Apply discount
         if self.discount_type == 'percentage':
-            discount_amount = (self.subtotal * self.discount) / 100
+            discount_amount = (self.subtotal * discount) / Decimal('100')
         else:
-            discount_amount = self.discount
+            discount_amount = discount
 
         # Calculate tax
         taxable_amount = self.subtotal - discount_amount
-        tax_amount = (taxable_amount * float(self.tax or 0)) / 100
+        tax_rate = Decimal(str(self.tax or 0))
+        tax_amount = (taxable_amount * tax_rate) / Decimal('100')
 
         self.total = self.subtotal - discount_amount + tax_amount
         return self.total
@@ -561,7 +575,11 @@ class SaleItem(db.Model):
 
     def calculate_subtotal(self):
         """Calculate item subtotal"""
-        self.subtotal = (self.quantity * self.unit_price) - self.discount
+        from decimal import Decimal
+        qty = Decimal(str(self.quantity or 0))
+        price = self.unit_price if isinstance(self.unit_price, Decimal) else Decimal(str(self.unit_price or 0))
+        disc = self.discount if isinstance(self.discount, Decimal) else Decimal(str(self.discount or 0))
+        self.subtotal = (qty * price) - disc
         return self.subtotal
 
     def __repr__(self):
@@ -963,6 +981,11 @@ class StockTransfer(db.Model):
         return self.items.count()
 
     @property
+    def items_list(self):
+        """Get items as a list (for template iteration)"""
+        return list(self.items)
+
+    @property
     def total_quantity_requested(self):
         """Get total quantity requested across all items"""
         return sum(item.quantity_requested for item in self.items) or 0
@@ -1135,6 +1158,343 @@ class GatePass(db.Model):
 
     def __repr__(self):
         return f'<GatePass {self.gate_pass_number}>'
+
+
+# ============================================================
+# PRODUCTION SYSTEM MODELS
+# For Attar and Perfume Manufacturing
+# ============================================================
+
+class RawMaterialCategory(db.Model):
+    """Categories for raw materials: OIL, ETHANOL, BOTTLE"""
+    __tablename__ = 'raw_material_categories'
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(32), unique=True, nullable=False)  # OIL, ETHANOL, BOTTLE
+    name = db.Column(db.String(128), nullable=False)
+    unit = db.Column(db.String(32), nullable=False)  # grams, ml, pieces
+    description = db.Column(db.Text)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    materials = db.relationship('RawMaterial', backref='category', lazy='dynamic')
+
+    def __repr__(self):
+        return f'<RawMaterialCategory {self.code}>'
+
+
+class RawMaterial(db.Model):
+    """Raw materials for production: oils, ethanol, bottles"""
+    __tablename__ = 'raw_materials'
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(256), nullable=False, index=True)
+    category_id = db.Column(db.Integer, db.ForeignKey('raw_material_categories.id'), nullable=False)
+    supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'))
+
+    # For bottles - size specification in ml
+    bottle_size_ml = db.Column(db.Numeric(10, 2))  # 3ml, 6ml, 12ml, 30ml, 50ml, 100ml
+
+    # Pricing (for raw material purchases)
+    cost_per_unit = db.Column(db.Numeric(10, 4), nullable=False, default=0.00)
+
+    # Global Stock (backup, main tracking via RawMaterialStock)
+    quantity = db.Column(db.Numeric(12, 4), default=0)  # Supports decimal for grams/ml
+    reorder_level = db.Column(db.Numeric(12, 4), default=100)
+    reorder_quantity = db.Column(db.Numeric(12, 4), default=500)
+
+    # Tracking
+    batch_number = db.Column(db.String(64))
+    expiry_date = db.Column(db.Date)
+
+    # Status
+    is_active = db.Column(db.Boolean, default=True)
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    supplier = db.relationship('Supplier', backref='raw_materials')
+
+    @property
+    def is_low_stock(self):
+        """Check if stock is below reorder level"""
+        return self.quantity <= self.reorder_level
+
+    @property
+    def unit(self):
+        """Get unit from category"""
+        return self.category.unit if self.category else 'units'
+
+    def __repr__(self):
+        return f'<RawMaterial {self.code} - {self.name}>'
+
+
+class RawMaterialStock(db.Model):
+    """Location-specific stock for raw materials"""
+    __tablename__ = 'raw_material_stock'
+
+    id = db.Column(db.Integer, primary_key=True)
+    raw_material_id = db.Column(db.Integer, db.ForeignKey('raw_materials.id'), nullable=False)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False)
+
+    quantity = db.Column(db.Numeric(12, 4), default=0)
+    reserved_quantity = db.Column(db.Numeric(12, 4), default=0)  # For pending production
+    reorder_level = db.Column(db.Numeric(12, 4))
+
+    last_movement_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    raw_material = db.relationship('RawMaterial', backref='location_stocks')
+    location = db.relationship('Location', backref='raw_material_stocks')
+
+    __table_args__ = (
+        db.UniqueConstraint('raw_material_id', 'location_id', name='uix_rawmaterial_location'),
+    )
+
+    @property
+    def available_quantity(self):
+        """Get available quantity (total - reserved)"""
+        return float(self.quantity or 0) - float(self.reserved_quantity or 0)
+
+    @property
+    def is_low_stock(self):
+        """Check if below reorder level"""
+        reorder = self.reorder_level or (self.raw_material.reorder_level if self.raw_material else 100)
+        return self.quantity <= reorder
+
+    def __repr__(self):
+        return f'<RawMaterialStock {self.raw_material_id}@{self.location_id} qty={self.quantity}>'
+
+
+class RawMaterialMovement(db.Model):
+    """Track all raw material stock movements"""
+    __tablename__ = 'raw_material_movements'
+
+    id = db.Column(db.Integer, primary_key=True)
+    raw_material_id = db.Column(db.Integer, db.ForeignKey('raw_materials.id'), nullable=False)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    movement_type = db.Column(db.String(32), nullable=False)
+    # Types: purchase, production_consumption, adjustment, transfer_in, transfer_out, damage
+
+    quantity = db.Column(db.Numeric(12, 4), nullable=False)  # Positive for in, negative for out
+    reference = db.Column(db.String(128))  # PO number, Production Order number
+    notes = db.Column(db.Text)
+
+    production_order_id = db.Column(db.Integer, db.ForeignKey('production_orders.id'))
+
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    # Relationships
+    raw_material = db.relationship('RawMaterial', backref='movements')
+    location = db.relationship('Location', backref='raw_material_movements')
+    user = db.relationship('User', backref='raw_material_movements')
+
+    def __repr__(self):
+        return f'<RawMaterialMovement {self.movement_type} {self.quantity}>'
+
+
+class Recipe(db.Model):
+    """Production recipe/formula for finished products (attars/perfumes)"""
+    __tablename__ = 'recipes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(256), nullable=False)
+
+    # Recipe Type: single_oil, blended, perfume
+    recipe_type = db.Column(db.String(32), nullable=False)
+
+    # Output Product (the finished attar/perfume)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'))
+
+    # Output specifications
+    output_size_ml = db.Column(db.Numeric(10, 2))  # e.g., 6ml, 30ml, 50ml
+
+    # For perfumes: oil percentage (rest is ethanol)
+    # 100% for attars, 35% for perfumes
+    oil_percentage = db.Column(db.Numeric(5, 2), default=100.00)
+
+    # Production constraints
+    can_produce_at_warehouse = db.Column(db.Boolean, default=True)
+    can_produce_at_kiosk = db.Column(db.Boolean, default=True)  # False for perfumes
+
+    # Status
+    is_active = db.Column(db.Boolean, default=True)
+    version = db.Column(db.Integer, default=1)
+
+    # Notes
+    description = db.Column(db.Text)
+    instructions = db.Column(db.Text)
+
+    # Audit
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    product = db.relationship('Product', backref='recipes')
+    ingredients = db.relationship('RecipeIngredient', backref='recipe', lazy='dynamic', cascade='all, delete-orphan')
+    creator = db.relationship('User', backref='created_recipes')
+
+    @property
+    def ingredients_list(self):
+        """Get ingredients as list for easy iteration"""
+        return list(self.ingredients)
+
+    @property
+    def oil_ingredients(self):
+        """Get only oil ingredients (not bottles)"""
+        return [i for i in self.ingredients if not i.is_packaging]
+
+    @property
+    def bottle_ingredient(self):
+        """Get the bottle/packaging ingredient"""
+        for i in self.ingredients:
+            if i.is_packaging:
+                return i
+        return None
+
+    def __repr__(self):
+        return f'<Recipe {self.code} - {self.name}>'
+
+
+class RecipeIngredient(db.Model):
+    """Ingredients in a recipe"""
+    __tablename__ = 'recipe_ingredients'
+
+    id = db.Column(db.Integer, primary_key=True)
+    recipe_id = db.Column(db.Integer, db.ForeignKey('recipes.id'), nullable=False)
+    raw_material_id = db.Column(db.Integer, db.ForeignKey('raw_materials.id'), nullable=False)
+
+    # For blended: percentage of total oil component (should sum to 100%)
+    percentage = db.Column(db.Numeric(5, 2))  # e.g., 40.00 for 40%
+
+    # For bottles - one bottle per product
+    is_packaging = db.Column(db.Boolean, default=False)
+
+    notes = db.Column(db.Text)
+
+    # Relationships
+    raw_material = db.relationship('RawMaterial', backref='recipe_usages')
+
+    def __repr__(self):
+        return f'<RecipeIngredient {self.raw_material_id} {self.percentage}%>'
+
+
+class ProductionOrder(db.Model):
+    """Production/Manufacturing order"""
+    __tablename__ = 'production_orders'
+
+    id = db.Column(db.Integer, primary_key=True)
+    order_number = db.Column(db.String(64), unique=True, nullable=False, index=True)
+
+    recipe_id = db.Column(db.Integer, db.ForeignKey('recipes.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False)
+
+    # Quantities
+    quantity_ordered = db.Column(db.Integer, nullable=False)  # Number of units to produce
+    quantity_produced = db.Column(db.Integer, default=0)  # Actual produced
+
+    # Status workflow: draft -> pending -> approved -> in_progress -> completed
+    #                              \-> rejected
+    #                  cancelled <-/
+    status = db.Column(db.String(32), default='draft', index=True)
+
+    # Priority
+    priority = db.Column(db.String(16), default='normal')  # low, normal, high, urgent
+    due_date = db.Column(db.Date)
+
+    # Timestamps
+    requested_at = db.Column(db.DateTime)
+    approved_at = db.Column(db.DateTime)
+    started_at = db.Column(db.DateTime)
+    completed_at = db.Column(db.DateTime)
+
+    # Users
+    requested_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    produced_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # Notes
+    notes = db.Column(db.Text)
+    rejection_reason = db.Column(db.Text)
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    recipe = db.relationship('Recipe', backref='production_orders')
+    product = db.relationship('Product', backref='production_orders')
+    location = db.relationship('Location', backref='production_orders')
+    requester = db.relationship('User', foreign_keys=[requested_by], backref='requested_productions')
+    approver = db.relationship('User', foreign_keys=[approved_by], backref='approved_productions')
+    producer = db.relationship('User', foreign_keys=[produced_by], backref='executed_productions')
+    material_consumptions = db.relationship('ProductionMaterialConsumption', backref='production_order',
+                                            lazy='dynamic', cascade='all, delete-orphan')
+
+    @property
+    def status_badge_class(self):
+        """Get Bootstrap badge class for status"""
+        status_classes = {
+            'draft': 'secondary',
+            'pending': 'info',
+            'approved': 'primary',
+            'in_progress': 'warning',
+            'completed': 'success',
+            'rejected': 'danger',
+            'cancelled': 'dark'
+        }
+        return status_classes.get(self.status, 'secondary')
+
+    @property
+    def can_approve(self):
+        return self.status == 'pending'
+
+    @property
+    def can_start(self):
+        return self.status == 'approved'
+
+    @property
+    def can_complete(self):
+        return self.status == 'in_progress'
+
+    @property
+    def can_cancel(self):
+        return self.status in ['draft', 'pending', 'approved']
+
+    def __repr__(self):
+        return f'<ProductionOrder {self.order_number} {self.status}>'
+
+
+class ProductionMaterialConsumption(db.Model):
+    """Track raw materials consumed in production"""
+    __tablename__ = 'production_material_consumptions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    production_order_id = db.Column(db.Integer, db.ForeignKey('production_orders.id'), nullable=False)
+    raw_material_id = db.Column(db.Integer, db.ForeignKey('raw_materials.id'), nullable=False)
+
+    quantity_required = db.Column(db.Numeric(12, 4), nullable=False)
+    quantity_consumed = db.Column(db.Numeric(12, 4), default=0)
+
+    unit = db.Column(db.String(32))  # grams, ml, pieces
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    raw_material = db.relationship('RawMaterial', backref='consumptions')
+
+    def __repr__(self):
+        return f'<ProductionConsumption {self.raw_material_id} qty={self.quantity_required}>'
 
 
 class TransferRequest(db.Model):

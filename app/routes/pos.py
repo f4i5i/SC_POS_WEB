@@ -589,6 +589,123 @@ def refund_sale(sale_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@bp.route('/edit-sale/<int:sale_id>', methods=['GET', 'POST'])
+@login_required
+def edit_sale(sale_id):
+    """Edit sale - Admin only"""
+    # Only admin can edit sales
+    if not current_user.is_global_admin and current_user.role != 'admin':
+        flash('Only administrators can edit sales.', 'danger')
+        return redirect(url_for('pos.sale_details', sale_id=sale_id))
+
+    sale = Sale.query.get_or_404(sale_id)
+    customers = Customer.query.filter_by(is_active=True).order_by(Customer.name).all()
+
+    if request.method == 'POST':
+        try:
+            # Track changes for audit
+            changes = []
+
+            # Update customer
+            new_customer_id = request.form.get('customer_id', type=int)
+            if new_customer_id != sale.customer_id:
+                old_customer = sale.customer.name if sale.customer else 'Walk-in'
+                new_customer = Customer.query.get(new_customer_id).name if new_customer_id else 'Walk-in'
+                changes.append(f"Customer: {old_customer} → {new_customer}")
+                sale.customer_id = new_customer_id if new_customer_id else None
+
+            # Update payment method
+            new_payment_method = request.form.get('payment_method')
+            if new_payment_method and new_payment_method != sale.payment_method:
+                changes.append(f"Payment: {sale.payment_method} → {new_payment_method}")
+                sale.payment_method = new_payment_method
+
+            # Update payment status
+            new_payment_status = request.form.get('payment_status')
+            if new_payment_status and new_payment_status != sale.payment_status:
+                changes.append(f"Status: {sale.payment_status} → {new_payment_status}")
+                sale.payment_status = new_payment_status
+
+            # Update discount
+            new_discount_str = request.form.get('discount', '0')
+            new_discount = Decimal(new_discount_str) if new_discount_str else Decimal('0')
+            new_discount_type = request.form.get('discount_type', 'amount')
+            if new_discount != sale.discount or new_discount_type != sale.discount_type:
+                changes.append(f"Discount: {sale.discount} ({sale.discount_type}) → {new_discount} ({new_discount_type})")
+                sale.discount = new_discount
+                sale.discount_type = new_discount_type
+
+            # Update notes
+            new_notes = request.form.get('notes', '').strip()
+            if new_notes != (sale.notes or ''):
+                changes.append(f"Notes updated")
+                sale.notes = new_notes
+
+            # Update item prices if provided
+            for item in sale.items:
+                item_price_key = f'item_price_{item.id}'
+                item_qty_key = f'item_qty_{item.id}'
+
+                new_price_str = request.form.get(item_price_key)
+                new_qty = request.form.get(item_qty_key, type=int)
+
+                if new_price_str:
+                    new_price = Decimal(new_price_str)
+                    if new_price != item.unit_price:
+                        changes.append(f"Item {item.product.code}: Price {item.unit_price} → {new_price}")
+                        item.unit_price = new_price
+                        item.calculate_subtotal()
+
+                if new_qty is not None and new_qty != item.quantity:
+                    # Adjust stock
+                    qty_diff = new_qty - item.quantity
+                    product = item.product
+
+                    # Check if enough stock for increase
+                    if qty_diff > 0 and int(product.quantity or 0) < qty_diff:
+                        flash(f'Not enough stock for {product.name}. Available: {product.quantity}', 'danger')
+                        return redirect(url_for('pos.edit_sale', sale_id=sale_id))
+
+                    # Update product stock
+                    product.quantity = int(product.quantity or 0) - qty_diff
+
+                    # Update location stock if applicable
+                    if sale.location_id:
+                        loc_stock = LocationStock.query.filter_by(
+                            product_id=product.id,
+                            location_id=sale.location_id
+                        ).first()
+                        if loc_stock:
+                            loc_stock.quantity = int(loc_stock.quantity or 0) - qty_diff
+
+                    changes.append(f"Item {product.code}: Qty {item.quantity} → {new_qty}")
+                    item.quantity = new_qty
+                    item.calculate_subtotal()
+
+            # Recalculate sale totals
+            sale.calculate_totals()
+
+            # Add edit note with timestamp
+            edit_note = f"\n[Edited by {current_user.full_name} on {datetime.now().strftime('%Y-%m-%d %H:%M')}]"
+            if changes:
+                edit_note += f"\nChanges: {'; '.join(changes)}"
+
+            if sale.notes:
+                sale.notes += edit_note
+            else:
+                sale.notes = edit_note.strip()
+
+            db.session.commit()
+            flash('Sale updated successfully.', 'success')
+            return redirect(url_for('pos.sale_details', sale_id=sale_id))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating sale: {str(e)}', 'danger')
+
+    return render_template('pos/edit_sale.html', sale=sale, customers=customers)
+
+
 @bp.route('/hold-sale', methods=['POST'])
 @login_required
 @permission_required(Permissions.POS_HOLD_SALE)

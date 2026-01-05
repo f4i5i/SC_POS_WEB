@@ -56,6 +56,11 @@
             <a href="{{ url_for('pos.print_receipt', sale_id=sale.id) }}" class="btn btn-primary" target="_blank">
                 <i class="fas fa-print"></i> Print Receipt
             </a>
+            {% if current_user.is_global_admin or current_user.role == 'admin' %}
+            <a href="{{ url_for('pos.edit_sale', sale_id=sale.id) }}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Edit Sale
+            </a>
+            {% endif %}
         </div>
     </div>
 

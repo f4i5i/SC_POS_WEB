@@ -82,7 +82,17 @@ def daily_report():
     )
     if not current_user.is_global_admin and current_user.location_id:
         top_products_query = top_products_query.filter(Sale.location_id == current_user.location_id)
-    top_products = top_products_query.group_by(Product.id).order_by(func.sum(SaleItem.quantity).desc()).limit(10).all()
+    top_products_rows = top_products_query.group_by(Product.id).order_by(func.sum(SaleItem.quantity).desc()).limit(10).all()
+    # Convert to serializable list
+    top_products = [
+        {
+            'name': row.name,
+            'brand': row.brand,
+            'total_quantity': int(row.total_quantity) if row.total_quantity else 0,
+            'total_sales': float(row.total_sales) if row.total_sales else 0
+        }
+        for row in top_products_rows
+    ]
 
     # Hourly sales - filter by location
     hourly_sales_query = db.session.query(
@@ -94,7 +104,16 @@ def daily_report():
     )
     if not current_user.is_global_admin and current_user.location_id:
         hourly_sales_query = hourly_sales_query.filter(Sale.location_id == current_user.location_id)
-    hourly_sales = hourly_sales_query.group_by(extract('hour', Sale.sale_date)).all()
+    hourly_sales_rows = hourly_sales_query.group_by(extract('hour', Sale.sale_date)).all()
+    # Convert to serializable list
+    hourly_sales = [
+        {
+            'hour': int(row.hour) if row.hour else 0,
+            'count': int(row.count) if row.count else 0,
+            'total': float(row.total) if row.total else 0
+        }
+        for row in hourly_sales_rows
+    ]
 
     # Low stock alerts - use LocationStock for per-location data
     from app.models import LocationStock

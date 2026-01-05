@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Add Raw Material - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-plus-circle text-primary me-2"></i>Add Raw Material</h2>
+            <p class="text-muted mb-0">Add new oil, ethanol, or bottle</p>
+        </div>
+        <a href="{{ url_for('production.raw_materials') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Code <span class="text-danger">*</span></label>
+                                <input type="text" name="code" class="form-control" required
+                                       placeholder="e.g., OIL-BR540" style="text-transform: uppercase;">
+                                <small class="text-muted">Unique identifier</small>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <input type="text" name="name" class="form-control" required
+                                       placeholder="e.g., Br 540 Oil">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Category <span class="text-danger">*</span></label>
+                                <select name="category_id" class="form-select" required id="category-select">
+                                    <option value="">Select category...</option>
+                                    {% for cat in categories %}
+                                    <option value="{{ cat.id }}" data-code="{{ cat.code }}">{{ cat.name }} ({{ cat.unit }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Cost per Unit (PKR)</label>
+                                <input type="number" name="cost_per_unit" class="form-control"
+                                       step="0.01" min="0" value="0">
+                            </div>
+
+                            <!-- Bottle size field - shown only for BOTTLE category -->
+                            <div class="col-md-6" id="bottle-size-field" style="display: none;">
+                                <label class="form-label">Bottle Size (ml) <span class="text-danger">*</span></label>
+                                <select name="bottle_size_ml" class="form-select">
+                                    <option value="">Select size...</option>
+                                    <option value="3">3ml (Attar)</option>
+                                    <option value="6">6ml (Attar)</option>
+                                    <option value="12">12ml (Attar)</option>
+                                    <option value="30">30ml (Perfume)</option>
+                                    <option value="50">50ml (Perfume)</option>
+                                    <option value="100">100ml (Perfume)</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Reorder Level</label>
+                                <input type="number" name="reorder_level" class="form-control"
+                                       step="0.01" min="0" value="100">
+                                <small class="text-muted">Alert when stock falls below this</small>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Save Material
+                            </button>
+                            <a href="{{ url_for('production.raw_materials') }}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm bg-light border-0">
+                <div class="card-body">
+                    <h5><i class="fas fa-info-circle text-info me-2"></i>Material Types</h5>
+                    <hr>
+                    <div class="mb-3">
+                        <strong><i class="fas fa-tint text-warning me-2"></i>Oils</strong>
+                        <p class="small text-muted mb-0">Base oils for attars and perfumes. Measured in grams.</p>
+                    </div>
+                    <div class="mb-3">
+                        <strong><i class="fas fa-wine-bottle text-info me-2"></i>Ethanol</strong>
+                        <p class="small text-muted mb-0">Used for perfume dilution. Measured in ml.</p>
+                    </div>
+                    <div class="mb-0">
+                        <strong><i class="fas fa-box text-success me-2"></i>Bottles</strong>
+                        <p class="small text-muted mb-0">Empty bottles for packaging. Measured in pieces.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('category-select').addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    const categoryCode = selectedOption.dataset.code;
+    const bottleField = document.getElementById('bottle-size-field');
+
+    if (categoryCode === 'BOTTLE') {
+        bottleField.style.display = 'block';
+        bottleField.querySelector('select').required = true;
+    } else {
+        bottleField.style.display = 'none';
+        bottleField.querySelector('select').required = false;
+    }
+});
+</script>
+{% endblock %}

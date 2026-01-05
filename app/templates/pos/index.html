@@ -382,6 +382,63 @@
         z-index: 1050 !important;
     }
 
+    /* Payment Modal fixes */
+    #paymentModal.modal {
+        pointer-events: auto !important;
+    }
+
+    #paymentModal .modal-dialog {
+        pointer-events: auto !important;
+        margin: 1.75rem auto;
+    }
+
+    #paymentModal .modal-content {
+        background: #ffffff !important;
+        border-radius: 8px;
+        border: none;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+        pointer-events: auto !important;
+        opacity: 1 !important;
+    }
+
+    #paymentModal .modal-header {
+        background: #0d6efd !important;
+        border-radius: 8px 8px 0 0;
+        border: none;
+        padding: 1rem 1.5rem;
+    }
+
+    #paymentModal .modal-body {
+        pointer-events: auto !important;
+        background: #fff !important;
+        padding: 1.5rem;
+    }
+
+    #paymentModal .modal-footer {
+        pointer-events: auto !important;
+        background: #f8f9fa !important;
+        border-top: 1px solid #dee2e6;
+        padding: 1rem 1.5rem;
+    }
+
+    /* Force all form elements in payment modal to be clickable */
+    #paymentModal input,
+    #paymentModal button,
+    #paymentModal select,
+    #paymentModal textarea,
+    #paymentModal .btn,
+    #paymentModal .form-control,
+    #paymentModal .form-select {
+        pointer-events: auto !important;
+        cursor: pointer;
+    }
+
+    #paymentModal .form-control,
+    #paymentModal .form-select {
+        cursor: text;
+    }
+
+    /* Returns Modal fixes */
     #returnsModal.modal {
         pointer-events: auto !important;
     }
@@ -1111,16 +1168,20 @@ function displaySearchResults(products) {
         const stockClass = product.quantity > reorderLevel ? 'stock-ok' : product.quantity > 0 ? 'stock-low' : 'stock-out';
         const showReorderBtn = product.is_low_stock && product.can_reorder;
         const suggestedQty = product.suggested_reorder_qty || 10;
+        const isOutOfStock = product.quantity <= 0;
 
         html += `
-            <div class="search-result-item" onclick='addToCart(${JSON.stringify(product)})'>
+            <div class="search-result-item ${isOutOfStock ? 'opacity-50' : ''}"
+                 ${isOutOfStock ? 'onclick="showToast(\'Out of stock!\', \'error\')"' : `onclick='addToCart(${JSON.stringify(product)})'`}
+                 style="${isOutOfStock ? 'cursor: not-allowed;' : ''}">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <strong>${product.name}</strong>
+                        ${isOutOfStock ? '<span class="badge bg-danger ms-2">OUT OF STOCK</span>' : ''}
                         <br><small class="text-muted">${product.code} - ${product.brand || ''}</small>
                     </div>
                     <div class="text-end">
-                        <div class="fw-bold text-primary">Rs. ${product.selling_price.toFixed(2)}</div>
+                        <div class="fw-bold ${isOutOfStock ? 'text-muted' : 'text-primary'}">Rs. ${product.selling_price.toFixed(2)}</div>
                         <span class="product-stock ${stockClass}">${product.quantity} in stock</span>
                         ${product.is_low_stock ? `
                             <div class="mt-1">
@@ -1149,12 +1210,19 @@ function addToCart(product) {
     $('#searchResults').addClass('d-none');
     $('#productSearch').val('');
 
+    // Prevent adding out-of-stock items
+    if (product.quantity <= 0) {
+        showToast('This product is out of stock!', 'error');
+        return;
+    }
+
     const existingItem = cart.find(item => item.id === product.id);
     if (existingItem) {
         if (existingItem.quantity < product.quantity) {
             existingItem.quantity++;
+            showToast(`${product.name} quantity updated`, 'success');
         } else {
-            alert('Not enough stock!');
+            showToast('Not enough stock!', 'warning');
             return;
         }
     } else {
@@ -1165,6 +1233,7 @@ function addToCart(product) {
             quantity: 1,
             max_quantity: product.quantity
         });
+        showToast(`${product.name} added to cart`, 'success');
     }
 
     updateCartDisplay();
@@ -1227,7 +1296,7 @@ function updateQuantity(index, change) {
     }
 
     if (newQty > item.max_quantity) {
-        alert('Not enough stock!');
+        showToast('Not enough stock!', 'warning');
         return;
     }
 
@@ -1243,7 +1312,7 @@ function setQuantity(index, value) {
     }
 
     if (qty > cart[index].max_quantity) {
-        alert('Not enough stock!');
+        showToast('Not enough stock!', 'warning');
         cart[index].quantity = cart[index].max_quantity;
     } else {
         cart[index].quantity = qty;
@@ -1260,11 +1329,65 @@ function removeFromCart(index) {
 function clearCart() {
     if (cart.length === 0) return;
 
-    if (confirm('Clear all items from cart?')) {
-        cart = [];
-        clearCartStorage();
-        updateCartDisplay();
-    }
+    showConfirmModal(
+        'Clear Cart?',
+        'Are you sure you want to remove all items from the cart?',
+        'danger',
+        function() {
+            cart = [];
+            clearCartStorage();
+            updateCartDisplay();
+            showToast('Cart cleared', 'info');
+        }
+    );
+}
+
+// Styled confirmation modal replacement for browser confirm()
+function showConfirmModal(title, message, type, onConfirm) {
+    const btnClass = type === 'danger' ? 'btn-danger' : 'btn-primary';
+    const headerClass = type === 'danger' ? 'bg-danger' : 'bg-primary';
+    const icon = type === 'danger' ? 'fa-exclamation-triangle' : 'fa-question-circle';
+
+    const modalHtml = `
+        <div class="modal fade" id="confirmModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header ${headerClass} text-white">
+                        <h5 class="modal-title"><i class="fas ${icon} me-2"></i>${title}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body text-center py-4">
+                        <p class="mb-0">${message}</p>
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn ${btnClass}" id="confirmModalBtn">
+                            <i class="fas fa-check"></i> Confirm
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if any
+    $('#confirmModal').remove();
+    $('body').append(modalHtml);
+
+    const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+
+    // Handle confirm button
+    $('#confirmModalBtn').on('click', function() {
+        modal.hide();
+        if (typeof onConfirm === 'function') {
+            onConfirm();
+        }
+    });
+
+    modal.show();
+    $('#confirmModal').on('hidden.bs.modal', function() {
+        $(this).remove();
+    });
 }
 
 function updateTotals() {
@@ -1295,13 +1418,49 @@ function updateTotals() {
 }
 
 function showPaymentModal() {
-    const finalTotal = parseFloat($('#total').text().replace('Rs. ', ''));
+    const finalTotal = parseFloat($('#total').text().replace('Rs. ', '').replace(/,/g, ''));
 
     $('#paymentTotal').val('Rs. ' + finalTotal.toFixed(2));
     $('#amountPaid').val(finalTotal.toFixed(2));
     calculateChange();
 
-    $('#paymentModal').modal('show');
+    // Auto-select customer if one was looked up
+    if (currentCustomer && currentCustomer.id) {
+        $('#customerId').val(currentCustomer.id);
+    } else {
+        $('#customerId').val('');
+    }
+
+    // Get modal element
+    var modalEl = document.getElementById('paymentModal');
+    if (!modalEl) {
+        console.error('Payment modal element not found!');
+        showToast('Error: Payment modal not found', 'error');
+        return;
+    }
+
+    // Move modal to body to avoid z-index issues from parent containers
+    if (modalEl.parentElement !== document.body) {
+        document.body.appendChild(modalEl);
+    }
+
+    // Remove any existing backdrops
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+    document.body.classList.remove('modal-open');
+
+    // Create fresh modal instance
+    var paymentModalInstance = new bootstrap.Modal(modalEl, {
+        backdrop: true,
+        keyboard: true,
+        focus: true
+    });
+
+    paymentModalInstance.show();
+
+    // Focus on amount paid after modal opens
+    modalEl.addEventListener('shown.bs.modal', function () {
+        $('#amountPaid').focus().select();
+    }, { once: true });
 }
 
 function selectPayment(method) {
@@ -1320,12 +1479,23 @@ function calculateChange() {
 
 function completeSale() {
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const discount = parseFloat($('#discount').val()) || 0;
-    const total = subtotal - discount;
+
+    // Get discount using the same logic as updateTotals
+    const discountType = $('input[name="discountType"]:checked').val();
+    const discountValue = parseFloat($('#discountValue').val()) || 0;
+    let discount = 0;
+    if (discountType === 'percent') {
+        const percent = Math.min(discountValue, 100);
+        discount = (subtotal * percent) / 100;
+    } else {
+        discount = Math.min(discountValue, subtotal);
+    }
+
+    const total = Math.max(0, subtotal - discount);
     const amountPaid = parseFloat($('#amountPaid').val()) || 0;
 
     if (amountPaid < total) {
-        alert('Amount paid is less than total!');
+        showToast('Amount paid is less than total!', 'error');
         return;
     }
 
@@ -1343,7 +1513,7 @@ function completeSale() {
         })),
         subtotal: subtotal,
         discount: discount,
-        discount_type: 'amount',
+        discount_type: discountType,
         tax: 0,
         total: total,
         payment_method: selectedPaymentMethod,
@@ -1360,22 +1530,36 @@ function completeSale() {
         data: JSON.stringify(saleData),
         success: function(response) {
             if (response.success) {
-                alert('Sale completed successfully!\nChange: Rs. ' + response.change.toFixed(2));
+                // Hide modal and clean up first
+                var paymentModalEl = document.getElementById('paymentModal');
+                var paymentModalInst = bootstrap.Modal.getInstance(paymentModalEl);
+                if (paymentModalInst) {
+                    paymentModalInst.hide();
+                }
+                // Clean up any remaining backdrops
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+
+                // Show success message with change
+                showToast('Sale completed! Change: Rs. ' + response.change.toFixed(2), 'success');
+
+                // Clear cart
                 cart = [];
                 clearCartStorage();
                 updateCartDisplay();
-                $('#paymentModal').modal('hide');
-                $('#discount').val(0);
-                $('#saleDate').val(''); // Reset backdate field
 
-                // Optionally print receipt
-                if (confirm('Print receipt?')) {
-                    window.open('/pos/print-receipt/' + response.sale_id, '_blank');
-                }
+                // Reset form fields
+                $('#discountValue').val(0);
+                $('#discountPercent').prop('checked', true);
+                $('#saleDate').val(''); // Reset backdate field
+                clearCustomer(); // Clear selected customer
+
+                // Show receipt in modal popup
+                showReceiptModal(response.sale_id, response.change);
             }
         },
         error: function(xhr) {
-            alert('Error: ' + (xhr.responseJSON?.error || 'Failed to complete sale'));
+            showToast('Error: ' + (xhr.responseJSON?.error || 'Failed to complete sale'), 'error');
         }
     });
 }
@@ -1384,7 +1568,7 @@ function holdSale() {
     if (cart.length === 0) return;
 
     // Implementation for holding sale
-    alert('Sale held successfully!');
+    showToast('Sale held successfully!', 'success');
 }
 
 // Keyboard shortcuts
@@ -1637,12 +1821,12 @@ function showCloseDayModal() {
             if (response.success) {
                 displayCloseDayModal(response.summary);
             } else {
-                alert(response.error || 'Unable to close day');
+                showToast(response.error || 'Unable to close day', 'error');
             }
         },
         error: function(xhr) {
             const error = xhr.responseJSON?.error || 'Error loading day summary';
-            alert(error);
+            showToast(error, 'error');
         }
     });
 }
@@ -1761,7 +1945,7 @@ function displayCloseDayModal(summary) {
 function processCloseDay() {
     const closingBalance = parseFloat($('#closingBalance').val());
     if (!closingBalance && closingBalance !== 0) {
-        alert('Please enter the actual closing balance');
+        showToast('Please enter the actual closing balance', 'warning');
         return;
     }
 
@@ -1791,12 +1975,12 @@ function processCloseDay() {
                 // Optionally reload page or clear sales
                 setTimeout(() => location.reload(), 2000);
             } else {
-                alert(response.error || 'Error closing day');
+                showToast(response.error || 'Error closing day', 'error');
                 $btn.prop('disabled', false).html('<i class="fas fa-moon"></i> Close Day & Generate Report');
             }
         },
         error: function(xhr) {
-            alert(xhr.responseJSON?.error || 'Error closing day');
+            showToast(xhr.responseJSON?.error || 'Error closing day', 'error');
             $btn.prop('disabled', false).html('<i class="fas fa-moon"></i> Close Day & Generate Report');
         }
     });
@@ -1882,7 +2066,7 @@ function showReturnsModal() {
     var modalEl = document.getElementById('returnsModal');
     if (!modalEl) {
         console.error('Returns modal element not found!');
-        alert('Error: Returns modal not found');
+        showToast('Error: Returns modal not found', 'error');
         return;
     }
 
@@ -2164,7 +2348,7 @@ function processReturn() {
                 // Show refund amount prominently for cash refund
                 if (response.return_type === 'cash') {
                     setTimeout(() => {
-                        alert(`CASH REFUND: Rs. ${response.refund_amount.toFixed(2)}\n\nReturn #: ${response.return_number}`);
+                        showRefundModal(response.refund_amount, response.return_number);
                     }, 300);
                 }
             } else {
@@ -2182,16 +2366,163 @@ function processReturn() {
 // ============================================
 // REORDER FUNCTIONALITY
 // ============================================
+// Show receipt in modal popup
+function showReceiptModal(saleId, change) {
+    const modalHtml = `
+        <div class="modal fade" id="receiptModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i>Sale Completed</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <div class="text-center py-3 bg-light border-bottom">
+                            <h4 class="text-success mb-1"><i class="fas fa-coins me-2"></i>Change: Rs. ${change.toFixed(2)}</h4>
+                        </div>
+                        <div id="receiptContent" style="max-height: 60vh; overflow-y: auto;">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="mt-2 text-muted">Loading receipt...</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times"></i> Close
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="printReceiptFromModal(${saleId})">
+                            <i class="fas fa-print"></i> Print Receipt
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if any
+    $('#receiptModal').remove();
+    $('body').append(modalHtml);
+
+    const modal = new bootstrap.Modal(document.getElementById('receiptModal'));
+    modal.show();
+
+    // Fetch receipt content
+    $.ajax({
+        url: '/pos/print-receipt/' + saleId,
+        method: 'GET',
+        success: function(html) {
+            $('#receiptContent').html(html);
+        },
+        error: function() {
+            $('#receiptContent').html('<div class="text-center py-4 text-danger"><i class="fas fa-exclamation-circle fa-2x mb-2"></i><p>Failed to load receipt</p></div>');
+        }
+    });
+
+    $('#receiptModal').on('hidden.bs.modal', function() {
+        $(this).remove();
+    });
+}
+
+// Print receipt from modal
+function printReceiptFromModal(saleId) {
+    const printWindow = window.open('/pos/print-receipt/' + saleId, '_blank', 'width=400,height=600');
+    printWindow.onload = function() {
+        printWindow.print();
+    };
+}
+
+// Show styled refund modal instead of browser alert
+function showRefundModal(amount, returnNumber) {
+    const modalHtml = `
+        <div class="modal fade" id="refundResultModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i>Refund Processed</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body text-center py-4">
+                        <i class="fas fa-money-bill-wave fa-4x text-success mb-3"></i>
+                        <h2 class="text-success mb-2">Rs. ${amount.toFixed(2)}</h2>
+                        <p class="text-muted mb-1">Cash Refund Amount</p>
+                        <hr>
+                        <p class="mb-0"><strong>Return #:</strong> ${returnNumber}</p>
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <button type="button" class="btn btn-success btn-lg" data-bs-dismiss="modal">
+                            <i class="fas fa-check"></i> Done
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if any
+    $('#refundResultModal').remove();
+    $('body').append(modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('refundResultModal'));
+    modal.show();
+    $('#refundResultModal').on('hidden.bs.modal', function() {
+        $(this).remove();
+    });
+}
+
 function createReorder(productId, productName, suggestedQty) {
-    const qty = prompt(`Create reorder for "${productName}"?\n\nEnter quantity (suggested: ${suggestedQty}):`, suggestedQty);
+    showReorderModal(productId, productName, suggestedQty);
+}
 
-    if (qty === null) return; // Cancelled
+// Show styled reorder modal instead of browser prompt
+function showReorderModal(productId, productName, suggestedQty) {
+    const modalHtml = `
+        <div class="modal fade" id="reorderModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="fas fa-truck-loading me-2"></i>Create Reorder</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-3">Create reorder request for:</p>
+                        <h5 class="text-primary mb-3">${productName}</h5>
+                        <div class="mb-3">
+                            <label class="form-label">Quantity to Reorder</label>
+                            <input type="number" class="form-control form-control-lg text-center"
+                                   id="reorderQty" value="${suggestedQty}" min="1">
+                            <small class="text-muted">Suggested: ${suggestedQty} units</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="submitReorder(${productId}, '${productName.replace(/'/g, "\\'")}')">
+                            <i class="fas fa-check"></i> Create Reorder
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
 
-    const quantity = parseInt(qty);
+    // Remove existing modal if any
+    $('#reorderModal').remove();
+    $('body').append(modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('reorderModal'));
+    modal.show();
+    $('#reorderModal').on('hidden.bs.modal', function() {
+        $(this).remove();
+    });
+}
+
+function submitReorder(productId, productName) {
+    const quantity = parseInt($('#reorderQty').val());
     if (isNaN(quantity) || quantity <= 0) {
         showToast('Please enter a valid quantity', 'warning');
         return;
     }
+
+    // Close modal
+    bootstrap.Modal.getInstance(document.getElementById('reorderModal')).hide();
 
     $.ajax({
         url: '/pos/create-reorder',
