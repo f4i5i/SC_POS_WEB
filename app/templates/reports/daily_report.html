@@ -1,35 +1,76 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, signature_area %}
 
-{% block title %}Daily Sales Report - Sunnat Collection{% endblock %}
+{% block title %}Daily Sales Report - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <!-- Print Header -->
+    {{ print_header('DAILY SALES REPORT', report_date.strftime('%A, %B %d, %Y'), user_location) }}
+
+    <!-- Screen Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 page-header-regular no-print">
         <div>
             <h2 class="mb-1">
                 <i class="fas fa-calendar-day text-primary"></i>
                 Daily Sales Report
             </h2>
-            <p class="text-muted mb-0">{{ report_date.strftime('%A, %B %d, %Y') }}</p>
+            <p class="text-muted mb-0">
+                {{ report_date.strftime('%A, %B %d, %Y') }}
+                {% if user_location %}
+                <span class="badge bg-info ms-2">{{ user_location.name }}</span>
+                {% endif %}
+            </p>
         </div>
         <div>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary me-2">
+            <form method="GET" class="d-inline no-print">
+                <input type="date" name="date" class="form-control d-inline-block" style="width: auto;"
+                       value="{{ report_date.strftime('%Y-%m-%d') }}" onchange="this.form.submit()">
+            </form>
+            <button onclick="window.print()" class="btn btn-outline-primary ms-2">
+                <i class="fas fa-print"></i> Print
+            </button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2">
                 <i class="fas fa-arrow-left"></i> Back
-            </a>
-            <a href="{{ url_for('reports.export_daily_pdf', date=report_date.strftime('%Y-%m-%d')) }}" class="btn btn-primary">
-                <i class="fas fa-file-pdf"></i> Export PDF
             </a>
         </div>
     </div>
 
-    <!-- Summary Cards -->
-    <div class="row g-3 mb-4">
+    <!-- Print Summary -->
+    <div class="print-summary">
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+                <td style="border: 1px solid #000; padding: 10px; width: 25%; text-align: center;">
+                    <div style="font-size: 9pt; color: #666;">TOTAL SALES</div>
+                    <div style="font-size: 14pt; font-weight: bold;">Rs. {{ "{:,.2f}".format(total_sales) }}</div>
+                </td>
+                <td style="border: 1px solid #000; padding: 10px; width: 25%; text-align: center;">
+                    <div style="font-size: 9pt; color: #666;">TRANSACTIONS</div>
+                    <div style="font-size: 14pt; font-weight: bold;">{{ total_transactions }}</div>
+                </td>
+                <td style="border: 1px solid #000; padding: 10px; width: 25%; text-align: center;">
+                    <div style="font-size: 9pt; color: #666;">AVG. TRANSACTION</div>
+                    <div style="font-size: 14pt; font-weight: bold;">Rs. {{ "{:,.2f}".format(avg_transaction) }}</div>
+                </td>
+                <td style="border: 1px solid #000; padding: 10px; width: 25%; text-align: center;">
+                    <div style="font-size: 9pt; color: #666;">LOW STOCK ITEMS</div>
+                    <div style="font-size: 14pt; font-weight: bold; color: #dc3545;">{{ low_stock|length }}</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Summary Cards (Screen only) -->
+    <div class="row g-3 mb-4 no-print">
         <div class="col-md-3">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
                     <h6 class="text-muted mb-1">Total Sales</h6>
-                    <h3 class="mb-0">Rs. {{ "{:,.2f}".format(total_sales) }}</h3>
+                    <h3 class="mb-0 text-primary">Rs. {{ "{:,.2f}".format(total_sales) }}</h3>
                 </div>
             </div>
         </div>
@@ -37,7 +78,7 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
                     <h6 class="text-muted mb-1">Transactions</h6>
-                    <h3 class="mb-0">{{ total_transactions }}</h3>
+                    <h3 class="mb-0 text-success">{{ total_transactions }}</h3>
                 </div>
             </div>
         </div>
@@ -45,7 +86,7 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
                     <h6 class="text-muted mb-1">Avg. Transaction</h6>
-                    <h3 class="mb-0">Rs. {{ "{:,.2f}".format(avg_transaction) }}</h3>
+                    <h3 class="mb-0 text-info">Rs. {{ "{:,.2f}".format(avg_transaction) }}</h3>
                 </div>
             </div>
         </div>
@@ -60,32 +101,76 @@
     </div>
 
     <div class="row g-3">
-        <!-- Payment Methods -->
+        <!-- Payment Methods (Print version) -->
         <div class="col-md-6">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3">
                     <h5 class="mb-0">
-                        <i class="fas fa-credit-card text-primary"></i>
+                        <i class="fas fa-credit-card text-primary no-print"></i>
                         Payment Methods
                     </h5>
                 </div>
                 <div class="card-body">
-                    <canvas id="paymentMethodsChart" height="200"></canvas>
+                    <!-- Chart for screen -->
+                    <canvas id="paymentMethodsChart" height="200" class="no-print"></canvas>
+                    <!-- Table for print -->
+                    <table class="table table-sm print-only" style="display: none;">
+                        <thead>
+                            <tr>
+                                <th>Method</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for method, amount in payment_methods.items() %}
+                            <tr>
+                                <td class="text-capitalize">{{ method.replace('_', ' ') }}</td>
+                                <td class="text-end">Rs. {{ "{:,.2f}".format(amount) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="fw-bold">
+                                <td>Total</td>
+                                <td class="text-end">Rs. {{ "{:,.2f}".format(total_sales) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
                 </div>
             </div>
         </div>
 
-        <!-- Hourly Sales -->
+        <!-- Hourly Sales (Print version) -->
         <div class="col-md-6">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3">
                     <h5 class="mb-0">
-                        <i class="fas fa-clock text-primary"></i>
+                        <i class="fas fa-clock text-primary no-print"></i>
                         Hourly Sales
                     </h5>
                 </div>
                 <div class="card-body">
-                    <canvas id="hourlySalesChart" height="200"></canvas>
+                    <!-- Chart for screen -->
+                    <canvas id="hourlySalesChart" height="200" class="no-print"></canvas>
+                    <!-- Table for print -->
+                    <table class="table table-sm print-only" style="display: none;">
+                        <thead>
+                            <tr>
+                                <th>Hour</th>
+                                <th class="text-center">Transactions</th>
+                                <th class="text-end">Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for hour in hourly_sales %}
+                            <tr>
+                                <td>{{ hour.hour }}:00</td>
+                                <td class="text-center">{{ hour.count }}</td>
+                                <td class="text-end">Rs. {{ "{:,.2f}".format(hour.total) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -95,7 +180,7 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3">
                     <h5 class="mb-0">
-                        <i class="fas fa-star text-primary"></i>
+                        <i class="fas fa-star text-primary no-print"></i>
                         Top Selling Products
                     </h5>
                 </div>
@@ -107,7 +192,7 @@
                                     <th>#</th>
                                     <th>Product</th>
                                     <th>Brand</th>
-                                    <th class="text-end">Quantity Sold</th>
+                                    <th class="text-center">Qty Sold</th>
                                     <th class="text-end">Total Sales</th>
                                 </tr>
                             </thead>
@@ -117,7 +202,7 @@
                                     <td>{{ loop.index }}</td>
                                     <td>{{ product.name }}</td>
                                     <td>{{ product.brand or '-' }}</td>
-                                    <td class="text-end">{{ product.total_quantity }}</td>
+                                    <td class="text-center">{{ product.total_quantity }}</td>
                                     <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(product.total_sales) }}</td>
                                 </tr>
                                 {% endfor %}
@@ -127,9 +212,63 @@
                 </div>
             </div>
         </div>
-    </div>
-</div>
 
+        <!-- Transactions List (for print) -->
+        {% if sales %}
+        <div class="col-12 page-break-before">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-receipt text-primary no-print"></i>
+                        All Transactions
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Sale #</th>
+                                    <th>Time</th>
+                                    <th>Customer</th>
+                                    <th>Payment</th>
+                                    <th class="text-end">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sale in sales %}
+                                <tr>
+                                    <td><code>{{ sale.sale_number }}</code></td>
+                                    <td>{{ sale.sale_date.strftime('%I:%M %p') }}</td>
+                                    <td>{{ sale.customer.name if sale.customer else 'Walk-in' }}</td>
+                                    <td class="text-capitalize">{{ sale.payment_method.replace('_', ' ') }}</td>
+                                    <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(sale.total) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-light fw-bold">
+                                    <td colspan="4">Total</td>
+                                    <td class="text-end">Rs. {{ "{:,.2f}".format(total_sales) }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Signature Area -->
+    {{ signature_area() }}
+
+    <!-- Print Footer -->
+    {{ print_footer() }}
+</div>
+{% endblock %}
+
+{% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 // Payment Methods Chart
@@ -137,11 +276,21 @@ const paymentData = {{ payment_methods | tojson }};
 new Chart(document.getElementById('paymentMethodsChart'), {
     type: 'doughnut',
     data: {
-        labels: Object.keys(paymentData),
+        labels: Object.keys(paymentData).map(k => k.replace('_', ' ').toUpperCase()),
         datasets: [{
             data: Object.values(paymentData),
-            backgroundColor: ['#6366F1', '#10B981', '#F59E0B', '#EF4444']
+            backgroundColor: ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
         }]
+    },
+    options: {
+        plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+                callbacks: {
+                    label: ctx => 'Rs. ' + ctx.parsed.toLocaleString()
+                }
+            }
+        }
     }
 });
 
@@ -164,6 +313,7 @@ new Chart(document.getElementById('hourlySalesChart'), {
         }]
     },
     options: {
+        plugins: { legend: { display: false } },
         scales: {
             y: {
                 beginAtZero: true,
@@ -175,4 +325,9 @@ new Chart(document.getElementById('hourlySalesChart'), {
     }
 });
 </script>
+<style>
+@media print {
+    .print-only { display: table !important; }
+}
+</style>
 {% endblock %}

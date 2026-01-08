@@ -98,9 +98,14 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     """Production configuration"""
     DEBUG = False
-    # SESSION_COOKIE_SECURE inherited from Config (reads from env)
-    # Set to True only when using HTTPS
+    # Production should use HTTPS with secure cookies
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Strict'
     SQLALCHEMY_ECHO = False
+
+    # Additional production security settings
+    PREFERRED_URL_SCHEME = 'https'
 
 
 class TestingConfig(Config):

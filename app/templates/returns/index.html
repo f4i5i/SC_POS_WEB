@@ -98,12 +98,12 @@
                             {% endif %}
                         </td>
                         <td>{{ ret.customer.name if ret.customer else 'Walk-in' }}</td>
-                        <td>{{ ret.created_at.strftime('%d %b %Y') }}</td>
+                        <td>{{ ret.return_date.strftime('%d %b %Y') if ret.return_date else '-' }}</td>
                         <td class="text-end fw-bold">Rs. {{ "{:,.0f}".format(ret.total_amount) }}</td>
                         <td>
-                            {% if ret.refund_type == 'cash' %}
+                            {% if ret.return_type == 'refund' %}
                             <span class="badge bg-success">Cash Refund</span>
-                            {% elif ret.refund_type == 'store_credit' %}
+                            {% elif ret.return_type == 'credit' %}
                             <span class="badge bg-info">Store Credit</span>
                             {% else %}
                             <span class="badge bg-secondary">Exchange</span>

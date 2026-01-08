@@ -331,7 +331,7 @@
             {% endif %}
 
             <!-- Material Consumptions (for completed orders) -->
-            {% if order.status == 'completed' and order.material_consumptions.count() > 0 %}
+            {% if order.status == 'completed' and order.material_consumptions|list|length > 0 %}
             <div class="card shadow-sm mt-4">
                 <div class="card-header bg-success text-white">
                     <h5 class="mb-0"><i class="fas fa-check-double me-2"></i>Materials Consumed</h5>

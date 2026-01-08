@@ -176,6 +176,7 @@ def view(return_id):
     items = ret.items.all()
 
     return render_template('returns/view.html',
+                         return_obj=ret,
                          return_order=ret,
                          items=items)
 
@@ -409,8 +410,9 @@ def customer_credits():
         page=page, per_page=20, error_out=False
     )
 
-    # Calculate credit balances
-    customer_balances = []
+    # Calculate credit balances - create credit objects for template
+    credits = []
+    total_credits = Decimal('0')
     for customer in customers.items:
         last_credit = CustomerCredit.query.filter_by(
             customer_id=customer.id
@@ -418,14 +420,21 @@ def customer_credits():
 
         balance = last_credit.balance_after if last_credit else Decimal('0')
         if balance > 0:
-            customer_balances.append({
+            credits.append({
                 'customer': customer,
-                'balance': balance
+                'customer_id': customer.id,
+                'balance': balance,
+                'updated_at': last_credit.created_at if last_credit else None
             })
+            total_credits += balance
+
+    customers_with_credit = len(credits)
 
     return render_template('returns/credits.html',
                          customers=customers,
-                         customer_balances=customer_balances)
+                         credits=credits,
+                         total_credits=total_credits,
+                         customers_with_credit=customers_with_credit)
 
 
 @bp.route('/credits/<int:customer_id>')

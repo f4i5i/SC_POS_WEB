@@ -159,7 +159,7 @@ def feature_required(feature_name):
                         'feature': feature_name
                     }), 403
                 flash(f'This feature ({feature_name}) is not enabled. Contact admin to enable it.', 'warning')
-                return redirect(url_for('main.index'))
+                return redirect(url_for('index'))
             return f(*args, **kwargs)
         return decorated_function
     return decorator

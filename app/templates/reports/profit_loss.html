@@ -1,114 +1,653 @@
 {% extends "base.html" %}
 
-{% block title %}Profit & Loss Statement - Sunnat Collection{% endblock %}
+{% block title %}Profit & Loss Report - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .period-btn {
+        border-radius: 20px;
+        padding: 0.5rem 1.5rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    .period-btn.active {
+        background: linear-gradient(135deg, #6366F1, #4F46E5);
+        color: white;
+        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    }
+    .stat-card {
+        border-radius: 15px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: transform 0.3s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .stat-card .icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        font-size: 1.5rem;
+    }
+    .stat-card .value {
+        font-size: 1.8rem;
+        font-weight: 700;
+    }
+    .pnl-table {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    .pnl-table td, .pnl-table th {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .pnl-table .section-header {
+        background: #f8fafc;
+        font-weight: 600;
+        color: #374151;
+    }
+    .pnl-table .total-row {
+        background: #f0fdf4;
+        font-weight: 600;
+    }
+    .pnl-table .total-row.negative {
+        background: #fef2f2;
+    }
+    .change-badge {
+        font-size: 0.85rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+    }
+    .expense-item {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        border-radius: 10px;
+        margin-bottom: 0.5rem;
+        background: #f9fafb;
+    }
+    .expense-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 1rem;
+    }
+
+    /* Print Header - Hidden on screen */
+    .print-header {
+        display: none;
+    }
+
+    /* Print Styles */
+    @media print {
+        /* Hide screen-only elements */
+        .sidebar, .navbar, .no-print, .btn, .period-btn,
+        .btn-group, form, .card-header .btn, .stat-card .icon,
+        .change-badge, canvas, .profit-health-indicator {
+            display: none !important;
+        }
+
+        /* Reset page */
+        body {
+            background: white !important;
+            font-size: 11pt;
+            color: #000 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .container-fluid {
+            padding: 0 !important;
+            max-width: 100% !important;
+        }
+
+        /* Show print header */
+        .print-header {
+            display: block !important;
+            text-align: center;
+            border-bottom: 3px double #000;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .print-header .business-name {
+            font-size: 24pt;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .print-header .report-title {
+            font-size: 16pt;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .print-header .report-period {
+            font-size: 12pt;
+            color: #333;
+        }
+
+        .print-header .report-meta {
+            font-size: 9pt;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        /* Hide regular header */
+        .page-header-regular {
+            display: none !important;
+        }
+
+        /* Cards styling for print */
+        .card {
+            border: 1px solid #ddd !important;
+            box-shadow: none !important;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .card-header {
+            background: #f5f5f5 !important;
+            border-bottom: 1px solid #ddd !important;
+            padding: 10px 15px !important;
+        }
+
+        /* Stat cards for print */
+        .stat-card {
+            border: 1px solid #ddd !important;
+            padding: 10px !important;
+            box-shadow: none !important;
+        }
+
+        .stat-card .value {
+            font-size: 14pt !important;
+            color: #000 !important;
+        }
+
+        .stat-card .text-muted {
+            color: #333 !important;
+            font-size: 9pt;
+        }
+
+        /* P&L Table styling */
+        .pnl-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .pnl-table td {
+            padding: 8px 12px !important;
+            border-bottom: 1px solid #ddd !important;
+        }
+
+        .pnl-table .section-header {
+            background: #e9ecef !important;
+            font-weight: bold;
+        }
+
+        .pnl-table .total-row {
+            background: #d4edda !important;
+            font-weight: bold;
+        }
+
+        .pnl-table .total-row.negative {
+            background: #f8d7da !important;
+        }
+
+        /* Colors for print */
+        .text-success { color: #198754 !important; }
+        .text-danger { color: #dc3545 !important; }
+        .text-primary { color: #0d6efd !important; }
+        .text-warning { color: #856404 !important; }
+        .text-info { color: #0dcaf0 !important; }
+
+        /* Layout adjustments */
+        .col-lg-8 { width: 100% !important; max-width: 100% !important; }
+        .col-lg-4 { display: none !important; }
+
+        .row { display: block !important; }
+
+        /* Page breaks */
+        .page-break-before { page-break-before: always; }
+        .page-break-after { page-break-after: always; }
+
+        /* Top products table */
+        .table thead { background: #e9ecef !important; }
+        .table th, .table td {
+            padding: 6px 10px !important;
+            border: 1px solid #ddd !important;
+        }
+
+        /* Footer */
+        .print-footer {
+            display: block !important;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 8pt;
+            color: #666;
+            border-top: 1px solid #ddd;
+            padding-top: 5px;
+        }
+
+        /* Badge styling for print */
+        .badge {
+            border: 1px solid #000 !important;
+            color: #000 !important;
+            background: #fff !important;
+        }
+
+        /* Show print summary */
+        .print-summary {
+            display: block !important;
+        }
+
+        /* Signature area */
+        .signature-area {
+            display: flex !important;
+            justify-content: space-between;
+            margin-top: 50px;
+            padding-top: 20px;
+        }
+
+        .signature-box {
+            width: 200px;
+            text-align: center;
+        }
+
+        .signature-line {
+            border-top: 1px solid #000;
+            margin-top: 50px;
+            padding-top: 5px;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <!-- Print Header (Only visible when printing) -->
+    <div class="print-header">
+        <div class="business-name">{{ business_name or 'Sunnat Collection' }}</div>
+        <div class="report-title">PROFIT & LOSS STATEMENT</div>
+        <div class="report-period">{{ period_label }}</div>
+        {% if user_location %}
+        <div class="report-meta">Location: {{ user_location.name }}</div>
+        {% endif %}
+        <div class="report-meta">Generated: {{ now().strftime('%B %d, %Y at %I:%M %p') if now else '' }}</div>
+    </div>
+
+    <!-- Print Footer -->
+    <div class="print-footer" style="display: none;">
+        This is a computer-generated document. No signature required.
+    </div>
+
+    <!-- Regular Header (Hidden on print) -->
+    <div class="d-flex justify-content-between align-items-center mb-4 page-header-regular no-print">
         <div>
             <h2 class="mb-1">
-                <i class="fas fa-file-invoice-dollar text-primary"></i>
-                Profit & Loss Statement
+                <i class="fas fa-chart-line text-primary"></i>
+                Profit & Loss Report
             </h2>
-            <p class="text-muted mb-0">{{ start_date.strftime('%B %d, %Y') }} - {{ end_date.strftime('%B %d, %Y') }}</p>
+            <p class="text-muted mb-0">
+                {{ period_label }}
+                {% if user_location %}
+                <span class="badge bg-info ms-2">{{ user_location.name }}</span>
+                {% endif %}
+            </p>
         </div>
         <div>
+            <button onclick="window.print()" class="btn btn-outline-primary me-2">
+                <i class="fas fa-print"></i> Print
+            </button>
             <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Reports
+                <i class="fas fa-arrow-left"></i> Back
             </a>
         </div>
     </div>
 
-    <div class="row g-3">
+    <!-- Period Selector (Hidden on print) -->
+    <div class="card border-0 shadow-sm mb-4 no-print">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <div class="btn-group" role="group">
+                        <a href="{{ url_for('reports.profit_loss', period='daily') }}"
+                           class="btn btn-outline-primary period-btn {{ 'active' if period == 'daily' }}">
+                            <i class="fas fa-calendar-day"></i> Daily
+                        </a>
+                        <a href="{{ url_for('reports.profit_loss', period='weekly') }}"
+                           class="btn btn-outline-primary period-btn {{ 'active' if period == 'weekly' }}">
+                            <i class="fas fa-calendar-week"></i> Weekly
+                        </a>
+                        <a href="{{ url_for('reports.profit_loss', period='monthly') }}"
+                           class="btn btn-outline-primary period-btn {{ 'active' if period == 'monthly' }}">
+                            <i class="fas fa-calendar-alt"></i> Monthly
+                        </a>
+                        <a href="{{ url_for('reports.profit_loss', period='custom') }}"
+                           class="btn btn-outline-primary period-btn {{ 'active' if period == 'custom' }}">
+                            <i class="fas fa-calendar"></i> Custom
+                        </a>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <form method="GET" class="row g-2 justify-content-end">
+                        <input type="hidden" name="period" value="{{ period }}">
+                        {% if period == 'custom' %}
+                        <div class="col-auto">
+                            <input type="date" name="start_date" class="form-control"
+                                   value="{{ start_date.strftime('%Y-%m-%d') }}">
+                        </div>
+                        <div class="col-auto">
+                            <input type="date" name="end_date" class="form-control"
+                                   value="{{ end_date.strftime('%Y-%m-%d') }}">
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search"></i> Apply
+                            </button>
+                        </div>
+                        {% else %}
+                        <div class="col-auto">
+                            <input type="date" name="start_date" class="form-control"
+                                   value="{{ start_date.strftime('%Y-%m-%d') }}"
+                                   onchange="this.form.submit()">
+                        </div>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Print Summary Table (Only visible when printing) -->
+    <div class="print-summary" style="display: none;">
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+                <td style="border: 1px solid #000; padding: 10px; width: 20%; text-align: center;">
+                    <strong>Net Revenue</strong><br>
+                    Rs. {{ "{:,.2f}".format(net_revenue) }}
+                </td>
+                <td style="border: 1px solid #000; padding: 10px; width: 20%; text-align: center;">
+                    <strong>Gross Profit</strong><br>
+                    Rs. {{ "{:,.2f}".format(gross_profit) }}<br>
+                    <small>({{ "{:.1f}".format(gross_margin) }}% margin)</small>
+                </td>
+                <td style="border: 1px solid #000; padding: 10px; width: 20%; text-align: center;">
+                    <strong>Growth Share</strong><br>
+                    Rs. {{ "{:,.2f}".format(growth_share) }}<br>
+                    <small>({{ growth_share_percent }}%)</small>
+                </td>
+                <td style="border: 1px solid #000; padding: 10px; width: 20%; text-align: center;">
+                    <strong>Expenses</strong><br>
+                    Rs. {{ "{:,.2f}".format(total_expenses) }}
+                </td>
+                <td style="border: 1px solid #000; padding: 10px; width: 20%; text-align: center; background: {{ '#d4edda' if net_profit >= 0 else '#f8d7da' }};">
+                    <strong>Net Profit</strong><br>
+                    Rs. {{ "{:,.2f}".format(net_profit) }}<br>
+                    <small>({{ "{:.1f}".format(net_margin) }}% margin)</small>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Key Metrics (Hidden on print - shown in print summary instead) -->
+    <div class="row g-3 mb-4 no-print">
+        <div class="col-6 col-lg">
+            <div class="card border-0 shadow-sm stat-card">
+                <div class="icon bg-primary bg-opacity-10 text-primary">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <div class="value text-primary">Rs. {{ "{:,.0f}".format(net_revenue) }}</div>
+                <div class="text-muted">Net Revenue</div>
+                {% if revenue_change != 0 %}
+                <span class="change-badge bg-{{ 'success' if revenue_change > 0 else 'danger' }} text-white mt-2">
+                    <i class="fas fa-arrow-{{ 'up' if revenue_change > 0 else 'down' }}"></i>
+                    {{ "{:.1f}".format(revenue_change|abs) }}%
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-6 col-lg">
+            <div class="card border-0 shadow-sm stat-card">
+                <div class="icon bg-success bg-opacity-10 text-success">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="value text-success">Rs. {{ "{:,.0f}".format(gross_profit) }}</div>
+                <div class="text-muted">Gross Profit</div>
+                <span class="change-badge bg-{{ 'success' if gross_margin >= 40 else 'warning' if gross_margin >= 25 else 'danger' }} text-white mt-2">
+                    {{ "{:.1f}".format(gross_margin) }}% margin
+                </span>
+            </div>
+        </div>
+        <div class="col-6 col-lg">
+            <div class="card border-0 shadow-sm stat-card">
+                <div class="icon bg-info bg-opacity-10 text-info">
+                    <i class="fas fa-chart-pie"></i>
+                </div>
+                <div class="value text-info">Rs. {{ "{:,.0f}".format(growth_share) }}</div>
+                <div class="text-muted">Growth Share</div>
+                <span class="change-badge bg-info text-white mt-2">
+                    {{ growth_share_percent }}% of profit
+                </span>
+            </div>
+        </div>
+        <div class="col-6 col-lg">
+            <div class="card border-0 shadow-sm stat-card">
+                <div class="icon bg-warning bg-opacity-10 text-warning">
+                    <i class="fas fa-receipt"></i>
+                </div>
+                <div class="value text-warning">Rs. {{ "{:,.0f}".format(total_expenses) }}</div>
+                <div class="text-muted">Expenses</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg">
+            <div class="card border-0 shadow-sm stat-card">
+                <div class="icon bg-{{ 'success' if net_profit >= 0 else 'danger' }} bg-opacity-10 text-{{ 'success' if net_profit >= 0 else 'danger' }}">
+                    <i class="fas fa-{{ 'trophy' if net_profit >= 0 else 'exclamation-triangle' }}"></i>
+                </div>
+                <div class="value text-{{ 'success' if net_profit >= 0 else 'danger' }}">
+                    Rs. {{ "{:,.0f}".format(net_profit) }}
+                </div>
+                <div class="text-muted">Net Profit</div>
+                <span class="change-badge bg-{{ 'success' if net_margin >= 20 else 'warning' if net_margin >= 10 else 'danger' }} text-white mt-2">
+                    {{ "{:.1f}".format(net_margin) }}% margin
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
         <!-- P&L Statement -->
-        <div class="col-md-8">
+        <div class="col-lg-8">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3">
                     <h5 class="mb-0">
-                        <i class="fas fa-calculator text-primary"></i>
-                        Income Statement
+                        <i class="fas fa-file-invoice-dollar text-primary"></i>
+                        Profit & Loss Statement
                     </h5>
                 </div>
-                <div class="card-body">
-                    <table class="table">
+                <div class="card-body p-0">
+                    <table class="table pnl-table mb-0">
                         <tbody>
                             <!-- Revenue Section -->
-                            <tr class="table-light">
-                                <td colspan="2"><strong>REVENUE</strong></td>
+                            <tr class="section-header">
+                                <td colspan="2"><i class="fas fa-plus-circle text-success me-2"></i>REVENUE</td>
                             </tr>
                             <tr>
-                                <td>Gross Sales</td>
+                                <td class="ps-4">Gross Sales</td>
                                 <td class="text-end">Rs. {{ "{:,.2f}".format(gross_revenue) }}</td>
                             </tr>
                             <tr>
-                                <td class="ps-4">Less: Discounts</td>
+                                <td class="ps-4">Less: Discounts Given</td>
                                 <td class="text-end text-danger">(Rs. {{ "{:,.2f}".format(total_discounts) }})</td>
                             </tr>
-                            <tr class="table-light">
+                            <tr class="total-row">
                                 <td><strong>Net Revenue</strong></td>
                                 <td class="text-end"><strong>Rs. {{ "{:,.2f}".format(net_revenue) }}</strong></td>
                             </tr>
 
-                            <!-- Cost Section -->
-                            <tr class="table-light">
-                                <td colspan="2" class="pt-3"><strong>COST OF GOODS SOLD</strong></td>
+                            <!-- Cost of Goods Sold -->
+                            <tr class="section-header">
+                                <td colspan="2"><i class="fas fa-minus-circle text-danger me-2"></i>COST OF GOODS SOLD</td>
                             </tr>
                             <tr>
-                                <td>Cost of Goods Sold (COGS)</td>
+                                <td class="ps-4">Product Cost (COGS)</td>
                                 <td class="text-end text-danger">(Rs. {{ "{:,.2f}".format(cogs) }})</td>
                             </tr>
-
-                            <!-- Gross Profit -->
-                            <tr class="table-success">
+                            <tr class="total-row">
                                 <td><strong>Gross Profit</strong></td>
-                                <td class="text-end"><strong>Rs. {{ "{:,.2f}".format(gross_profit) }}</strong></td>
-                            </tr>
-                            <tr>
-                                <td>Gross Margin</td>
                                 <td class="text-end">
-                                    <span class="badge bg-{{ 'success' if gross_margin >= 40 else 'primary' if gross_margin >= 25 else 'warning' }}">
-                                        {{ "{:.1f}".format(gross_margin) }}%
-                                    </span>
+                                    <strong class="text-{{ 'success' if gross_profit >= 0 else 'danger' }}">
+                                        Rs. {{ "{:,.2f}".format(gross_profit) }}
+                                    </strong>
+                                    <span class="badge bg-secondary ms-2">{{ "{:.1f}".format(gross_margin) }}%</span>
                                 </td>
                             </tr>
 
-                            <!-- Summary -->
-                            <tr class="table-light">
-                                <td colspan="2" class="pt-3"><strong>SUMMARY</strong></td>
+                            <!-- Growth Share -->
+                            <tr class="section-header">
+                                <td colspan="2"><i class="fas fa-chart-pie text-info me-2"></i>GROWTH SHARE</td>
                             </tr>
                             <tr>
-                                <td>Total Transactions</td>
-                                <td class="text-end">{{ total_transactions }}</td>
+                                <td class="ps-4">Growth Share ({{ growth_share_percent }}% of Gross Profit)</td>
+                                <td class="text-end text-danger">(Rs. {{ "{:,.2f}".format(growth_share) }})</td>
                             </tr>
+                            <tr class="total-row">
+                                <td><strong>Profit After Growth Share</strong></td>
+                                <td class="text-end">
+                                    <strong class="text-{{ 'success' if profit_after_growth_share >= 0 else 'danger' }}">
+                                        Rs. {{ "{:,.2f}".format(profit_after_growth_share) }}
+                                    </strong>
+                                </td>
+                            </tr>
+
+                            <!-- Operating Expenses -->
+                            <tr class="section-header">
+                                <td colspan="2"><i class="fas fa-wallet text-warning me-2"></i>OPERATING EXPENSES</td>
+                            </tr>
+                            {% if expense_by_category %}
+                                {% for exp in expense_by_category %}
+                                <tr>
+                                    <td class="ps-4">
+                                        <i class="fas fa-{{ exp.icon or 'money-bill' }} me-2" style="color: {{ exp.color or '#6B7280' }}"></i>
+                                        {{ exp.name }}
+                                    </td>
+                                    <td class="text-end text-danger">(Rs. {{ "{:,.2f}".format(exp.total or 0) }})</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
                             <tr>
-                                <td>Average Transaction Value</td>
-                                <td class="text-end">Rs. {{ "{:,.2f}".format(net_revenue / total_transactions if total_transactions > 0 else 0) }}</td>
+                                <td class="ps-4 text-muted" colspan="2">No expenses recorded</td>
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <td class="ps-4"><strong>Total Operating Expenses</strong></td>
+                                <td class="text-end text-danger"><strong>(Rs. {{ "{:,.2f}".format(total_expenses) }})</strong></td>
+                            </tr>
+
+                            <!-- Net Profit -->
+                            <tr class="total-row {{ 'negative' if net_profit < 0 }}">
+                                <td><strong><i class="fas fa-star me-2"></i>NET PROFIT / (LOSS)</strong></td>
+                                <td class="text-end">
+                                    <strong class="text-{{ 'success' if net_profit >= 0 else 'danger' }}" style="font-size: 1.2rem;">
+                                        Rs. {{ "{:,.2f}".format(net_profit) }}
+                                    </strong>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
+
+            <!-- Top Products by Profit -->
+            {% if top_products %}
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-trophy text-warning"></i>
+                        Top Products by Profit
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Product</th>
+                                <th class="text-center">Qty Sold</th>
+                                <th class="text-end">Revenue</th>
+                                <th class="text-end">Profit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in top_products %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>
+                                    <strong>{{ product.name }}</strong>
+                                    <br><small class="text-muted">{{ product.code }}</small>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-primary">{{ product.qty_sold or 0 }}</span>
+                                </td>
+                                <td class="text-end">Rs. {{ "{:,.0f}".format(product.revenue or 0) }}</td>
+                                <td class="text-end text-success fw-bold">Rs. {{ "{:,.0f}".format(product.profit or 0) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
-        <!-- Key Metrics -->
-        <div class="col-md-4">
-            <!-- Profit Indicator -->
-            <div class="card border-0 shadow-sm mb-3">
-                <div class="card-body text-center">
-                    <div class="mb-2">
-                        <i class="fas fa-chart-line fa-3x text-{{ 'success' if gross_profit > 0 else 'danger' }}"></i>
+        <!-- Right Sidebar -->
+        <div class="col-lg-4">
+            <!-- Summary Card -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle text-primary"></i>
+                        Period Summary
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Total Transactions:</span>
+                        <strong>{{ total_transactions }}</strong>
                     </div>
-                    <h6 class="text-muted mb-1">Net Profit</h6>
-                    <h2 class="mb-0 text-{{ 'success' if gross_profit > 0 else 'danger' }}">
-                        Rs. {{ "{:,.2f}".format(gross_profit) }}
-                    </h2>
-                    <small class="text-muted">{{ "{:.1f}".format(gross_margin) }}% margin</small>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Avg Transaction:</span>
+                        <strong>Rs. {{ "{:,.0f}".format(net_revenue / total_transactions if total_transactions > 0 else 0) }}</strong>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Previous Period:</span>
+                        <span>Rs. {{ "{:,.0f}".format(prev_revenue) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Change:</span>
+                        <span class="text-{{ 'success' if revenue_change >= 0 else 'danger' }}">
+                            <i class="fas fa-arrow-{{ 'up' if revenue_change >= 0 else 'down' }}"></i>
+                            {{ "{:.1f}".format(revenue_change|abs) }}%
+                        </span>
+                    </div>
                 </div>
             </div>
 
-            <!-- Payment Breakdown -->
-            <div class="card border-0 shadow-sm">
+            <!-- Payment Methods -->
+            <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
                     <h6 class="mb-0">
                         <i class="fas fa-credit-card text-primary"></i>
@@ -116,46 +655,123 @@
                     </h6>
                 </div>
                 <div class="card-body">
-                    <canvas id="paymentBreakdownChart" height="200"></canvas>
+                    {% for method, data in payment_breakdown.items() %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <i class="fas fa-{% if method == 'cash' %}money-bill{% elif method == 'card' %}credit-card{% elif method == 'bank_transfer' %}university{% else %}wallet{% endif %} text-primary me-2"></i>
+                            <span class="text-capitalize">{{ method.replace('_', ' ') }}</span>
+                        </div>
+                        <div class="text-end">
+                            <strong>Rs. {{ "{:,.0f}".format(data.total) }}</strong>
+                            <br><small class="text-muted">{{ data.count }} txn</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% if not payment_breakdown %}
+                    <p class="text-muted text-center mb-0">No transactions</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Daily Trend Chart (for weekly/monthly) -->
+            {% if period in ['weekly', 'monthly', 'custom'] and daily_data %}
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0">
+                        <i class="fas fa-chart-bar text-primary"></i>
+                        Daily Revenue Trend
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="dailyTrendChart" height="200"></canvas>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Profit Health Indicator -->
+            <div class="card border-0 shadow-sm mt-4 profit-health-indicator no-print">
+                <div class="card-body text-center py-4">
+                    <div class="mb-3">
+                        {% if net_margin >= 20 %}
+                        <i class="fas fa-smile-beam fa-4x text-success"></i>
+                        <h5 class="mt-2 text-success">Excellent!</h5>
+                        <p class="text-muted mb-0">Your profit margin is healthy</p>
+                        {% elif net_margin >= 10 %}
+                        <i class="fas fa-meh fa-4x text-warning"></i>
+                        <h5 class="mt-2 text-warning">Moderate</h5>
+                        <p class="text-muted mb-0">Consider reducing expenses</p>
+                        {% elif net_margin >= 0 %}
+                        <i class="fas fa-frown fa-4x text-danger"></i>
+                        <h5 class="mt-2 text-danger">Low Margin</h5>
+                        <p class="text-muted mb-0">Review pricing and costs</p>
+                        {% else %}
+                        <i class="fas fa-sad-tear fa-4x text-danger"></i>
+                        <h5 class="mt-2 text-danger">Loss!</h5>
+                        <p class="text-muted mb-0">Urgent action needed</p>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
+    <!-- Signature Area (Only for print) -->
+    <div class="signature-area" style="display: none;">
+        <div class="signature-box">
+            <div class="signature-line">Prepared By</div>
+        </div>
+        <div class="signature-box">
+            <div class="signature-line">Reviewed By</div>
+        </div>
+        <div class="signature-box">
+            <div class="signature-line">Approved By</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-const paymentData = {{ payment_breakdown | tojson }};
-const paymentLabels = Object.keys(paymentData);
-const paymentValues = Object.values(paymentData);
+{% if period in ['weekly', 'monthly', 'custom'] and daily_data %}
+const dailyData = {{ daily_data | tojson }};
+const labels = Object.keys(dailyData).sort();
+const revenues = labels.map(d => dailyData[d].revenue);
 
-new Chart(document.getElementById('paymentBreakdownChart'), {
-    type: 'pie',
+new Chart(document.getElementById('dailyTrendChart'), {
+    type: 'bar',
     data: {
-        labels: paymentLabels,
+        labels: labels.map(d => {
+            const date = new Date(d);
+            return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+        }),
         datasets: [{
-            data: paymentValues,
-            backgroundColor: [
-                'rgba(99, 102, 241, 0.8)',
-                'rgba(16, 185, 129, 0.8)',
-                'rgba(245, 158, 11, 0.8)',
-                'rgba(239, 68, 68, 0.8)'
-            ]
+            label: 'Revenue',
+            data: revenues,
+            backgroundColor: 'rgba(99, 102, 241, 0.8)',
+            borderRadius: 8
         }]
     },
     options: {
         responsive: true,
         plugins: {
-            legend: {
-                position: 'bottom'
-            },
+            legend: { display: false },
             tooltip: {
                 callbacks: {
-                    label: context => 'Rs. ' + context.parsed.toLocaleString('en-PK', {minimumFractionDigits: 2})
+                    label: ctx => 'Rs. ' + ctx.parsed.y.toLocaleString()
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: value => 'Rs. ' + (value / 1000) + 'k'
                 }
             }
         }
     }
 });
+{% endif %}
 </script>
 {% endblock %}

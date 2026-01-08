@@ -1,28 +1,63 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, signature_area %}
 
-{% block title %}Weekly Sales Report - Sunnat Collection{% endblock %}
+{% block title %}Weekly Sales Report - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <!-- Print Header -->
+    {{ print_header('WEEKLY SALES REPORT', start_date.strftime('%B %d') + ' - ' + end_date.strftime('%B %d, %Y'), user_location) }}
+
+    <!-- Screen Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 page-header-regular no-print">
         <div>
             <h2 class="mb-1">
                 <i class="fas fa-calendar-week text-primary"></i>
                 Weekly Sales Report
             </h2>
-            <p class="text-muted mb-0">{{ start_date.strftime('%B %d, %Y') }} - {{ end_date.strftime('%B %d, %Y') }}</p>
+            <p class="text-muted mb-0">
+                {{ start_date.strftime('%B %d, %Y') }} - {{ end_date.strftime('%B %d, %Y') }}
+                {% if user_location %}
+                <span class="badge bg-info ms-2">{{ user_location.name }}</span>
+                {% endif %}
+            </p>
         </div>
         <div>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Reports
+            <button onclick="window.print()" class="btn btn-outline-primary">
+                <i class="fas fa-print"></i> Print
+            </button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2">
+                <i class="fas fa-arrow-left"></i> Back
             </a>
         </div>
     </div>
 
-    <!-- Summary Cards -->
-    <div class="row g-3 mb-4">
-        <!-- Current Week Total -->
+    <!-- Print Summary -->
+    <div class="print-summary">
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+                <td style="border: 1px solid #000; padding: 10px; width: 33%; text-align: center;">
+                    <div style="font-size: 9pt; color: #666;">CURRENT WEEK SALES</div>
+                    <div style="font-size: 14pt; font-weight: bold;">Rs. {{ "{:,.2f}".format(current_total) }}</div>
+                </td>
+                <td style="border: 1px solid #000; padding: 10px; width: 33%; text-align: center;">
+                    <div style="font-size: 9pt; color: #666;">PREVIOUS WEEK SALES</div>
+                    <div style="font-size: 14pt; font-weight: bold;">Rs. {{ "{:,.2f}".format(previous_total) }}</div>
+                </td>
+                <td style="border: 1px solid #000; padding: 10px; width: 33%; text-align: center; background: {{ '#d4edda' if change_percent >= 0 else '#f8d7da' }};">
+                    <div style="font-size: 9pt; color: #666;">WEEK-OVER-WEEK CHANGE</div>
+                    <div style="font-size: 14pt; font-weight: bold;">{{ "{:+.1f}".format(change_percent) }}%</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Summary Cards (Screen only) -->
+    <div class="row g-3 mb-4 no-print">
         <div class="col-md-4">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
@@ -40,8 +75,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Previous Week Total -->
         <div class="col-md-4">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
@@ -59,8 +92,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Change Percentage -->
         <div class="col-md-4">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
@@ -83,8 +114,8 @@
         </div>
     </div>
 
-    <!-- Daily Sales Chart -->
-    <div class="card border-0 shadow-sm mb-4">
+    <!-- Daily Sales Chart (Screen only) -->
+    <div class="card border-0 shadow-sm mb-4 no-print">
         <div class="card-header bg-white py-3">
             <h5 class="mb-0">
                 <i class="fas fa-chart-bar text-primary"></i>
@@ -100,7 +131,7 @@
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white py-3">
             <h5 class="mb-0">
-                <i class="fas fa-table text-primary"></i>
+                <i class="fas fa-table text-primary no-print"></i>
                 Daily Sales Details
             </h5>
         </div>
@@ -111,7 +142,7 @@
                         <tr>
                             <th>Date</th>
                             <th>Day</th>
-                            <th class="text-end">Transactions</th>
+                            <th class="text-center">Transactions</th>
                             <th class="text-end">Total Sales</th>
                             <th class="text-end">Avg. Transaction</th>
                         </tr>
@@ -121,41 +152,53 @@
                         <tr>
                             <td>{{ day.date.strftime('%b %d, %Y') }}</td>
                             <td>{{ day.date.strftime('%A') }}</td>
-                            <td class="text-end">{{ day.count }}</td>
+                            <td class="text-center">{{ day.count }}</td>
                             <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(day.total) }}</td>
                             <td class="text-end">Rs. {{ "{:,.2f}".format(day.total / day.count if day.count > 0 else 0) }}</td>
                         </tr>
                         {% endfor %}
-                        {% if not daily_sales %}
-                        <tr>
-                            <td colspan="5" class="text-center text-muted py-4">
-                                <i class="fas fa-inbox fa-2x mb-2"></i>
-                                <p class="mb-0">No sales data for this week</p>
-                            </td>
-                        </tr>
-                        {% endif %}
                     </tbody>
+                    <tfoot>
+                        <tr class="table-light fw-bold">
+                            <td colspan="2">Total</td>
+                            <td class="text-center">{{ daily_sales|sum(attribute='count') }}</td>
+                            <td class="text-end">Rs. {{ "{:,.2f}".format(current_total) }}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
         </div>
     </div>
-</div>
 
+    <!-- Signature Area -->
+    {{ signature_area() }}
+
+    <!-- Print Footer -->
+    {{ print_footer() }}
+</div>
+{% endblock %}
+
+{% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// Daily Sales Chart
-const ctx = document.getElementById('dailySalesChart').getContext('2d');
-const dailySalesData = {{ daily_sales | tojson }};
-
+const dailySalesData = [
+    {% for day in daily_sales %}
+    {
+        date: '{{ day.date.strftime("%Y-%m-%d") }}',
+        total: {{ day.total }},
+        count: {{ day.count }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
 const labels = dailySalesData.map(d => {
-    const date = new Date(d.date);
+    const date = new Date(d.date + 'T00:00:00');
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 });
-
 const data = dailySalesData.map(d => d.total);
 const counts = dailySalesData.map(d => d.count);
 
-new Chart(ctx, {
+new Chart(document.getElementById('dailySalesChart'), {
     type: 'bar',
     data: {
         labels: labels,
@@ -163,37 +206,24 @@ new Chart(ctx, {
             label: 'Sales Amount',
             data: data,
             backgroundColor: 'rgba(99, 102, 241, 0.8)',
-            borderColor: 'rgba(99, 102, 241, 1)',
-            borderWidth: 2,
             borderRadius: 8
         }]
     },
     options: {
         responsive: true,
-        maintainAspectRatio: true,
         plugins: {
-            legend: {
-                display: false
-            },
+            legend: { display: false },
             tooltip: {
                 callbacks: {
-                    label: function(context) {
-                        return 'Rs. ' + context.parsed.y.toLocaleString('en-PK', {minimumFractionDigits: 2});
-                    },
-                    afterLabel: function(context) {
-                        return 'Transactions: ' + counts[context.dataIndex];
-                    }
+                    label: ctx => 'Rs. ' + ctx.parsed.y.toLocaleString(),
+                    afterLabel: ctx => 'Transactions: ' + counts[ctx.dataIndex]
                 }
             }
         },
         scales: {
             y: {
                 beginAtZero: true,
-                ticks: {
-                    callback: function(value) {
-                        return 'Rs. ' + value.toLocaleString();
-                    }
-                }
+                ticks: { callback: value => 'Rs. ' + value.toLocaleString() }
             }
         }
     }

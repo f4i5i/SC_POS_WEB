@@ -4,9 +4,11 @@ Initializes and configures the Flask application
 """
 
 import os
-from flask import Flask, render_template
+import secrets
+from flask import Flask, render_template, request
 from flask_login import LoginManager
 from flask_migrate import Migrate
+from flask_wtf.csrf import CSRFProtect
 from config import config
 from app.models import db, User
 
@@ -16,6 +18,17 @@ from app import models_extended
 # Initialize extensions
 login_manager = LoginManager()
 migrate = Migrate()
+csrf = CSRFProtect()
+
+# Try to import Flask-Limiter for rate limiting
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    limiter = Limiter(key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
+    LIMITER_AVAILABLE = True
+except ImportError:
+    limiter = None
+    LIMITER_AVAILABLE = False
 
 
 def create_app(config_name='default'):
@@ -28,10 +41,22 @@ def create_app(config_name='default'):
     # Load configuration
     app.config.from_object(config[config_name])
 
+    # Validate secret key in production
+    if config_name == 'production':
+        if not app.config.get('SECRET_KEY') or app.config['SECRET_KEY'] == 'dev-secret-key-change-in-production':
+            raise ValueError("Production requires a secure SECRET_KEY. Set it via environment variable.")
+        if len(app.config['SECRET_KEY']) < 32:
+            raise ValueError("SECRET_KEY must be at least 32 characters for production.")
+
     # Initialize extensions
     db.init_app(app)
     login_manager.init_app(app)
     migrate.init_app(app, db)
+    csrf.init_app(app)
+
+    # Initialize rate limiter if available
+    if LIMITER_AVAILABLE and limiter:
+        limiter.init_app(app)
 
     # Configure login manager
     login_manager.login_view = 'auth.login'
@@ -234,5 +259,38 @@ def create_app(config_name='default'):
         if current_user.is_authenticated:
             from app.utils.location_context import set_location_context
             set_location_context()
+
+    @app.after_request
+    def add_security_headers(response):
+        """Add security headers to all responses"""
+        # Content Security Policy - Allow same-origin and common CDNs
+        csp = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
+            "img-src 'self' data: blob:; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "form-action 'self';"
+        )
+        response.headers['Content-Security-Policy'] = csp
+
+        # Prevent clickjacking
+        response.headers['X-Frame-Options'] = 'DENY'
+
+        # Prevent MIME type sniffing
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+
+        # Enable XSS filter
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+
+        # Referrer policy
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+
+        # Permissions policy (formerly feature policy)
+        response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+
+        return response
 
     return app

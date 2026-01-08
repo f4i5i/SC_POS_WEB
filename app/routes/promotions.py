@@ -70,7 +70,7 @@ def index():
 @bp.route('/add', methods=['GET', 'POST'])
 @login_required
 @feature_required(Features.PROMOTIONS)
-def add_promotion():
+def add():
     """Create new promotion"""
     if request.method == 'POST':
         try:
@@ -106,12 +106,12 @@ def add_promotion():
     return render_template('promotions/add.html')
 
 
-@bp.route('/edit/<int:promo_id>', methods=['GET', 'POST'])
+@bp.route('/edit/<int:promotion_id>', methods=['GET', 'POST'])
 @login_required
 @feature_required(Features.PROMOTIONS)
-def edit_promotion(promo_id):
+def edit(promotion_id):
     """Edit promotion"""
-    promotion = Promotion.query.get_or_404(promo_id)
+    promotion = Promotion.query.get_or_404(promotion_id)
 
     if request.method == 'POST':
         try:

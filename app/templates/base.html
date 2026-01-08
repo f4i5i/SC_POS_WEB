@@ -1665,6 +1665,89 @@
         body.modal-open .navbar {
             z-index: 999 !important;
         }
+
+        /* ========== GLOBAL PRINT STYLES ========== */
+        @media print {
+            /* Hide navigation and UI elements */
+            .sidebar,
+            .navbar,
+            .no-print,
+            .btn:not(.btn-print),
+            .modal,
+            .modal-backdrop,
+            .toast-container,
+            .dropdown-menu,
+            .sidebar-toggle,
+            footer {
+                display: none !important;
+            }
+
+            /* Reset page layout */
+            body {
+                background: white !important;
+                margin: 0;
+                padding: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            /* Full width content */
+            .main-content {
+                margin-left: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+            }
+
+            .container-fluid {
+                padding: 15px !important;
+                max-width: 100% !important;
+            }
+
+            /* Cards for print */
+            .card {
+                border: 1px solid #ddd !important;
+                box-shadow: none !important;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+
+            .card-header {
+                background: #f5f5f5 !important;
+                border-bottom: 1px solid #ddd !important;
+            }
+
+            /* Tables for print */
+            .table {
+                border-collapse: collapse !important;
+            }
+
+            .table th,
+            .table td {
+                border: 1px solid #ddd !important;
+                padding: 8px !important;
+            }
+
+            .table-hover tbody tr:hover {
+                background: none !important;
+            }
+
+            /* Links for print */
+            a {
+                color: #000 !important;
+                text-decoration: none !important;
+            }
+
+            /* Avoid page breaks inside elements */
+            h1, h2, h3, h4, h5, h6 {
+                page-break-after: avoid;
+            }
+
+            /* Page setup */
+            @page {
+                margin: 1cm;
+                size: A4;
+            }
+        }
     </style>
 
     {% block extra_css %}{% endblock %}

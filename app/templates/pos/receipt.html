@@ -5,144 +5,284 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Receipt - {{ sale.sale_number }}</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @page {
+            size: 80mm auto;
+            margin: 0;
+        }
+
         @media print {
-            .no-print { display: none; }
+            .no-print { display: none !important; }
+            html, body {
+                width: 80mm;
+                margin: 0;
+                padding: 0;
+            }
+            body {
+                padding: 5mm;
+            }
         }
 
         body {
-            font-family: 'Courier New', monospace;
+            font-family: 'Courier New', 'Consolas', monospace;
             max-width: 80mm;
-            margin: 20px auto;
+            margin: 0 auto;
             padding: 10px;
+            background: #fff;
+            color: #000;
+            font-size: 11px;
+            line-height: 1.4;
         }
 
+        /* Header */
         .receipt-header {
             text-align: center;
-            margin-bottom: 20px;
-            border-bottom: 2px dashed #000;
-            padding-bottom: 15px;
+            padding-bottom: 12px;
+            border-bottom: 2px double #000;
+            margin-bottom: 12px;
         }
 
         .receipt-logo {
-            max-width: 150px;
+            max-width: 140px;
             height: auto;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
-        .receipt-header h2 {
-            margin: 5px 0;
-            font-size: 18px;
+        .business-name {
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin: 6px 0;
         }
 
-        .receipt-header p {
-            margin: 3px 0;
-            font-size: 12px;
+        .business-tagline {
+            font-size: 10px;
+            font-style: italic;
+            margin-bottom: 6px;
         }
 
+        .business-contact {
+            font-size: 9px;
+            line-height: 1.5;
+        }
+
+        /* Receipt Info */
         .receipt-info {
-            margin-bottom: 15px;
+            border-bottom: 1px dashed #000;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+            font-size: 10px;
+        }
+
+        .receipt-info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+        }
+
+        .receipt-number {
             font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+            background: #f0f0f0;
+            padding: 4px;
+            margin-bottom: 8px;
+            border: 1px solid #ccc;
         }
 
-        .receipt-info div {
-            margin: 5px 0;
-        }
-
-        table {
+        /* Items Table */
+        .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 15px 0;
-            font-size: 12px;
+            margin: 10px 0;
+            font-size: 10px;
         }
 
-        table th {
+        .items-table th {
             border-bottom: 1px solid #000;
-            padding: 5px 4px;
+            border-top: 1px solid #000;
+            padding: 5px 2px;
             text-align: left;
+            font-weight: bold;
         }
 
-        table td {
-            padding: 5px 4px;
+        .items-table td {
+            padding: 4px 2px;
             border-bottom: 1px dashed #ccc;
+            vertical-align: top;
         }
 
-        .text-right {
+        .items-table th:first-child,
+        .items-table td:first-child {
+            width: 50%;
+        }
+
+        .items-table th:nth-child(2),
+        .items-table td:nth-child(2) {
+            width: 12%;
+            text-align: center;
+        }
+
+        .items-table th:nth-child(3),
+        .items-table td:nth-child(3),
+        .items-table th:nth-child(4),
+        .items-table td:nth-child(4) {
+            width: 19%;
             text-align: right;
         }
 
-        /* Column widths for better spacing */
-        table th:first-child,
-        table td:first-child {
-            width: 45%;
-            padding-right: 8px;
+        .item-name {
+            word-wrap: break-word;
+            max-width: 120px;
         }
 
-        table th:nth-child(2),
-        table td:nth-child(2) {
-            width: 12%;
-            padding-left: 6px;
-            padding-right: 6px;
-        }
-
-        table th:nth-child(3),
-        table td:nth-child(3) {
-            width: 20%;
-            padding-left: 6px;
-            padding-right: 6px;
-        }
-
-        table th:nth-child(4),
-        table td:nth-child(4) {
-            width: 23%;
-            padding-left: 6px;
-        }
-
+        /* Totals */
         .totals {
-            margin-top: 15px;
-            border-top: 2px solid #000;
-            padding-top: 10px;
-            font-size: 12px;
+            border-top: 1px solid #000;
+            padding-top: 8px;
+            margin-top: 5px;
+            font-size: 10px;
         }
 
-        .totals div {
+        .totals-row {
             display: flex;
             justify-content: space-between;
-            margin: 5px 0;
+            margin: 4px 0;
         }
 
-        .totals .grand-total {
-            font-size: 16px;
-            font-weight: bold;
-            margin-top: 10px;
-            padding-top: 10px;
+        .totals-row.discount {
+            color: #555;
+        }
+
+        .grand-total {
             border-top: 2px solid #000;
+            border-bottom: 2px solid #000;
+            margin: 8px 0;
+            padding: 8px 0;
+            font-size: 14px;
+            font-weight: bold;
         }
 
+        .payment-info {
+            border-top: 1px dashed #000;
+            padding-top: 8px;
+            margin-top: 8px;
+            font-size: 10px;
+        }
+
+        .payment-method {
+            text-align: center;
+            font-weight: bold;
+            background: #f5f5f5;
+            padding: 4px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        /* Customer Loyalty */
+        .loyalty-info {
+            text-align: center;
+            border: 1px dashed #000;
+            padding: 6px;
+            margin: 10px 0;
+            font-size: 9px;
+            background: #f9f9f9;
+        }
+
+        .loyalty-points {
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        /* Footer */
         .receipt-footer {
             text-align: center;
-            margin-top: 20px;
-            padding-top: 15px;
-            border-top: 2px dashed #000;
-            font-size: 11px;
+            border-top: 2px double #000;
+            margin-top: 12px;
+            padding-top: 10px;
+            font-size: 10px;
         }
 
+        .thank-you {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .footer-tagline {
+            font-style: italic;
+            margin-bottom: 8px;
+        }
+
+        .footer-contact {
+            font-size: 9px;
+            margin-top: 8px;
+        }
+
+        .barcode-area {
+            text-align: center;
+            margin: 10px 0;
+            font-family: 'Libre Barcode 39', cursive;
+            font-size: 28px;
+        }
+
+        /* Print Button */
         .print-btn {
             text-align: center;
-            margin: 20px 0;
+            margin: 15px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
         }
 
         .print-btn button {
-            background: #3B82F6;
+            background: linear-gradient(135deg, #6366F1, #4F46E5);
             color: white;
             border: none;
-            padding: 10px 30px;
-            border-radius: 5px;
+            padding: 12px 30px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s;
         }
 
         .print-btn button:hover {
-            background: #2563EB;
+            background: linear-gradient(135deg, #4F46E5, #4338CA);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+        }
+
+        .close-btn {
+            background: #6c757d !important;
+            margin-left: 10px;
+        }
+
+        .close-btn:hover {
+            background: #5a6268 !important;
+        }
+
+        /* Divider */
+        .divider {
+            border-bottom: 1px dashed #999;
+            margin: 8px 0;
+        }
+
+        /* Items count */
+        .items-count {
+            text-align: center;
+            font-size: 9px;
+            color: #666;
+            margin: 5px 0;
         }
     </style>
 </head>
@@ -151,83 +291,147 @@
         <button onclick="window.print()">
             <i class="fas fa-print"></i> Print Receipt
         </button>
+        <button class="close-btn" onclick="window.close()">
+            <i class="fas fa-times"></i> Close
+        </button>
     </div>
 
+    <!-- Receipt Header -->
     <div class="receipt-header">
-        <img src="{{ url_for('static', filename='images/SC - Black.png') }}" alt="{{ business_name }}" class="receipt-logo">
-        <p>{{ business_address or 'First Floor, Mall of Wah, G.T Road' }}</p>
-        <p>Tel: {{ business_phone or 'N/A' }} | Email: {{ business_email or 'N/A' }}</p>
+        <img src="{{ url_for('static', filename='images/SC - Black.png') }}" alt="{{ business_name }}" class="receipt-logo" onerror="this.style.display='none'">
+        <div class="business-name">{{ business_name or 'SUNNAT COLLECTION' }}</div>
+        <div class="business-tagline">Premium Attars & Perfumes</div>
+        <div class="business-contact">
+            {{ business_address or 'First Floor, Mall of Wah, G.T Road' }}<br>
+            Tel: {{ business_phone or 'N/A' }}
+        </div>
     </div>
 
+    <!-- Receipt Number -->
+    <div class="receipt-number">
+        RECEIPT: {{ sale.sale_number }}
+    </div>
+
+    <!-- Receipt Info -->
     <div class="receipt-info">
-        <div><strong>Receipt #:</strong> {{ sale.sale_number }}</div>
-        <div><strong>Date:</strong> {{ sale.sale_date.strftime('%b %d, %Y %I:%M %p') }}</div>
-        <div><strong>Cashier:</strong> {{ sale.cashier.full_name if sale.cashier else 'N/A' }}</div>
+        <div class="receipt-info-row">
+            <span>Date:</span>
+            <span>{{ sale.sale_date.strftime('%b %d, %Y') }}</span>
+        </div>
+        <div class="receipt-info-row">
+            <span>Time:</span>
+            <span>{{ sale.sale_date.strftime('%I:%M %p') }}</span>
+        </div>
+        <div class="receipt-info-row">
+            <span>Cashier:</span>
+            <span>{{ sale.cashier.full_name if sale.cashier else 'N/A' }}</span>
+        </div>
         {% if sale.customer %}
-        <div><strong>Customer:</strong> {{ sale.customer.name }}</div>
+        <div class="receipt-info-row">
+            <span>Customer:</span>
+            <span>{{ sale.customer.name }}</span>
+        </div>
+        {% endif %}
+        {% if sale.location %}
+        <div class="receipt-info-row">
+            <span>Location:</span>
+            <span>{{ sale.location.name }}</span>
+        </div>
         {% endif %}
     </div>
 
-    <table>
+    <!-- Items -->
+    <table class="items-table">
         <thead>
             <tr>
-                <th>Item</th>
-                <th class="text-right">Qty</th>
-                <th class="text-right">Price</th>
-                <th class="text-right">Total</th>
+                <th>ITEM</th>
+                <th>QTY</th>
+                <th>PRICE</th>
+                <th>TOTAL</th>
             </tr>
         </thead>
         <tbody>
             {% for item in sale.items %}
             <tr>
-                <td>{{ item.product.name }}</td>
-                <td class="text-right">{{ item.quantity }}</td>
-                <td class="text-right">{{ "%.2f"|format(item.unit_price) }}</td>
-                <td class="text-right">{{ "%.2f"|format(item.subtotal) }}</td>
+                <td class="item-name">{{ item.product.name }}</td>
+                <td style="text-align: center;">{{ item.quantity }}</td>
+                <td style="text-align: right;">{{ "{:,.0f}".format(item.unit_price) }}</td>
+                <td style="text-align: right;">{{ "{:,.0f}".format(item.subtotal) }}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 
+    <div class="items-count">
+        Total Items: {{ sale.items|sum(attribute='quantity') }} ({{ sale.items|length }} line{{ 's' if sale.items|length > 1 else '' }})
+    </div>
+
+    <!-- Totals -->
     <div class="totals">
-        <div>
+        <div class="totals-row">
             <span>Subtotal:</span>
-            <span>Rs. {{ "%.2f"|format(sale.subtotal) }}</span>
+            <span>Rs. {{ "{:,.2f}".format(sale.subtotal) }}</span>
         </div>
         {% if sale.discount > 0 %}
-        <div>
+        <div class="totals-row discount">
             <span>Discount:</span>
-            <span>- Rs. {{ "%.2f"|format(sale.discount) }}</span>
+            <span>- Rs. {{ "{:,.2f}".format(sale.discount) }}</span>
         </div>
         {% endif %}
         {% if sale.tax > 0 %}
-        <div>
+        <div class="totals-row">
             <span>Tax:</span>
-            <span>Rs. {{ "%.2f"|format(sale.tax) }}</span>
+            <span>Rs. {{ "{:,.2f}".format(sale.tax) }}</span>
         </div>
         {% endif %}
-        <div class="grand-total">
+
+        <div class="totals-row grand-total">
             <span>TOTAL:</span>
-            <span>Rs. {{ "%.2f"|format(sale.total) }}</span>
-        </div>
-        <div>
-            <span>Amount Paid:</span>
-            <span>Rs. {{ "%.2f"|format(sale.amount_paid) }}</span>
-        </div>
-        <div>
-            <span>Change:</span>
-            <span>Rs. {{ "%.2f"|format(sale.amount_paid - sale.total) }}</span>
-        </div>
-        <div style="margin-top: 10px;">
-            <span>Payment Method:</span>
-            <span>{{ sale.payment_method|upper }}</span>
+            <span>Rs. {{ "{:,.2f}".format(sale.total) }}</span>
         </div>
     </div>
 
+    <!-- Payment Info -->
+    <div class="payment-info">
+        <div class="payment-method">
+            PAID BY {{ sale.payment_method.replace('_', ' ')|upper }}
+        </div>
+        <div class="totals-row">
+            <span>Amount Received:</span>
+            <span>Rs. {{ "{:,.2f}".format(sale.amount_paid) }}</span>
+        </div>
+        {% set change = sale.amount_paid - sale.total %}
+        {% if change > 0 %}
+        <div class="totals-row">
+            <span>Change:</span>
+            <span>Rs. {{ "{:,.2f}".format(change) }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Customer Loyalty Points -->
+    {% if sale.customer %}
+    <div class="loyalty-info">
+        <div>Customer: {{ sale.customer.name }}</div>
+        <div class="loyalty-points">
+            Loyalty Points: {{ sale.customer.loyalty_points or 0 }}
+        </div>
+        <div>{{ sale.customer.loyalty_tier }} Member</div>
+    </div>
+    {% endif %}
+
+    <!-- Footer -->
     <div class="receipt-footer">
-        <p><strong>Thank you for your purchase!</strong></p>
-        <p>{{ tagline or 'Visit us again!' }}</p>
-        <p style="margin-top: 10px;">www.sunnatcollection.com</p>
+        <div class="thank-you">Thank You For Your Purchase!</div>
+        <div class="footer-tagline">Experience the essence of tradition</div>
+        <div class="divider"></div>
+        <div class="footer-contact">
+            www.sunnatcollection.com<br>
+            Follow us: @sunnatcollection
+        </div>
+        <div style="margin-top: 10px; font-size: 8px; color: #999;">
+            {{ sale.sale_date.strftime('%Y-%m-%d %H:%M:%S') }}
+        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>

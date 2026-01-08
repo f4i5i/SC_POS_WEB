@@ -1,21 +1,37 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, signature_area %}
 
-{% block title %}Product Performance Report - Sunnat Collection{% endblock %}
+{% block title %}Product Performance Report - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <!-- Print Header -->
+    {{ print_header('PRODUCT PERFORMANCE ANALYSIS', start_date.strftime('%B %d, %Y') + ' - ' + end_date.strftime('%B %d, %Y'), user_location) }}
+
+    <!-- Screen Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 page-header-regular no-print">
         <div>
             <h2 class="mb-1">
                 <i class="fas fa-box-open text-primary"></i>
                 Product Performance Analysis
             </h2>
-            <p class="text-muted mb-0">{{ start_date.strftime('%B %d, %Y') }} - {{ end_date.strftime('%B %d, %Y') }}</p>
+            <p class="text-muted mb-0">
+                {{ start_date.strftime('%B %d, %Y') }} - {{ end_date.strftime('%B %d, %Y') }}
+                {% if user_location %}
+                <span class="badge bg-info ms-2">{{ user_location.name }}</span>
+                {% endif %}
+            </p>
         </div>
         <div>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Reports
+            <button onclick="window.print()" class="btn btn-outline-primary">
+                <i class="fas fa-print"></i> Print
+            </button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2">
+                <i class="fas fa-arrow-left"></i> Back
             </a>
         </div>
     </div>
@@ -24,7 +40,7 @@
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white py-3">
             <h5 class="mb-0">
-                <i class="fas fa-trophy text-warning"></i>
+                <i class="fas fa-trophy text-warning no-print"></i>
                 Top 20 Performing Products
             </h5>
         </div>
@@ -67,6 +83,19 @@
                         </tr>
                         {% endfor %}
                     </tbody>
+                    {% if top_products %}
+                    <tfoot>
+                        <tr class="table-light fw-bold">
+                            <td colspan="4">Total</td>
+                            <td class="text-end">{{ top_products|sum(attribute='units_sold') }}</td>
+                            <td class="text-end">Rs. {{ "{:,.2f}".format(top_products|sum(attribute='revenue')) }}</td>
+                            {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
+                            <td class="text-end text-success">Rs. {{ "{:,.2f}".format(top_products|sum(attribute='profit')) }}</td>
+                            {% endif %}
+                            <td class="text-end">{{ top_products|sum(attribute='transactions') }}</td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
                 </table>
             </div>
         </div>
@@ -78,7 +107,7 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3">
                     <h5 class="mb-0">
-                        <i class="fas fa-exclamation-triangle text-warning"></i>
+                        <i class="fas fa-exclamation-triangle text-warning no-print"></i>
                         Underperforming Products
                     </h5>
                 </div>
@@ -103,6 +132,11 @@
                                     <td class="text-end">Rs. {{ "{:,.2f}".format(product.revenue) }}</td>
                                 </tr>
                                 {% endfor %}
+                                {% if not worst_products %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-3">No data available</td>
+                                </tr>
+                                {% endif %}
                             </tbody>
                         </table>
                     </div>
@@ -115,7 +149,7 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3">
                     <h5 class="mb-0">
-                        <i class="fas fa-times-circle text-danger"></i>
+                        <i class="fas fa-times-circle text-danger no-print"></i>
                         Never Sold ({{ never_sold|length }})
                     </h5>
                 </div>
@@ -152,11 +186,28 @@
                                 </tr>
                                 {% endif %}
                             </tbody>
+                            {% if never_sold %}
+                            <tfoot>
+                                <tr class="table-light fw-bold">
+                                    <td>Total</td>
+                                    <td class="text-end">{{ never_sold|sum(attribute='quantity') }}</td>
+                                    {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
+                                    <td class="text-end text-danger">Rs. {{ "{:,.2f}".format(never_sold|map(attribute='cost_price')|sum) }}</td>
+                                    {% endif %}
+                                </tr>
+                            </tfoot>
+                            {% endif %}
                         </table>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Signature Area -->
+    {{ signature_area() }}
+
+    <!-- Print Footer -->
+    {{ print_footer() }}
 </div>
 {% endblock %}

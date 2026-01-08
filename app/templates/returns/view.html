@@ -50,12 +50,12 @@
                                 <span class="badge bg-danger">Rejected</span>
                                 {% endif %}
                             </p>
-                            <p class="mb-1"><strong>Date:</strong> {{ return_obj.created_at.strftime('%d %b %Y %H:%M') }}</p>
+                            <p class="mb-1"><strong>Date:</strong> {{ return_obj.return_date.strftime('%d %b %Y %H:%M') if return_obj.return_date else '-' }}</p>
                             <p class="mb-0">
-                                <strong>Refund Type:</strong>
-                                {% if return_obj.refund_type == 'cash' %}
+                                <strong>Return Type:</strong>
+                                {% if return_obj.return_type == 'refund' %}
                                 Cash Refund
-                                {% elif return_obj.refund_type == 'store_credit' %}
+                                {% elif return_obj.return_type == 'credit' %}
                                 Store Credit
                                 {% else %}
                                 Exchange
@@ -91,7 +91,7 @@
                                     <td>{{ item.product.name if item.product else 'Unknown' }}</td>
                                     <td class="text-center">{{ item.quantity }}</td>
                                     <td class="text-end">Rs. {{ "{:,.2f}".format(item.unit_price) }}</td>
-                                    <td class="text-end">Rs. {{ "{:,.2f}".format(item.total_price) }}</td>
+                                    <td class="text-end">Rs. {{ "{:,.2f}".format(item.subtotal) }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -106,7 +106,7 @@
 
                     <div class="row mt-3">
                         <div class="col-md-6">
-                            <p><strong>Reason:</strong> {{ return_obj.reason|title if return_obj.reason else 'Not specified' }}</p>
+                            <p><strong>Reason:</strong> {{ return_obj.return_reason|title if return_obj.return_reason else 'Not specified' }}</p>
                         </div>
                         {% if return_obj.notes %}
                         <div class="col-md-6">

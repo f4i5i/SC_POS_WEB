@@ -1,27 +1,66 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, signature_area %}
 
-{% block title %}Inventory Valuation - Sunnat Collection{% endblock %}
+{% block title %}Inventory Valuation - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <!-- Print Header -->
+    {{ print_header('INVENTORY VALUATION REPORT', 'As of ' + now().strftime('%B %d, %Y') if now else '', user_location) }}
+
+    <!-- Screen Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 page-header-regular no-print">
         <div>
             <h2 class="mb-1">
                 <i class="fas fa-boxes text-primary"></i>
                 Inventory Valuation Report
             </h2>
-            <p class="text-muted mb-0">Current stock value and potential profit analysis</p>
+            <p class="text-muted mb-0">
+                Current stock value and potential profit analysis
+                {% if user_location %}
+                <span class="badge bg-info ms-2">{{ user_location.name }}</span>
+                {% endif %}
+            </p>
         </div>
         <div>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Reports
+            <button onclick="window.print()" class="btn btn-outline-primary">
+                <i class="fas fa-print"></i> Print
+            </button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2">
+                <i class="fas fa-arrow-left"></i> Back
             </a>
         </div>
     </div>
 
-    <!-- Summary Cards -->
-    <div class="row g-3 mb-4">
+    <!-- Print Summary -->
+    <div class="print-summary">
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+                <td style="border: 1px solid #000; padding: 10px; width: 33%; text-align: center;">
+                    <div style="font-size: 9pt; color: #666;">TOTAL COST VALUE</div>
+                    <div style="font-size: 14pt; font-weight: bold;">Rs. {{ "{:,.2f}".format(total_cost_value) }}</div>
+                    <div style="font-size: 8pt; color: #666;">Investment in stock</div>
+                </td>
+                <td style="border: 1px solid #000; padding: 10px; width: 33%; text-align: center;">
+                    <div style="font-size: 9pt; color: #666;">TOTAL SELLING VALUE</div>
+                    <div style="font-size: 14pt; font-weight: bold;">Rs. {{ "{:,.2f}".format(total_selling_value) }}</div>
+                    <div style="font-size: 8pt; color: #666;">If all stock sold</div>
+                </td>
+                <td style="border: 1px solid #000; padding: 10px; width: 33%; text-align: center; background: #d4edda;">
+                    <div style="font-size: 9pt; color: #666;">POTENTIAL PROFIT</div>
+                    <div style="font-size: 14pt; font-weight: bold;">Rs. {{ "{:,.2f}".format(potential_profit) }}</div>
+                    <div style="font-size: 8pt; color: #666;">{{ "{:.1f}".format((potential_profit / total_cost_value * 100) if total_cost_value > 0 else 0) }}% margin</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Summary Cards (Screen only) -->
+    <div class="row g-3 mb-4 no-print">
         <div class="col-md-4">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
@@ -87,10 +126,10 @@
         <div class="card-header bg-white py-3">
             <div class="d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
-                    <i class="fas fa-list text-primary"></i>
+                    <i class="fas fa-list text-primary no-print"></i>
                     Stock Details
                 </h5>
-                <div class="input-group" style="max-width: 300px;">
+                <div class="input-group no-print" style="max-width: 300px;">
                     <span class="input-group-text"><i class="fas fa-search"></i></span>
                     <input type="text" class="form-control" id="searchInput" placeholder="Search products...">
                 </div>
@@ -144,10 +183,28 @@
                         </tr>
                         {% endif %}
                     </tbody>
+                    {% if products %}
+                    <tfoot>
+                        <tr class="table-light fw-bold">
+                            <td colspan="2">Total</td>
+                            <td class="text-end">{{ products|sum(attribute='quantity') }}</td>
+                            <td colspan="2"></td>
+                            <td class="text-end">Rs. {{ "{:,.2f}".format(total_cost_value) }}</td>
+                            <td class="text-end">Rs. {{ "{:,.2f}".format(total_selling_value) }}</td>
+                            <td class="text-end text-success">Rs. {{ "{:,.2f}".format(potential_profit) }}</td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
                 </table>
             </div>
         </div>
     </div>
+
+    <!-- Signature Area -->
+    {{ signature_area() }}
+
+    <!-- Print Footer -->
+    {{ print_footer() }}
 </div>
 
 <script>

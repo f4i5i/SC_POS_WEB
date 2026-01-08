@@ -59,7 +59,7 @@
                         <td class="text-end">
                             <span class="badge bg-success fs-6">Rs. {{ "{:,.0f}".format(credit.balance) }}</span>
                         </td>
-                        <td>{{ credit.updated_at.strftime('%d %b %Y') }}</td>
+                        <td>{{ credit.updated_at.strftime('%d %b %Y') if credit.updated_at else '-' }}</td>
                         <td>
                             <a href="{{ url_for('returns.credit_history', customer_id=credit.customer_id) }}"
                                class="btn btn-sm btn-outline-primary">

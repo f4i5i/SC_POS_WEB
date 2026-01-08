@@ -27,6 +27,10 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Account lockout fields for security
+    failed_login_attempts = db.Column(db.Integer, default=0)
+    locked_until = db.Column(db.DateTime)
+
     # Multi-kiosk support
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'))  # Assigned kiosk/warehouse
     is_global_admin = db.Column(db.Boolean, default=False)  # Can access all locations

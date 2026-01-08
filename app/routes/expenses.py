@@ -336,14 +336,25 @@ def seed_default_categories():
 @feature_required(Features.EXPENSE_TRACKING)
 def expense_report():
     """Expense report"""
-    # Date range
-    date_from = request.args.get('date_from', (date.today() - timedelta(days=30)).isoformat())
-    date_to = request.args.get('date_to', date.today().isoformat())
+    # Date range - parse from request or use defaults
+    date_from_str = request.args.get('date_from') or request.args.get('start_date')
+    date_to_str = request.args.get('date_to') or request.args.get('end_date')
+
+    # Convert to date objects
+    if date_from_str:
+        start_date = datetime.strptime(date_from_str, '%Y-%m-%d').date()
+    else:
+        start_date = date.today() - timedelta(days=30)
+
+    if date_to_str:
+        end_date = datetime.strptime(date_to_str, '%Y-%m-%d').date()
+    else:
+        end_date = date.today()
 
     # Get expenses in range
     expenses = Expense.query.filter(
-        Expense.expense_date >= date_from,
-        Expense.expense_date <= date_to,
+        Expense.expense_date >= start_date,
+        Expense.expense_date <= end_date,
         Expense.status == 'approved'
     ).all()
 
@@ -364,11 +375,15 @@ def expense_report():
         method_totals[method] += float(expense.amount)
 
     total_amount = sum(float(e.amount) for e in expenses)
+    total_count = len(expenses)
 
     return render_template('expenses/report.html',
                          expenses=expenses,
                          category_totals=category_totals,
                          method_totals=method_totals,
                          total_amount=total_amount,
-                         date_from=date_from,
-                         date_to=date_to)
+                         total_count=total_count,
+                         start_date=start_date,
+                         end_date=end_date,
+                         date_from=start_date.isoformat(),
+                         date_to=end_date.isoformat())

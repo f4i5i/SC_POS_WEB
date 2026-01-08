@@ -88,8 +88,8 @@
                                 {% if ing.percentage %}({{ ing.percentage }}%){% endif %}
                             </span>
                             {% endfor %}
-                            {% if recipe.ingredients.count() > 3 %}
-                            <span class="badge bg-secondary">+{{ recipe.ingredients.count() - 3 }} more</span>
+                            {% if recipe.ingredients|list|length > 3 %}
+                            <span class="badge bg-secondary">+{{ recipe.ingredients|list|length - 3 }} more</span>
                             {% endif %}
                         </div>
                     </div>
