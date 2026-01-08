@@ -215,7 +215,22 @@ def weekly_report():
     )
     if not current_user.is_global_admin and current_user.location_id:
         daily_query = daily_query.filter(Sale.location_id == current_user.location_id)
-    daily_sales = daily_query.group_by(func.date(Sale.sale_date)).all()
+    daily_sales_raw = daily_query.group_by(func.date(Sale.sale_date)).all()
+
+    # Convert to list of dicts with proper date objects
+    daily_sales = []
+    for row in daily_sales_raw:
+        # Handle both string and date objects from different DB drivers
+        if isinstance(row.date, str):
+            from datetime import datetime as dt
+            date_obj = dt.strptime(row.date, '%Y-%m-%d').date()
+        else:
+            date_obj = row.date
+        daily_sales.append({
+            'date': date_obj,
+            'count': row.count or 0,
+            'total': float(row.total or 0)
+        })
 
     return render_template('reports/weekly_report.html',
                          start_date=start_date,
@@ -616,37 +631,88 @@ def sales_by_category():
 
 @bp.route('/profit-loss')
 @login_required
-@permission_required(Permissions.REPORT_VIEW_FINANCIAL)
+@permission_required(Permissions.REPORT_VIEW_SALES)
 def profit_loss():
-    """Profit and Loss (P&L) statement"""
-    # Get date range
+    """Profit and Loss (P&L) statement with daily/weekly/monthly presets"""
+    from app.models import Location
+    from calendar import monthrange
+
+    # Get period type: daily, weekly, monthly, custom
+    period = request.args.get('period', 'daily')
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
 
-    if start_date_str and end_date_str:
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-        end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
-    else:
-        # Default to current month
-        today = datetime.now()
-        start_date = today.replace(day=1)
-        end_date = today
+    today = datetime.now()
 
-    # Revenue
+    # Determine date range based on period
+    if period == 'daily':
+        # Single day - today or specified date
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+        else:
+            start_date = today.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_date = start_date.replace(hour=23, minute=59, second=59)
+        period_label = start_date.strftime('%B %d, %Y')
+
+    elif period == 'weekly':
+        # Current week (Monday to Sunday)
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+        else:
+            start_date = today - timedelta(days=today.weekday())
+        start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_date = start_date + timedelta(days=6)
+        end_date = end_date.replace(hour=23, minute=59, second=59)
+        period_label = f"{start_date.strftime('%b %d')} - {end_date.strftime('%b %d, %Y')}"
+
+    elif period == 'monthly':
+        # Current month or specified month
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+        else:
+            start_date = today.replace(day=1)
+        start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        _, last_day = monthrange(start_date.year, start_date.month)
+        end_date = start_date.replace(day=last_day, hour=23, minute=59, second=59)
+        period_label = start_date.strftime('%B %Y')
+
+    else:  # custom
+        if start_date_str and end_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+            end_date = end_date.replace(hour=23, minute=59, second=59)
+        else:
+            start_date = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            end_date = today.replace(hour=23, minute=59, second=59)
+        period_label = f"{start_date.strftime('%b %d, %Y')} - {end_date.strftime('%b %d, %Y')}"
+
+    # Get user location for filtering
+    user_location = None
+    location_filter = True  # Default: no filter
+    if not current_user.is_global_admin:
+        if current_user.location_id:
+            location_filter = Sale.location_id == current_user.location_id
+            user_location = Location.query.get(current_user.location_id)
+        else:
+            location_filter = False
+
+    # ===== REVENUE SECTION =====
     sales = Sale.query.filter(
         and_(
             Sale.sale_date >= start_date,
             Sale.sale_date <= end_date,
-            Sale.status == 'completed'
+            Sale.status == 'completed',
+            location_filter
         )
     ).all()
 
-    gross_revenue = sum(sale.subtotal for sale in sales)
-    total_discounts = sum(sale.discount for sale in sales)
-    net_revenue = sum(sale.total for sale in sales)
+    gross_revenue = sum(float(sale.subtotal or 0) for sale in sales)
+    total_discounts = sum(float(sale.discount or 0) for sale in sales)
+    net_revenue = sum(float(sale.total or 0) for sale in sales)
+    total_transactions = len(sales)
 
-    # Cost of Goods Sold
-    cogs = db.session.query(
+    # ===== COST OF GOODS SOLD =====
+    cogs_query = db.session.query(
         func.sum(Product.cost_price * SaleItem.quantity)
     ).join(SaleItem).join(Sale).filter(
         and_(
@@ -654,31 +720,151 @@ def profit_loss():
             Sale.sale_date <= end_date,
             Sale.status == 'completed'
         )
-    ).scalar() or 0
+    )
+    if not current_user.is_global_admin and current_user.location_id:
+        cogs_query = cogs_query.filter(Sale.location_id == current_user.location_id)
+    cogs = float(cogs_query.scalar() or 0)
 
-    # Gross Profit
+    # ===== GROSS PROFIT =====
     gross_profit = net_revenue - cogs
     gross_margin = (gross_profit / net_revenue * 100) if net_revenue > 0 else 0
 
-    # Payment method breakdown
+    # ===== GROWTH SHARE (20% of Gross Profit) =====
+    growth_share_percent = 20  # Can be made configurable later
+    growth_share = (gross_profit * growth_share_percent / 100) if gross_profit > 0 else 0
+    profit_after_growth_share = gross_profit - growth_share
+
+    # ===== EXPENSES SECTION =====
+    try:
+        from app.models_extended import Expense, ExpenseCategory
+        expense_query = Expense.query.filter(
+            and_(
+                Expense.expense_date >= start_date.date(),
+                Expense.expense_date <= end_date.date()
+            )
+        )
+        if not current_user.is_global_admin and current_user.location_id:
+            expense_query = expense_query.filter(Expense.location_id == current_user.location_id)
+
+        expenses = expense_query.all()
+        total_expenses = sum(float(exp.amount or 0) for exp in expenses)
+
+        # Expenses by category
+        expense_by_category = db.session.query(
+            ExpenseCategory.name,
+            ExpenseCategory.icon,
+            ExpenseCategory.color,
+            func.sum(Expense.amount).label('total')
+        ).join(Expense).filter(
+            and_(
+                Expense.expense_date >= start_date.date(),
+                Expense.expense_date <= end_date.date()
+            )
+        )
+        if not current_user.is_global_admin and current_user.location_id:
+            expense_by_category = expense_by_category.filter(Expense.location_id == current_user.location_id)
+        expense_by_category = expense_by_category.group_by(ExpenseCategory.id).all()
+    except:
+        expenses = []
+        total_expenses = 0
+        expense_by_category = []
+
+    # ===== NET PROFIT =====
+    net_profit = profit_after_growth_share - total_expenses
+    net_margin = (net_profit / net_revenue * 100) if net_revenue > 0 else 0
+
+    # ===== PAYMENT METHOD BREAKDOWN =====
     payment_breakdown = {}
     for sale in sales:
-        method = sale.payment_method
+        method = sale.payment_method or 'cash'
         if method not in payment_breakdown:
-            payment_breakdown[method] = 0
-        payment_breakdown[method] += float(sale.total)
+            payment_breakdown[method] = {'count': 0, 'total': 0}
+        payment_breakdown[method]['count'] += 1
+        payment_breakdown[method]['total'] += float(sale.total or 0)
+
+    # ===== DAILY BREAKDOWN (for charts) =====
+    daily_data = {}
+    for sale in sales:
+        day_key = sale.sale_date.strftime('%Y-%m-%d')
+        if day_key not in daily_data:
+            daily_data[day_key] = {'revenue': 0, 'transactions': 0}
+        daily_data[day_key]['revenue'] += float(sale.total or 0)
+        daily_data[day_key]['transactions'] += 1
+
+    # ===== TOP PRODUCTS BY PROFIT =====
+    top_products_query = db.session.query(
+        Product.name,
+        Product.code,
+        func.sum(SaleItem.quantity).label('qty_sold'),
+        func.sum(SaleItem.subtotal).label('revenue'),
+        func.sum((SaleItem.unit_price - Product.cost_price) * SaleItem.quantity).label('profit')
+    ).join(SaleItem).join(Sale).filter(
+        and_(
+            Sale.sale_date >= start_date,
+            Sale.sale_date <= end_date,
+            Sale.status == 'completed'
+        )
+    )
+    if not current_user.is_global_admin and current_user.location_id:
+        top_products_query = top_products_query.filter(Sale.location_id == current_user.location_id)
+    top_products = top_products_query.group_by(Product.id).order_by(
+        func.sum((SaleItem.unit_price - Product.cost_price) * SaleItem.quantity).desc()
+    ).limit(10).all()
+
+    # ===== COMPARISON WITH PREVIOUS PERIOD =====
+    period_duration = (end_date - start_date).days + 1
+    prev_start = start_date - timedelta(days=period_duration)
+    prev_end = start_date - timedelta(seconds=1)
+
+    prev_query = Sale.query.filter(
+        and_(
+            Sale.sale_date >= prev_start,
+            Sale.sale_date <= prev_end,
+            Sale.status == 'completed'
+        )
+    )
+    if not current_user.is_global_admin and current_user.location_id:
+        prev_query = prev_query.filter(Sale.location_id == current_user.location_id)
+    prev_sales = prev_query.all()
+    prev_revenue = sum(float(s.total or 0) for s in prev_sales)
+
+    revenue_change = 0
+    if prev_revenue > 0:
+        revenue_change = ((net_revenue - prev_revenue) / prev_revenue) * 100
 
     return render_template('reports/profit_loss.html',
+                         period=period,
+                         period_label=period_label,
                          start_date=start_date,
                          end_date=end_date,
+                         # Revenue
                          gross_revenue=gross_revenue,
                          total_discounts=total_discounts,
                          net_revenue=net_revenue,
+                         total_transactions=total_transactions,
+                         # Costs
                          cogs=cogs,
+                         # Growth Share
+                         growth_share_percent=growth_share_percent,
+                         growth_share=growth_share,
+                         profit_after_growth_share=profit_after_growth_share,
+                         # Expenses
+                         total_expenses=total_expenses,
+                         expense_by_category=expense_by_category,
+                         # Profit
                          gross_profit=gross_profit,
                          gross_margin=gross_margin,
+                         net_profit=net_profit,
+                         net_margin=net_margin,
+                         # Breakdowns
                          payment_breakdown=payment_breakdown,
-                         total_transactions=len(sales))
+                         daily_data=daily_data,
+                         top_products=top_products,
+                         # Comparison
+                         prev_revenue=prev_revenue,
+                         revenue_change=revenue_change,
+                         # Location
+                         user_location=user_location)
 
 
 @bp.route('/customer-analysis')
