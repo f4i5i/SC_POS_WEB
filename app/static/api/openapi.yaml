@@ -1,0 +1,580 @@
+openapi: 3.0.3
+info:
+  title: Sunnat Collection POS API
+  description: |
+    REST API documentation for the Sunnat Collection Point of Sale system.
+
+    ## Authentication
+    Most endpoints require authentication. Login via `/auth/login` to obtain a session cookie.
+
+    ## Rate Limiting
+    API requests are rate-limited to 200 per day and 50 per hour per IP address.
+
+    ## Permissions
+    Access to endpoints is controlled by role-based permissions (RBAC).
+    See the permission requirements in each endpoint description.
+
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@sunnatcollection.com
+
+servers:
+  - url: /
+    description: Current server
+
+tags:
+  - name: Authentication
+    description: User authentication and session management
+  - name: Dashboard
+    description: Dashboard data and charts
+  - name: POS
+    description: Point of Sale operations
+  - name: Inventory
+    description: Product and stock management
+  - name: Customers
+    description: Customer management
+  - name: Reports
+    description: Sales and business reports
+  - name: Settings
+    description: System configuration and backup
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and create session
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  description: User's username
+                password:
+                  type: string
+                  format: password
+                  description: User's password
+                remember:
+                  type: boolean
+                  description: Remember session
+      responses:
+        '302':
+          description: Redirect to dashboard on success
+        '200':
+          description: Login page with error message on failure
+
+  /auth/logout:
+    get:
+      tags:
+        - Authentication
+      summary: User logout
+      description: End current session and logout
+      security:
+        - sessionAuth: []
+      responses:
+        '302':
+          description: Redirect to login page
+
+  /auth/change-password:
+    post:
+      tags:
+        - Authentication
+      summary: Change password
+      description: Change current user's password
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - current_password
+                - new_password
+                - confirm_password
+              properties:
+                current_password:
+                  type: string
+                  format: password
+                new_password:
+                  type: string
+                  format: password
+                  minLength: 6
+                confirm_password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Password changed successfully
+        '400':
+          description: Validation error
+
+  /auth/keepalive:
+    post:
+      tags:
+        - Authentication
+      summary: Extend session
+      description: Reset session timeout timer
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Session extended
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  message:
+                    type: string
+                    example: Session extended
+
+  /api/dashboard/chart-data:
+    get:
+      tags:
+        - Dashboard
+      summary: Get dashboard chart data
+      description: |
+        Returns data for dashboard charts including:
+        - Sales trend (last 7 days)
+        - Payment methods breakdown
+        - Top products
+
+        **Permission:** Authenticated user
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Chart data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  salesTrend:
+                    type: object
+                    properties:
+                      labels:
+                        type: array
+                        items:
+                          type: string
+                        example: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+                      sales:
+                        type: array
+                        items:
+                          type: number
+                        example: [15000, 22000, 18000, 25000, 30000, 28000, 20000]
+                      counts:
+                        type: array
+                        items:
+                          type: integer
+                        example: [12, 18, 15, 20, 25, 22, 16]
+                  paymentMethods:
+                    type: object
+                    properties:
+                      labels:
+                        type: array
+                        items:
+                          type: string
+                        example: ["Cash", "Card", "Online"]
+                      values:
+                        type: array
+                        items:
+                          type: number
+                        example: [50000, 30000, 20000]
+                  topProducts:
+                    type: object
+                    properties:
+                      labels:
+                        type: array
+                        items:
+                          type: string
+                        example: ["Oud Perfume", "Rose Attar", "Misk"]
+                      values:
+                        type: array
+                        items:
+                          type: integer
+                        example: [45, 38, 32]
+        '401':
+          description: Unauthorized
+
+  /pos/checkout:
+    post:
+      tags:
+        - POS
+      summary: Process checkout
+      description: |
+        Complete a sale transaction.
+
+        **Permission:** `pos.create_sale`
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - items
+                - payment_method
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      product_id:
+                        type: integer
+                      quantity:
+                        type: integer
+                      price:
+                        type: number
+                customer_id:
+                  type: integer
+                  nullable: true
+                payment_method:
+                  type: string
+                  enum: [cash, card, online, credit]
+                discount_amount:
+                  type: number
+                  default: 0
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Sale completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  sale_id:
+                    type: integer
+                  invoice_number:
+                    type: string
+                  total:
+                    type: number
+
+  /inventory/api/products/search:
+    get:
+      tags:
+        - Inventory
+      summary: Search products
+      description: |
+        Search products by name, code, or barcode.
+
+        **Permission:** `inventory.view`
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: q
+          in: query
+          description: Search query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Maximum results
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+
+  /customers/api/search:
+    get:
+      tags:
+        - Customers
+      summary: Search customers
+      description: |
+        Search customers by name or phone number.
+
+        **Permission:** `customer.view`
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: q
+          in: query
+          description: Search query (name or phone)
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Customer search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+
+  /reports/export/{report_type}:
+    get:
+      tags:
+        - Reports
+      summary: Export report
+      description: |
+        Export report data to Excel or CSV format.
+
+        **Permission:** `report.view_sales`
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: report_type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [daily, sales, inventory, customers, product-performance]
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [excel, csv]
+            default: excel
+        - name: date
+          in: query
+          description: Report date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: start_date
+          in: query
+          description: Start date for range
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: End date for range
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: File download
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            text/csv:
+              schema:
+                type: string
+                format: binary
+
+  /settings/backup/create:
+    post:
+      tags:
+        - Settings
+      summary: Create backup
+      description: |
+        Create a new database backup.
+
+        **Permission:** Admin only
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Backup created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  filename:
+                    type: string
+        '403':
+          description: Permission denied
+
+  /settings/backup/restore/{filename}:
+    post:
+      tags:
+        - Settings
+      summary: Restore backup
+      description: |
+        Restore database from backup file.
+
+        **Permission:** Admin only
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Restore completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '403':
+          description: Permission denied
+        '500':
+          description: Restore failed
+
+  /settings/activity-log/export:
+    get:
+      tags:
+        - Settings
+      summary: Export activity log
+      description: |
+        Export activity log to CSV.
+
+        **Permission:** Admin only
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+        - name: action_type
+          in: query
+          schema:
+            type: string
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: CSV file download
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: session
+
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        name:
+          type: string
+        brand:
+          type: string
+        category:
+          type: string
+        selling_price:
+          type: number
+        quantity:
+          type: integer
+        image_url:
+          type: string
+          nullable: true
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          nullable: true
+        loyalty_points:
+          type: integer
+        loyalty_tier:
+          type: string
+          enum: [Bronze, Silver, Gold, Platinum]
+
+    Sale:
+      type: object
+      properties:
+        id:
+          type: integer
+        invoice_number:
+          type: string
+        sale_date:
+          type: string
+          format: date-time
+        subtotal:
+          type: number
+        discount_amount:
+          type: number
+        total:
+          type: number
+        payment_method:
+          type: string
+        status:
+          type: string
+          enum: [completed, voided, pending]
+
+    ActivityLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        action:
+          type: string
+        entity_type:
+          type: string
+        entity_id:
+          type: integer
+        details:
+          type: string
+        ip_address:
+          type: string
+        timestamp:
+          type: string
+          format: date-time

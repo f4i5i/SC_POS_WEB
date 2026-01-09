@@ -853,8 +853,369 @@ class ScheduledTask(db.Model):
 
 
 # ============================================================
+# GAMIFIED LOYALTY SYSTEM
+# ============================================================
+
+class LoyaltyBadge(db.Model):
+    """Achievement badges for loyalty program"""
+    __tablename__ = 'loyalty_badges'
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(128), nullable=False)
+    description = db.Column(db.Text)
+
+    badge_type = db.Column(db.String(32), nullable=False, default='milestone')
+    # Types: purchase, milestone, engagement, special
+
+    icon = db.Column(db.String(64), default='fas fa-award')  # Font Awesome icon class
+    color = db.Column(db.String(7), default='#FFD700')  # Badge color (hex)
+
+    # Criteria to earn
+    criteria_type = db.Column(db.String(32))
+    # first_purchase, spend_amount, purchase_count, loyalty_tier, referral_count
+    criteria_value = db.Column(db.Integer)  # e.g., 10000 for "spend Rs.10,000"
+
+    # Rewards
+    points_reward = db.Column(db.Integer, default=0)  # Bonus points when earned
+    discount_reward = db.Column(db.Numeric(5, 2))  # Percentage discount
+
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<LoyaltyBadge {self.code}: {self.name}>'
+
+
+class CustomerBadge(db.Model):
+    """Badges earned by customers"""
+    __tablename__ = 'customer_badges'
+
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False, index=True)
+    badge_id = db.Column(db.Integer, db.ForeignKey('loyalty_badges.id'), nullable=False)
+
+    earned_at = db.Column(db.DateTime, default=datetime.utcnow)
+    notified = db.Column(db.Boolean, default=False)
+
+    # Unique constraint - customer can only earn each badge once
+    __table_args__ = (
+        db.UniqueConstraint('customer_id', 'badge_id', name='uix_customer_badge'),
+    )
+
+    # Relationships
+    customer = db.relationship('Customer', backref=db.backref('badges', lazy='dynamic'))
+    badge = db.relationship('LoyaltyBadge', backref=db.backref('holders', lazy='dynamic'))
+
+    def __repr__(self):
+        return f'<CustomerBadge {self.customer_id}:{self.badge_id}>'
+
+
+class LoyaltyChallenge(db.Model):
+    """Monthly/weekly challenges for customers"""
+    __tablename__ = 'loyalty_challenges'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), nullable=False)
+    description = db.Column(db.Text)
+
+    challenge_type = db.Column(db.String(32), nullable=False)
+    # Types: spending_goal, visit_count, referral_count, product_category
+
+    # Goal
+    target_value = db.Column(db.Integer, nullable=False)  # e.g., Rs. 5000 spending
+
+    # Duration
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False)
+
+    # Reward
+    reward_type = db.Column(db.String(32), default='points')  # points, discount, badge
+    reward_value = db.Column(db.Integer)  # Points amount or discount percentage
+    badge_id = db.Column(db.Integer, db.ForeignKey('loyalty_badges.id'))  # If reward is a badge
+
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    badge = db.relationship('LoyaltyBadge')
+
+    def __repr__(self):
+        return f'<LoyaltyChallenge {self.name}>'
+
+
+class CustomerChallengeProgress(db.Model):
+    """Track customer progress on challenges"""
+    __tablename__ = 'customer_challenge_progress'
+
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False, index=True)
+    challenge_id = db.Column(db.Integer, db.ForeignKey('loyalty_challenges.id'), nullable=False)
+
+    current_value = db.Column(db.Integer, default=0)
+    completed = db.Column(db.Boolean, default=False)
+    completed_at = db.Column(db.DateTime)
+    reward_claimed = db.Column(db.Boolean, default=False)
+
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Unique constraint
+    __table_args__ = (
+        db.UniqueConstraint('customer_id', 'challenge_id', name='uix_customer_challenge'),
+    )
+
+    # Relationships
+    customer = db.relationship('Customer', backref=db.backref('challenge_progress', lazy='dynamic'))
+    challenge = db.relationship('LoyaltyChallenge', backref=db.backref('participants', lazy='dynamic'))
+
+    @property
+    def progress_percentage(self):
+        if self.challenge and self.challenge.target_value > 0:
+            return min(100, (self.current_value / self.challenge.target_value) * 100)
+        return 0
+
+    def __repr__(self):
+        return f'<CustomerChallengeProgress {self.customer_id}:{self.challenge_id}>'
+
+
+class Referral(db.Model):
+    """Customer referral tracking"""
+    __tablename__ = 'referrals'
+
+    id = db.Column(db.Integer, primary_key=True)
+    referrer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False, index=True)
+    referred_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False, index=True)
+
+    referral_code = db.Column(db.String(32), index=True)
+
+    status = db.Column(db.String(32), default='pending')
+    # pending, qualified (made purchase), rewarded
+
+    referrer_reward = db.Column(db.Integer, default=0)  # Points awarded to referrer
+    referred_reward = db.Column(db.Integer, default=0)  # Points awarded to referred
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    qualified_at = db.Column(db.DateTime)
+
+    # Relationships
+    referrer = db.relationship('Customer', foreign_keys=[referrer_id],
+                              backref=db.backref('referrals_made', lazy='dynamic'))
+    referred = db.relationship('Customer', foreign_keys=[referred_id],
+                              backref=db.backref('referred_by', uselist=False))
+
+    def __repr__(self):
+        return f'<Referral {self.referrer_id}->{self.referred_id}>'
+
+
+# ============================================================
+# SMS MARKETING AUTOMATION
+# ============================================================
+
+class SMSCampaign(db.Model):
+    """SMS marketing campaigns"""
+    __tablename__ = 'sms_campaigns'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), nullable=False)
+    campaign_type = db.Column(db.String(32), nullable=False, default='one_time')
+    # Types: one_time, scheduled, recurring, automated_trigger
+
+    template_id = db.Column(db.Integer, db.ForeignKey('sms_templates.id'))
+
+    # Targeting
+    target_audience = db.Column(db.String(32), default='all')
+    # all, loyalty_tier, inactive, birthday_month, custom
+    target_criteria = db.Column(db.JSON)  # Filter criteria
+
+    # Scheduling
+    scheduled_at = db.Column(db.DateTime)
+    recurring_schedule = db.Column(db.String(64))  # Cron expression
+
+    # Status
+    status = db.Column(db.String(32), default='draft')
+    # draft, scheduled, running, completed, paused, cancelled
+
+    # Stats
+    total_recipients = db.Column(db.Integer, default=0)
+    sent_count = db.Column(db.Integer, default=0)
+    delivered_count = db.Column(db.Integer, default=0)
+    failed_count = db.Column(db.Integer, default=0)
+
+    # Channel
+    channel = db.Column(db.String(32), default='sms')  # sms, whatsapp, both
+
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    started_at = db.Column(db.DateTime)
+    completed_at = db.Column(db.DateTime)
+
+    # Relationships
+    template = db.relationship('SMSTemplate')
+
+    def __repr__(self):
+        return f'<SMSCampaign {self.name}>'
+
+
+class AutomatedTrigger(db.Model):
+    """Automated SMS/WhatsApp triggers"""
+    __tablename__ = 'automated_triggers'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), nullable=False)
+    trigger_type = db.Column(db.String(64), nullable=False)
+    # Types: no_purchase_days, birthday_reminder, loyalty_milestone,
+    #        payment_due, points_expiry, post_purchase
+
+    # Trigger conditions
+    trigger_days = db.Column(db.Integer)  # e.g., 30 for "no purchase in 30 days"
+    trigger_conditions = db.Column(db.JSON)
+
+    # Message
+    template_id = db.Column(db.Integer, db.ForeignKey('sms_templates.id'))
+    channel = db.Column(db.String(32), default='sms')  # sms, whatsapp, both
+
+    # Status
+    is_active = db.Column(db.Boolean, default=True)
+
+    # Stats
+    times_triggered = db.Column(db.Integer, default=0)
+    last_triggered_at = db.Column(db.DateTime)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    template = db.relationship('SMSTemplate')
+
+    def __repr__(self):
+        return f'<AutomatedTrigger {self.name}>'
+
+
+class TriggerLog(db.Model):
+    """Log of triggered automations"""
+    __tablename__ = 'trigger_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    trigger_id = db.Column(db.Integer, db.ForeignKey('automated_triggers.id'), nullable=False, index=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False, index=True)
+
+    triggered_at = db.Column(db.DateTime, default=datetime.utcnow)
+    message_sent = db.Column(db.Boolean, default=False)
+    channel_used = db.Column(db.String(32))
+    error_message = db.Column(db.Text)
+
+    # Relationships
+    trigger = db.relationship('AutomatedTrigger', backref=db.backref('logs', lazy='dynamic'))
+    customer = db.relationship('Customer')
+
+    def __repr__(self):
+        return f'<TriggerLog {self.trigger_id}:{self.customer_id}>'
+
+
+# ============================================================
 # HELPER FUNCTIONS
 # ============================================================
+
+def seed_default_badges():
+    """Seed default loyalty badges"""
+    default_badges = [
+        {
+            'code': 'first_purchase',
+            'name': 'First Timer',
+            'description': 'Made your first purchase',
+            'badge_type': 'milestone',
+            'icon': 'fas fa-seedling',
+            'color': '#4CAF50',
+            'criteria_type': 'first_purchase',
+            'criteria_value': 1,
+            'points_reward': 50
+        },
+        {
+            'code': 'big_spender_5k',
+            'name': 'Big Spender',
+            'description': 'Total purchases exceed Rs. 5,000',
+            'badge_type': 'milestone',
+            'icon': 'fas fa-gem',
+            'color': '#9C27B0',
+            'criteria_type': 'spend_amount',
+            'criteria_value': 5000,
+            'points_reward': 100
+        },
+        {
+            'code': 'loyal_10',
+            'name': 'Loyal Customer',
+            'description': 'Made 10 purchases',
+            'badge_type': 'milestone',
+            'icon': 'fas fa-heart',
+            'color': '#E91E63',
+            'criteria_type': 'purchase_count',
+            'criteria_value': 10,
+            'points_reward': 150
+        },
+        {
+            'code': 'silver_member',
+            'name': 'Silver Member',
+            'description': 'Reached Silver loyalty tier',
+            'badge_type': 'milestone',
+            'icon': 'fas fa-medal',
+            'color': '#9E9E9E',
+            'criteria_type': 'loyalty_tier',
+            'criteria_value': 2
+        },
+        {
+            'code': 'gold_member',
+            'name': 'Gold Member',
+            'description': 'Reached Gold loyalty tier',
+            'badge_type': 'milestone',
+            'icon': 'fas fa-crown',
+            'color': '#FFC107',
+            'criteria_type': 'loyalty_tier',
+            'criteria_value': 3
+        },
+        {
+            'code': 'platinum_member',
+            'name': 'Platinum Elite',
+            'description': 'Reached Platinum loyalty tier',
+            'badge_type': 'milestone',
+            'icon': 'fas fa-star',
+            'color': '#607D8B',
+            'criteria_type': 'loyalty_tier',
+            'criteria_value': 4
+        },
+        {
+            'code': 'referrer_3',
+            'name': 'Brand Ambassador',
+            'description': 'Referred 3 friends',
+            'badge_type': 'engagement',
+            'icon': 'fas fa-users',
+            'color': '#2196F3',
+            'criteria_type': 'referral_count',
+            'criteria_value': 3,
+            'points_reward': 200
+        },
+        {
+            'code': 'big_spender_25k',
+            'name': 'VIP Shopper',
+            'description': 'Total purchases exceed Rs. 25,000',
+            'badge_type': 'milestone',
+            'icon': 'fas fa-trophy',
+            'color': '#FF5722',
+            'criteria_type': 'spend_amount',
+            'criteria_value': 25000,
+            'points_reward': 500
+        },
+    ]
+
+    count = 0
+    for badge_data in default_badges:
+        existing = LoyaltyBadge.query.filter_by(code=badge_data['code']).first()
+        if not existing:
+            badge = LoyaltyBadge(**badge_data)
+            db.session.add(badge)
+            count += 1
+
+    db.session.commit()
+    return count
+
 
 def init_feature_flags():
     """Initialize default feature flags"""

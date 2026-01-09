@@ -393,9 +393,22 @@
 
     <!-- Payment Info -->
     <div class="payment-info">
+        {% if sale.is_split_payment %}
+        <div class="payment-method">
+            SPLIT PAYMENT
+        </div>
+        {% for payment in sale.payments %}
+        <div class="totals-row">
+            <span>{{ payment.payment_method.replace('_', ' ')|title }}:</span>
+            <span>Rs. {{ "{:,.2f}".format(payment.amount) }}</span>
+        </div>
+        {% endfor %}
+        <div class="divider"></div>
+        {% else %}
         <div class="payment-method">
             PAID BY {{ sale.payment_method.replace('_', ' ')|upper }}
         </div>
+        {% endif %}
         <div class="totals-row">
             <span>Amount Received:</span>
             <span>Rs. {{ "{:,.2f}".format(sale.amount_paid) }}</span>

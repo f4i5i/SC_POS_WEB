@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Loyalty Challenges - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-trophy me-2"></i>Loyalty Challenges</h2>
+                    <p class="text-muted mb-0">Create time-limited challenges for customers</p>
+                </div>
+                <a href="{{ url_for('loyalty.create_challenge') }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i>Create Challenge
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Challenges -->
+    <h5 class="text-success mb-3"><i class="fas fa-play-circle me-2"></i>Active Challenges</h5>
+    <div class="row g-4 mb-5">
+        {% set active_challenges = challenges | selectattr('is_active') | list %}
+        {% for challenge in active_challenges %}
+            {% set now = import('datetime').datetime.utcnow() %}
+            {% if challenge.end_date >= now %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-success">
+                    <div class="card-header bg-success text-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">{{ challenge.name }}</h6>
+                            <span class="badge bg-light text-success">Active</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">{{ challenge.description or 'No description' }}</p>
+
+                        <!-- Challenge Type -->
+                        <div class="mb-3">
+                            <span class="badge bg-info">
+                                {% if challenge.challenge_type == 'spending_goal' %}
+                                    <i class="fas fa-money-bill me-1"></i>Spend Rs. {{ "{:,.0f}".format(challenge.target_value) }}
+                                {% elif challenge.challenge_type == 'visit_count' %}
+                                    <i class="fas fa-store me-1"></i>{{ challenge.target_value }} Visits
+                                {% elif challenge.challenge_type == 'referral_count' %}
+                                    <i class="fas fa-users me-1"></i>{{ challenge.target_value }} Referrals
+                                {% elif challenge.challenge_type == 'product_count' %}
+                                    <i class="fas fa-box me-1"></i>Buy {{ challenge.target_value }} Items
+                                {% else %}
+                                    {{ challenge.challenge_type }}: {{ challenge.target_value }}
+                                {% endif %}
+                            </span>
+                        </div>
+
+                        <!-- Reward -->
+                        <div class="alert alert-success py-2 mb-3">
+                            <small>
+                                <i class="fas fa-gift me-1"></i>Reward:
+                                {% if challenge.reward_type == 'points' %}
+                                    {{ challenge.reward_value }} Points
+                                {% elif challenge.reward_type == 'discount' %}
+                                    {{ challenge.reward_value }}% Discount
+                                {% elif challenge.reward_type == 'badge' %}
+                                    Special Badge
+                                {% else %}
+                                    {{ challenge.reward_value }}
+                                {% endif %}
+                            </small>
+                        </div>
+
+                        <!-- Dates -->
+                        <p class="text-muted small mb-2">
+                            <i class="fas fa-calendar me-1"></i>
+                            {{ challenge.start_date.strftime('%b %d') }} - {{ challenge.end_date.strftime('%b %d, %Y') }}
+                        </p>
+
+                        <!-- Stats -->
+                        {% set stats = challenge_stats.get(challenge.id, {}) %}
+                        <div class="d-flex justify-content-between text-muted small">
+                            <span><i class="fas fa-users me-1"></i>{{ stats.get('total', 0) }} Participants</span>
+                            <span><i class="fas fa-check-circle me-1"></i>{{ stats.get('completed', 0) }} Completed</span>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="toggleChallenge({{ challenge.id }})">
+                            <i class="fas fa-pause me-1"></i>Deactivate
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        {% else %}
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>No active challenges. Create one to engage your customers!
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Past & Inactive Challenges -->
+    <h5 class="text-muted mb-3"><i class="fas fa-history me-2"></i>Past & Inactive Challenges</h5>
+    <div class="row g-4">
+        {% for challenge in challenges %}
+            {% if not challenge.is_active %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-secondary opacity-75">
+                    <div class="card-header bg-secondary text-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">{{ challenge.name }}</h6>
+                            <span class="badge bg-light text-secondary">Inactive</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text text-muted">{{ challenge.description or 'No description' }}</p>
+
+                        <p class="text-muted small mb-2">
+                            <i class="fas fa-calendar me-1"></i>
+                            {{ challenge.start_date.strftime('%b %d') }} - {{ challenge.end_date.strftime('%b %d, %Y') }}
+                        </p>
+
+                        {% set stats = challenge_stats.get(challenge.id, {}) %}
+                        <div class="d-flex justify-content-between text-muted small">
+                            <span><i class="fas fa-users me-1"></i>{{ stats.get('total', 0) }} Participated</span>
+                            <span><i class="fas fa-check-circle me-1"></i>{{ stats.get('completed', 0) }} Completed</span>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="toggleChallenge({{ challenge.id }})">
+                            <i class="fas fa-play me-1"></i>Reactivate
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+function toggleChallenge(challengeId) {
+    fetch(`/loyalty/challenges/${challengeId}/toggle`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            showToast(data.error || 'Failed to toggle challenge', 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error toggling challenge', 'error');
+    });
+}
+</script>
+{% endblock %}

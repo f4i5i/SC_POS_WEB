@@ -414,14 +414,43 @@ def complete_sale():
             )
             db.session.add(stock_movement)
 
-        # Add payment record
-        if sale.amount_paid > 0:
+        # Handle split payments
+        payments_data = data.get('payments', [])
+        is_split = len(payments_data) > 1
+
+        if is_split:
+            # Multiple payment methods
+            sale.is_split_payment = True
+            sale.payment_method = 'split'  # Indicate split payment
+
+            total_paid = Decimal('0')
+            for idx, pmt in enumerate(payments_data, 1):
+                pmt_amount = Decimal(str(pmt.get('amount', 0)))
+                total_paid += pmt_amount
+                payment = Payment(
+                    sale_id=sale.id,
+                    amount=pmt_amount,
+                    payment_method=pmt.get('method', 'cash'),
+                    reference_number=pmt.get('reference', ''),
+                    notes=pmt.get('notes', ''),
+                    payment_order=idx
+                )
+                db.session.add(payment)
+
+            # Recalculate amount_paid from actual payments
+            sale.amount_paid = total_paid
+            sale.amount_due = sale.total - total_paid
+            sale.payment_status = 'paid' if sale.amount_due <= 0 else 'partial'
+
+        elif sale.amount_paid > 0:
+            # Single payment (existing logic)
             payment = Payment(
                 sale_id=sale.id,
                 amount=sale.amount_paid,
                 payment_method=sale.payment_method,
                 reference_number=data.get('reference_number', ''),
-                notes=data.get('payment_notes', '')
+                notes=data.get('payment_notes', ''),
+                payment_order=1
             )
             db.session.add(payment)
 
@@ -439,11 +468,21 @@ def complete_sale():
 
         # Award loyalty points if customer is selected
         points_earned = 0
+        new_badges = []
+        completed_challenges = []
         if sale.customer_id:
             customer = Customer.query.get(sale.customer_id)
             if customer:
                 # Award 1 point per Rs. 100 spent
                 points_earned = customer.add_loyalty_points(float(sale.total))
+
+                # Check and award badges (gamified loyalty)
+                try:
+                    from app.routes.loyalty import check_and_award_badges, update_challenge_progress
+                    new_badges = check_and_award_badges(sale.customer_id, sale)
+                    completed_challenges = update_challenge_progress(sale.customer_id, sale)
+                except Exception as badge_error:
+                    current_app.logger.error(f"Badge checking error: {badge_error}")
 
         db.session.commit()
 
@@ -456,7 +495,9 @@ def complete_sale():
                     'points_earned': points_earned,
                     'total_points': customer.loyalty_points,
                     'loyalty_tier': customer.loyalty_tier,
-                    'points_value': customer.points_value_pkr
+                    'points_value': customer.points_value_pkr,
+                    'new_badges': new_badges,
+                    'completed_challenges': completed_challenges
                 }
 
         return jsonify({

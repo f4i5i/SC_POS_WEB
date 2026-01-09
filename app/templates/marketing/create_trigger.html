@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Create Trigger - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-magic me-2"></i>Create Automated Trigger</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('marketing.create_trigger') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="mb-3">
+                            <label class="form-label">Trigger Name *</label>
+                            <input type="text" class="form-control" name="name" required
+                                   placeholder="e.g., 30-Day Win Back">
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Trigger Type *</label>
+                                <select class="form-select" name="trigger_type" id="triggerType" required onchange="updateTriggerFields()">
+                                    <option value="no_purchase_days">No Purchase (X Days)</option>
+                                    <option value="birthday_reminder">Birthday Reminder</option>
+                                    <option value="loyalty_milestone">Loyalty Milestone</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3" id="triggerDaysGroup">
+                                <label class="form-label" id="triggerDaysLabel">Days Without Purchase *</label>
+                                <input type="number" class="form-control" name="trigger_days" value="30" min="1" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Channel *</label>
+                            <select class="form-select" name="channel" required>
+                                <option value="sms">SMS Only</option>
+                                <option value="whatsapp">WhatsApp Only</option>
+                                <option value="both">Both SMS & WhatsApp</option>
+                            </select>
+                        </div>
+
+                        <hr>
+
+                        <h6 class="mb-3"><i class="fas fa-comment me-2"></i>Message</h6>
+
+                        <div class="mb-3">
+                            <label class="form-label">Message Template *</label>
+                            <select class="form-select" name="template_id" required onchange="previewTemplate(this)">
+                                <option value="">-- Select a template --</option>
+                                {% for template in templates %}
+                                <option value="{{ template.id }}" data-message="{{ template.message }}">
+                                    {{ template.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Message Preview</label>
+                            <div class="p-3 bg-light border rounded" id="messagePreview">
+                                <em class="text-muted">Select a template to preview</em>
+                            </div>
+                        </div>
+
+                        <!-- Trigger Type Descriptions -->
+                        <div class="alert alert-info" id="triggerDescription">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <span id="triggerDescText">
+                                Sends a message to customers who haven't made a purchase in the specified number of days.
+                            </span>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>Create Trigger
+                            </button>
+                            <a href="{{ url_for('marketing.triggers') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Quick Templates -->
+            <div class="card mt-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="fas fa-lightbulb text-warning me-2"></i>Suggested Triggers</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="card bg-light border-0 h-100" style="cursor: pointer;" onclick="setTriggerTemplate('no_purchase_days', 30, '30-Day Win Back')">
+                                <div class="card-body text-center p-3">
+                                    <i class="fas fa-undo text-primary mb-2"></i>
+                                    <h6 class="mb-0 small">30-Day Win Back</h6>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light border-0 h-100" style="cursor: pointer;" onclick="setTriggerTemplate('birthday_reminder', 3, 'Birthday Wishes')">
+                                <div class="card-body text-center p-3">
+                                    <i class="fas fa-gift text-success mb-2"></i>
+                                    <h6 class="mb-0 small">3-Day Birthday</h6>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light border-0 h-100" style="cursor: pointer;" onclick="setTriggerTemplate('no_purchase_days', 60, '60-Day Comeback')">
+                                <div class="card-body text-center p-3">
+                                    <i class="fas fa-heart text-danger mb-2"></i>
+                                    <h6 class="mb-0 small">60-Day Comeback</h6>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateTriggerFields() {
+    const type = document.getElementById('triggerType').value;
+    const label = document.getElementById('triggerDaysLabel');
+    const group = document.getElementById('triggerDaysGroup');
+    const desc = document.getElementById('triggerDescText');
+
+    switch(type) {
+        case 'no_purchase_days':
+            group.style.display = 'block';
+            label.textContent = 'Days Without Purchase *';
+            desc.textContent = 'Sends a message to customers who haven\'t made a purchase in the specified number of days.';
+            break;
+        case 'birthday_reminder':
+            group.style.display = 'block';
+            label.textContent = 'Days Before Birthday *';
+            desc.textContent = 'Sends birthday wishes X days before the customer\'s birthday.';
+            break;
+        case 'loyalty_milestone':
+            group.style.display = 'none';
+            desc.textContent = 'Automatically sends congratulations when a customer reaches a new loyalty tier.';
+            break;
+    }
+}
+
+function previewTemplate(select) {
+    const selected = select.options[select.selectedIndex];
+    const message = selected.getAttribute('data-message');
+
+    if (message) {
+        const preview = message
+            .replace('{name}', '<strong>Ahmad</strong>')
+            .replace('{points}', '250')
+            .replace('{tier}', 'Gold');
+        document.getElementById('messagePreview').innerHTML = preview;
+    } else {
+        document.getElementById('messagePreview').innerHTML = '<em class="text-muted">Select a template to preview</em>';
+    }
+}
+
+function setTriggerTemplate(type, days, name) {
+    document.getElementById('triggerType').value = type;
+    document.querySelector('input[name="trigger_days"]').value = days;
+    document.querySelector('input[name="name"]').value = name;
+    updateTriggerFields();
+}
+
+// Initialize
+updateTriggerFields();
+</script>
+{% endblock %}

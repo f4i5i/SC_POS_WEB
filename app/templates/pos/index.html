@@ -964,7 +964,8 @@
                 <div class="row">
                     <div class="col-md-6">
                         <h4 class="mb-3">Payment Method</h4>
-                        <div class="d-grid gap-2">
+                        <!-- Single Payment Options -->
+                        <div id="singlePaymentOptions" class="d-grid gap-2">
                             <button class="btn btn-outline-primary btn-lg" onclick="selectPayment('cash')">
                                 <i class="fas fa-money-bill-wave fa-2x d-block mb-2"></i> Cash
                             </button>
@@ -977,6 +978,39 @@
                             <button class="btn btn-outline-primary btn-lg" onclick="selectPayment('jazzcash')">
                                 <i class="fas fa-mobile-alt fa-2x d-block mb-2"></i> JazzCash
                             </button>
+                            <hr>
+                            <button class="btn btn-outline-warning btn-lg" onclick="enableSplitPayment()">
+                                <i class="fas fa-divide fa-2x d-block mb-2"></i> Split Payment
+                            </button>
+                        </div>
+
+                        <!-- Split Payment Section (hidden by default) -->
+                        <div id="splitPaymentSection" class="d-none">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="mb-0"><i class="fas fa-divide text-warning"></i> Split Payment</h5>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="cancelSplitPayment()">
+                                    <i class="fas fa-times"></i> Cancel Split
+                                </button>
+                            </div>
+                            <div id="splitPaymentList">
+                                <!-- Dynamic payment entries will be added here -->
+                            </div>
+                            <div class="d-flex gap-2 mt-3">
+                                <button class="btn btn-outline-primary btn-sm flex-fill" onclick="addSplitPayment('cash')">
+                                    <i class="fas fa-money-bill"></i> + Cash
+                                </button>
+                                <button class="btn btn-outline-primary btn-sm flex-fill" onclick="addSplitPayment('card')">
+                                    <i class="fas fa-credit-card"></i> + Card
+                                </button>
+                                <button class="btn btn-outline-primary btn-sm flex-fill" onclick="addSplitPayment('easypaisa')">
+                                    <i class="fas fa-mobile-alt"></i> + Mobile
+                                </button>
+                            </div>
+                            <div class="alert alert-info mt-3 mb-0 py-2">
+                                <small>
+                                    <strong>Remaining:</strong> <span id="splitRemaining">Rs. 0</span>
+                                </small>
+                            </div>
                         </div>
                     </div>
                     <div class="col-md-6">
@@ -1518,8 +1552,124 @@ function showPaymentModal() {
 
 function selectPayment(method) {
     selectedPaymentMethod = method;
+    isSplitPayment = false;
     $('.btn-outline-primary').removeClass('active');
     event.target.closest('button').classList.add('active');
+}
+
+// Split Payment Functions
+var isSplitPayment = false;
+var splitPayments = [];
+
+function enableSplitPayment() {
+    isSplitPayment = true;
+    splitPayments = [];
+    $('#singlePaymentOptions').addClass('d-none');
+    $('#splitPaymentSection').removeClass('d-none');
+    // Add two payment entries by default
+    addSplitPayment('cash');
+    addSplitPayment('card');
+    updateSplitRemaining();
+}
+
+function cancelSplitPayment() {
+    isSplitPayment = false;
+    splitPayments = [];
+    $('#splitPaymentSection').addClass('d-none');
+    $('#singlePaymentOptions').removeClass('d-none');
+    $('#splitPaymentList').empty();
+}
+
+function addSplitPayment(method) {
+    const total = parseFloat($('#total').text().replace('Rs. ', '').replace(/,/g, '')) || 0;
+    const existing = splitPayments.reduce((sum, p) => sum + p.amount, 0);
+    const remaining = Math.max(0, total - existing);
+
+    const index = splitPayments.length;
+    splitPayments.push({ method: method, amount: remaining, reference: '' });
+
+    const methodLabels = {
+        'cash': '<i class="fas fa-money-bill text-success"></i> Cash',
+        'card': '<i class="fas fa-credit-card text-primary"></i> Card',
+        'easypaisa': '<i class="fas fa-mobile-alt text-info"></i> EasyPaisa',
+        'jazzcash': '<i class="fas fa-mobile-alt text-danger"></i> JazzCash'
+    };
+
+    const html = `
+        <div class="split-payment-item card mb-2" data-index="${index}">
+            <div class="card-body py-2 px-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-light text-dark">${methodLabels[method] || method}</span>
+                    <input type="number" class="form-control form-control-sm text-end"
+                           style="width: 120px;" value="${remaining.toFixed(2)}"
+                           onchange="updateSplitAmount(${index}, this.value)">
+                    <button class="btn btn-sm btn-outline-danger" onclick="removeSplitPayment(${index})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    $('#splitPaymentList').append(html);
+    updateSplitRemaining();
+}
+
+function removeSplitPayment(index) {
+    splitPayments.splice(index, 1);
+    renderSplitPayments();
+}
+
+function updateSplitAmount(index, value) {
+    splitPayments[index].amount = parseFloat(value) || 0;
+    updateSplitRemaining();
+}
+
+function renderSplitPayments() {
+    $('#splitPaymentList').empty();
+    const methodLabels = {
+        'cash': '<i class="fas fa-money-bill text-success"></i> Cash',
+        'card': '<i class="fas fa-credit-card text-primary"></i> Card',
+        'easypaisa': '<i class="fas fa-mobile-alt text-info"></i> EasyPaisa',
+        'jazzcash': '<i class="fas fa-mobile-alt text-danger"></i> JazzCash'
+    };
+
+    splitPayments.forEach((pmt, index) => {
+        const html = `
+            <div class="split-payment-item card mb-2" data-index="${index}">
+                <div class="card-body py-2 px-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-light text-dark">${methodLabels[pmt.method] || pmt.method}</span>
+                        <input type="number" class="form-control form-control-sm text-end"
+                               style="width: 120px;" value="${pmt.amount.toFixed(2)}"
+                               onchange="updateSplitAmount(${index}, this.value)">
+                        <button class="btn btn-sm btn-outline-danger" onclick="removeSplitPayment(${index})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        $('#splitPaymentList').append(html);
+    });
+    updateSplitRemaining();
+}
+
+function updateSplitRemaining() {
+    const total = parseFloat($('#total').text().replace('Rs. ', '').replace(/,/g, '')) || 0;
+    const paid = splitPayments.reduce((sum, p) => sum + p.amount, 0);
+    const remaining = total - paid;
+
+    if (remaining > 0) {
+        $('#splitRemaining').html(`<span class="text-danger">Rs. ${remaining.toFixed(2)}</span>`);
+    } else if (remaining < 0) {
+        $('#splitRemaining').html(`<span class="text-success">Change: Rs. ${Math.abs(remaining).toFixed(2)}</span>`);
+    } else {
+        $('#splitRemaining').html(`<span class="text-success">Exact Amount</span>`);
+    }
+
+    // Update amount paid field for display
+    $('#amountPaid').val(paid.toFixed(2));
+    calculateChange();
 }
 
 function calculateChange() {
@@ -1545,7 +1695,12 @@ function completeSale() {
     }
 
     const total = Math.max(0, subtotal - discount);
-    const amountPaid = parseFloat($('#amountPaid').val()) || 0;
+    let amountPaid = parseFloat($('#amountPaid').val()) || 0;
+
+    // Handle split payment validation
+    if (isSplitPayment && splitPayments.length > 0) {
+        amountPaid = splitPayments.reduce((sum, p) => sum + p.amount, 0);
+    }
 
     if (amountPaid < total) {
         showToast('Amount paid is less than total!', 'error');
@@ -1569,11 +1724,17 @@ function completeSale() {
         discount_type: discountType,
         tax: 0,
         total: total,
-        payment_method: selectedPaymentMethod,
+        payment_method: isSplitPayment ? 'split' : selectedPaymentMethod,
         amount_paid: amountPaid,
         customer_id: $('#customerId').val() || null,
         notes: '',
-        sale_date: saleDate || null
+        sale_date: saleDate || null,
+        // Include split payments if applicable
+        payments: isSplitPayment ? splitPayments.map(p => ({
+            method: p.method,
+            amount: p.amount,
+            reference: p.reference || ''
+        })) : []
     };
 
     $.ajax({
@@ -1606,6 +1767,9 @@ function completeSale() {
                 $('#discountPercent').prop('checked', true);
                 $('#saleDate').val(''); // Reset backdate field
                 clearCustomer(); // Clear selected customer
+
+                // Reset split payment state
+                cancelSplitPayment();
 
                 // Show receipt in modal popup
                 showReceiptModal(response.sale_id, response.change);
@@ -2584,10 +2748,25 @@ function showReceiptModal(saleId, change) {
                         <div class="text-center py-3 bg-light border-bottom">
                             <h4 class="text-success mb-1"><i class="fas fa-coins me-2"></i>Change: Rs. ${change.toFixed(2)}</h4>
                         </div>
-                        <div id="receiptContent" style="max-height: 60vh; overflow-y: auto;">
+                        <div id="receiptContent" style="max-height: 50vh; overflow-y: auto;">
                             <div class="text-center py-5">
                                 <div class="spinner-border text-primary" role="status"></div>
                                 <p class="mt-2 text-muted">Loading receipt...</p>
+                            </div>
+                        </div>
+                        <!-- Digital Receipt Options -->
+                        <div class="p-3 bg-light border-top">
+                            <p class="text-muted small mb-2 text-center">Send receipt to customer:</p>
+                            <div class="d-flex justify-content-center gap-2 flex-wrap">
+                                <button type="button" class="btn btn-sm btn-outline-success" onclick="sendReceiptWhatsApp(${saleId})">
+                                    <i class="fab fa-whatsapp"></i> WhatsApp
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-info" onclick="sendReceiptEmail(${saleId})">
+                                    <i class="fas fa-envelope"></i> Email
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showReceiptQR(${saleId})">
+                                    <i class="fas fa-qrcode"></i> QR Code
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -2634,6 +2813,112 @@ function printReceiptFromModal(saleId) {
     printWindow.onload = function() {
         printWindow.print();
     };
+}
+
+// Send receipt via WhatsApp
+function sendReceiptWhatsApp(saleId) {
+    const phone = prompt('Enter phone number (e.g., 03001234567):');
+    if (!phone) return;
+
+    // Format phone
+    let formattedPhone = phone.replace(/\D/g, '');
+    if (formattedPhone.startsWith('0')) {
+        formattedPhone = '92' + formattedPhone.substring(1);
+    } else if (!formattedPhone.startsWith('92')) {
+        formattedPhone = '92' + formattedPhone;
+    }
+
+    fetch('/receipts/send-whatsapp/' + saleId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({ phone: formattedPhone, use_api: false })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.link) {
+            window.open(data.link, '_blank');
+            showToast('WhatsApp opened. Send the message to complete.', 'success');
+        } else if (data.success) {
+            showToast('Receipt sent via WhatsApp!', 'success');
+        } else {
+            showToast('Error: ' + (data.error || 'Failed to send'), 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error sending WhatsApp receipt', 'error');
+    });
+}
+
+// Send receipt via Email
+function sendReceiptEmail(saleId) {
+    const email = prompt('Enter email address:');
+    if (!email) return;
+
+    fetch('/receipts/send-email/' + saleId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({ email: email })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Receipt sent to ' + email, 'success');
+        } else {
+            showToast('Error: ' + (data.error || 'Failed to send email'), 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error sending email receipt', 'error');
+    });
+}
+
+// Show QR code for receipt
+function showReceiptQR(saleId) {
+    fetch('/receipts/generate-qr/' + saleId)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            let content = '';
+            if (data.qr_code) {
+                content = `<img src="${data.qr_code}" alt="QR Code" style="max-width: 200px;">`;
+            } else {
+                content = `<a href="${data.url}" target="_blank" class="btn btn-primary">View Receipt</a>`;
+            }
+
+            // Show in a simple modal
+            const qrModalHtml = `
+                <div class="modal fade" id="qrCodeModal" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered modal-sm">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Scan QR Code</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body text-center">
+                                ${content}
+                                <p class="small text-muted mt-2">Customer can scan to view receipt</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            $('#qrCodeModal').remove();
+            $('body').append(qrModalHtml);
+            new bootstrap.Modal(document.getElementById('qrCodeModal')).show();
+        } else {
+            showToast('Error generating QR code', 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error generating QR code', 'error');
+    });
 }
 
 // Show styled refund modal instead of browser alert

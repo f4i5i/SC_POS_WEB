@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt - {{ sale.sale_number }}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f4;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 24px;">{{ business_name }}</h1>
+                            <p style="color: rgba(255,255,255,0.8); margin: 10px 0 0 0;">Your Purchase Receipt</p>
+                        </td>
+                    </tr>
+
+                    <!-- Receipt Number -->
+                    <tr>
+                        <td style="padding: 20px; text-align: center; background-color: #f8f9fa;">
+                            <p style="margin: 0; color: #666; font-size: 14px;">Receipt Number</p>
+                            <p style="margin: 5px 0 0 0; font-size: 20px; font-weight: bold; color: #333; font-family: monospace;">{{ sale.sale_number }}</p>
+                        </td>
+                    </tr>
+
+                    <!-- Sale Info -->
+                    <tr>
+                        <td style="padding: 20px;">
+                            <table width="100%" cellpadding="8" cellspacing="0">
+                                <tr>
+                                    <td style="color: #666;">Date:</td>
+                                    <td style="text-align: right; color: #333;">{{ sale.sale_date.strftime('%B %d, %Y') }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: #666;">Time:</td>
+                                    <td style="text-align: right; color: #333;">{{ sale.sale_date.strftime('%I:%M %p') }}</td>
+                                </tr>
+                                {% if sale.customer %}
+                                <tr>
+                                    <td style="color: #666;">Customer:</td>
+                                    <td style="text-align: right; color: #333;">{{ sale.customer.name }}</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Items -->
+                    <tr>
+                        <td style="padding: 0 20px;">
+                            <table width="100%" cellpadding="12" cellspacing="0" style="border-top: 2px solid #eee; border-bottom: 2px solid #eee;">
+                                <tr style="background-color: #f8f9fa;">
+                                    <th style="text-align: left; color: #333;">Item</th>
+                                    <th style="text-align: center; color: #333;">Qty</th>
+                                    <th style="text-align: right; color: #333;">Price</th>
+                                    <th style="text-align: right; color: #333;">Total</th>
+                                </tr>
+                                {% for item in sale.items %}
+                                <tr style="border-bottom: 1px solid #eee;">
+                                    <td style="color: #333;">{{ item.product.name }}</td>
+                                    <td style="text-align: center; color: #666;">{{ item.quantity }}</td>
+                                    <td style="text-align: right; color: #666;">Rs. {{ "{:,.0f}".format(item.unit_price) }}</td>
+                                    <td style="text-align: right; color: #333; font-weight: bold;">Rs. {{ "{:,.0f}".format(item.subtotal) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Totals -->
+                    <tr>
+                        <td style="padding: 20px;">
+                            <table width="100%" cellpadding="8" cellspacing="0">
+                                <tr>
+                                    <td style="color: #666;">Subtotal:</td>
+                                    <td style="text-align: right; color: #333;">Rs. {{ "{:,.2f}".format(sale.subtotal) }}</td>
+                                </tr>
+                                {% if sale.discount and sale.discount > 0 %}
+                                <tr>
+                                    <td style="color: #28a745;">Discount:</td>
+                                    <td style="text-align: right; color: #28a745;">- Rs. {{ "{:,.2f}".format(sale.discount) }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr style="border-top: 2px solid #333;">
+                                    <td style="font-size: 18px; font-weight: bold; color: #333; padding-top: 12px;">Total:</td>
+                                    <td style="text-align: right; font-size: 18px; font-weight: bold; color: #28a745; padding-top: 12px;">Rs. {{ "{:,.2f}".format(sale.total) }}</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Payment Method -->
+                    <tr>
+                        <td style="padding: 0 20px 20px;">
+                            <table width="100%" cellpadding="15" cellspacing="0" style="background-color: #e8f5e9; border-radius: 8px;">
+                                <tr>
+                                    <td style="text-align: center;">
+                                        {% if sale.is_split_payment %}
+                                        <p style="margin: 0; color: #2e7d32; font-weight: bold;">Split Payment</p>
+                                        <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">
+                                            {% for payment in sale.payments %}
+                                            {{ payment.payment_method|title }}: Rs. {{ "{:,.0f}".format(payment.amount) }}{% if not loop.last %} | {% endif %}
+                                            {% endfor %}
+                                        </p>
+                                        {% else %}
+                                        <p style="margin: 0; color: #2e7d32; font-weight: bold;">Paid by {{ sale.payment_method|title }}</p>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    {% if sale.customer %}
+                    <!-- Loyalty Points -->
+                    <tr>
+                        <td style="padding: 0 20px 20px;">
+                            <table width="100%" cellpadding="15" cellspacing="0" style="background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%); border-radius: 8px;">
+                                <tr>
+                                    <td style="text-align: center;">
+                                        <p style="margin: 0; color: #e65100; font-size: 12px;">LOYALTY POINTS</p>
+                                        <p style="margin: 5px 0; font-size: 24px; font-weight: bold; color: #e65100;">{{ sale.customer.loyalty_points }}</p>
+                                        <p style="margin: 0; color: #666; font-size: 12px;">{{ sale.customer.loyalty_tier }} Member</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8f9fa; padding: 20px; text-align: center;">
+                            <p style="margin: 0; font-size: 16px; color: #333;">Thank you for your purchase!</p>
+                            <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">{{ business_name }}</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}Marketing Campaigns - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-bullhorn me-2"></i>Marketing Campaigns</h2>
+                    <p class="text-muted mb-0">Create and manage SMS/WhatsApp marketing campaigns</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('marketing.triggers') }}" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-magic me-1"></i>Automated Triggers
+                    </a>
+                    <a href="{{ url_for('marketing.create_campaign') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i>Create Campaign
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Campaign Stats -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h3 class="mb-0">{{ campaigns|length }}</h3>
+                            <small>Total Campaigns</small>
+                        </div>
+                        <i class="fas fa-bullhorn fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h3 class="mb-0">{{ campaigns|selectattr('status', 'equalto', 'completed')|list|length }}</h3>
+                            <small>Completed</small>
+                        </div>
+                        <i class="fas fa-check-circle fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h3 class="mb-0">{{ campaigns|selectattr('status', 'equalto', 'draft')|list|length }}</h3>
+                            <small>Draft</small>
+                        </div>
+                        <i class="fas fa-edit fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h3 class="mb-0">{{ campaigns|sum(attribute='sent_count') }}</h3>
+                            <small>Messages Sent</small>
+                        </div>
+                        <i class="fas fa-paper-plane fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Campaigns List -->
+    <div class="card">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">All Campaigns</h5>
+        </div>
+        <div class="card-body">
+            {% if campaigns %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Campaign</th>
+                            <th>Type</th>
+                            <th>Target</th>
+                            <th>Channel</th>
+                            <th>Status</th>
+                            <th>Sent</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for campaign in campaigns %}
+                        <tr>
+                            <td>
+                                <strong>{{ campaign.name }}</strong>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ 'primary' if campaign.campaign_type == 'one_time' else 'info' if campaign.campaign_type == 'scheduled' else 'success' }}">
+                                    {{ campaign.campaign_type|replace('_', ' ')|title }}
+                                </span>
+                            </td>
+                            <td>{{ campaign.target_audience|replace('_', ' ')|title }}</td>
+                            <td>
+                                {% if campaign.channel == 'sms' %}
+                                <i class="fas fa-sms text-primary"></i> SMS
+                                {% elif campaign.channel == 'whatsapp' %}
+                                <i class="fab fa-whatsapp text-success"></i> WhatsApp
+                                {% else %}
+                                <i class="fas fa-comments text-info"></i> Both
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if campaign.status == 'completed' else 'warning' if campaign.status == 'scheduled' else 'secondary' }}">
+                                    {{ campaign.status|title }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if campaign.sent_count %}
+                                <span class="text-success">{{ campaign.sent_count }}</span>
+                                {% if campaign.failed_count %}<span class="text-danger"> / {{ campaign.failed_count }}</span>{% endif %}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>{{ campaign.created_at.strftime('%b %d, %Y') }}</td>
+                            <td>
+                                {% if campaign.status == 'draft' %}
+                                <button class="btn btn-sm btn-outline-primary" onclick="previewCampaign({{ campaign.id }})">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-sm btn-success" onclick="sendCampaign({{ campaign.id }}, '{{ campaign.name }}')">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteCampaign({{ campaign.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                {% else %}
+                                <button class="btn btn-sm btn-outline-secondary" disabled>
+                                    <i class="fas fa-check"></i> Sent
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-bullhorn fa-4x text-muted mb-3"></i>
+                <h5>No campaigns yet</h5>
+                <p class="text-muted">Create your first marketing campaign to engage customers</p>
+                <a href="{{ url_for('marketing.create_campaign') }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i>Create Campaign
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Campaign Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="previewContent">
+                    <div class="text-center py-4">
+                        <div class="spinner-border" role="status"></div>
+                        <p class="mt-2">Loading preview...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function previewCampaign(campaignId) {
+    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+    modal.show();
+
+    fetch(`/marketing/campaigns/${campaignId}/preview`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let html = `
+                    <div class="alert alert-info">
+                        <strong>${data.count}</strong> customers will receive this campaign
+                    </div>
+                    <h6>Preview Recipients (first 20):</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr><th>Name</th><th>Phone</th><th>Tier</th></tr>
+                            </thead>
+                            <tbody>
+                                ${data.preview.map(c => `
+                                    <tr>
+                                        <td>${c.name}</td>
+                                        <td>${c.phone}</td>
+                                        <td><span class="badge bg-secondary">${c.tier}</span></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                document.getElementById('previewContent').innerHTML = html;
+            } else {
+                document.getElementById('previewContent').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            }
+        })
+        .catch(error => {
+            document.getElementById('previewContent').innerHTML = '<div class="alert alert-danger">Error loading preview</div>';
+        });
+}
+
+function sendCampaign(campaignId, campaignName) {
+    if (!confirm(`Send campaign "${campaignName}" to all matching customers?`)) return;
+
+    fetch(`/marketing/campaigns/${campaignId}/send`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            location.reload();
+        } else {
+            showToast(data.error || 'Failed to send campaign', 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error sending campaign', 'error');
+    });
+}
+
+function deleteCampaign(campaignId) {
+    if (!confirm('Delete this campaign?')) return;
+
+    fetch(`/marketing/campaigns/${campaignId}/delete`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Campaign deleted', 'success');
+            location.reload();
+        } else {
+            showToast(data.error || 'Failed to delete', 'error');
+        }
+    });
+}
+</script>
+{% endblock %}

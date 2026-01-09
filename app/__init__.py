@@ -149,6 +149,15 @@ def create_app(config_name='default'):
     from app.routes.production import bp as production_bp
     app.register_blueprint(production_bp, url_prefix='/production')
 
+    from app.routes.receipts import bp as receipts_bp
+    app.register_blueprint(receipts_bp, url_prefix='/receipts')
+
+    from app.routes.loyalty import bp as loyalty_bp
+    app.register_blueprint(loyalty_bp, url_prefix='/loyalty')
+
+    from app.routes.marketing import bp as marketing_bp
+    app.register_blueprint(marketing_bp, url_prefix='/marketing')
+
     # Register main routes
     @app.route('/')
     def index():

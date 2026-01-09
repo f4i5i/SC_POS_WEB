@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Create Campaign - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-bullhorn me-2"></i>Create Marketing Campaign</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('marketing.create_campaign') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="mb-3">
+                            <label class="form-label">Campaign Name *</label>
+                            <input type="text" class="form-control" name="name" required
+                                   placeholder="e.g., January Sale Announcement">
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Campaign Type *</label>
+                                <select class="form-select" name="campaign_type" id="campaignType" required>
+                                    <option value="one_time">One-Time Send</option>
+                                    <option value="scheduled">Scheduled</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Channel *</label>
+                                <select class="form-select" name="channel" required>
+                                    <option value="sms">SMS Only</option>
+                                    <option value="whatsapp">WhatsApp Only</option>
+                                    <option value="both">Both SMS & WhatsApp</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3 d-none" id="scheduleGroup">
+                            <label class="form-label">Schedule For</label>
+                            <input type="datetime-local" class="form-control" name="scheduled_at">
+                        </div>
+
+                        <hr>
+
+                        <h6 class="mb-3"><i class="fas fa-users me-2"></i>Target Audience</h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Target Group *</label>
+                                <select class="form-select" name="target_audience" id="targetAudience" required onchange="updateCriteriaFields()">
+                                    <option value="all">All Customers (Opted In)</option>
+                                    <option value="loyalty_tier">By Loyalty Tier</option>
+                                    <option value="inactive">Inactive Customers</option>
+                                    <option value="birthday_month">Birthday This Month</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3" id="tierSelectGroup" style="display: none;">
+                                <label class="form-label">Select Tier</label>
+                                <select class="form-select" id="tierSelect">
+                                    <option value="Bronze">Bronze</option>
+                                    <option value="Silver">Silver</option>
+                                    <option value="Gold">Gold</option>
+                                    <option value="Platinum">Platinum</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3" id="inactiveDaysGroup" style="display: none;">
+                                <label class="form-label">Inactive For (days)</label>
+                                <input type="number" class="form-control" id="inactiveDays" value="30" min="7">
+                            </div>
+                        </div>
+
+                        <input type="hidden" name="target_criteria" id="targetCriteria" value="{}">
+
+                        <hr>
+
+                        <h6 class="mb-3"><i class="fas fa-comment me-2"></i>Message</h6>
+
+                        <div class="mb-3">
+                            <label class="form-label">Message Template</label>
+                            <select class="form-select" name="template_id" id="templateSelect" onchange="previewTemplate()">
+                                <option value="">-- Select a template --</option>
+                                {% for template in templates %}
+                                <option value="{{ template.id }}" data-message="{{ template.message }}">
+                                    {{ template.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Message Preview</label>
+                            <div class="p-3 bg-light border rounded" id="messagePreview">
+                                <em class="text-muted">Select a template to preview the message</em>
+                            </div>
+                            <small class="text-muted">
+                                Available placeholders: {name}, {phone}, {points}, {tier}
+                            </small>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary" onclick="return prepareSubmit()">
+                                <i class="fas fa-save me-1"></i>Create Campaign
+                            </button>
+                            <a href="{{ url_for('marketing.campaigns') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('campaignType').addEventListener('change', function() {
+    document.getElementById('scheduleGroup').classList.toggle('d-none', this.value !== 'scheduled');
+});
+
+function updateCriteriaFields() {
+    const audience = document.getElementById('targetAudience').value;
+    document.getElementById('tierSelectGroup').style.display = audience === 'loyalty_tier' ? 'block' : 'none';
+    document.getElementById('inactiveDaysGroup').style.display = audience === 'inactive' ? 'block' : 'none';
+}
+
+function previewTemplate() {
+    const select = document.getElementById('templateSelect');
+    const selected = select.options[select.selectedIndex];
+    const message = selected.getAttribute('data-message');
+
+    if (message) {
+        // Show with placeholder examples
+        const preview = message
+            .replace('{name}', '<strong>Ahmad</strong>')
+            .replace('{phone}', '03001234567')
+            .replace('{points}', '250')
+            .replace('{tier}', 'Gold');
+        document.getElementById('messagePreview').innerHTML = preview;
+    } else {
+        document.getElementById('messagePreview').innerHTML = '<em class="text-muted">Select a template to preview the message</em>';
+    }
+}
+
+function prepareSubmit() {
+    const audience = document.getElementById('targetAudience').value;
+    let criteria = {};
+
+    if (audience === 'loyalty_tier') {
+        criteria.tier = document.getElementById('tierSelect').value;
+    } else if (audience === 'inactive') {
+        criteria.days = parseInt(document.getElementById('inactiveDays').value);
+    }
+
+    document.getElementById('targetCriteria').value = JSON.stringify(criteria);
+    return true;
+}
+</script>
+{% endblock %}

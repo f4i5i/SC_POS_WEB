@@ -407,6 +407,16 @@ class Customer(db.Model):
     anniversary = db.Column(db.Date)
     notes = db.Column(db.Text)
 
+    # Receipt preferences
+    receipt_preference = db.Column(db.String(32), default='print')  # print, email, whatsapp, none
+    whatsapp_optin = db.Column(db.Boolean, default=False)
+    email_optin = db.Column(db.Boolean, default=False)
+    sms_optin = db.Column(db.Boolean, default=True)
+
+    # Referral system
+    referral_code = db.Column(db.String(16), unique=True, index=True)
+    referred_by_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
+
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -519,6 +529,7 @@ class Sale(db.Model):
     payment_status = db.Column(db.String(32), default='paid')  # paid, partial, pending
     amount_paid = db.Column(db.Numeric(10, 2), default=0.00)
     amount_due = db.Column(db.Numeric(10, 2), default=0.00)
+    is_split_payment = db.Column(db.Boolean, default=False)  # True if paid with multiple methods
 
     # Status
     status = db.Column(db.String(32), default='completed')  # completed, refunded, cancelled, held
@@ -606,11 +617,45 @@ class Payment(db.Model):
     payment_date = db.Column(db.DateTime, default=datetime.utcnow)
     reference_number = db.Column(db.String(128))  # Transaction ID, check number, etc.
     notes = db.Column(db.Text)
+    payment_order = db.Column(db.Integer, default=1)  # Order in split payment sequence
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
         return f'<Payment {self.id} - {self.amount}>'
+
+
+class DigitalReceipt(db.Model):
+    """Track digital receipts sent to customers"""
+    __tablename__ = 'digital_receipts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
+
+    delivery_method = db.Column(db.String(32), nullable=False)  # email, whatsapp, sms, qr_code
+    recipient = db.Column(db.String(256), nullable=False)  # Email or phone number
+
+    status = db.Column(db.String(32), default='pending')  # pending, sent, delivered, failed
+    sent_at = db.Column(db.DateTime)
+    delivered_at = db.Column(db.DateTime)
+
+    # For QR code receipt lookup
+    receipt_token = db.Column(db.String(64), unique=True, index=True)
+    qr_code_path = db.Column(db.String(512))
+
+    # Error tracking
+    error_message = db.Column(db.Text)
+    provider_response = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    sale = db.relationship('Sale', backref=db.backref('digital_receipts', lazy='dynamic'))
+    customer = db.relationship('Customer', backref=db.backref('digital_receipts', lazy='dynamic'))
+
+    def __repr__(self):
+        return f'<DigitalReceipt {self.id} - {self.delivery_method}>'
 
 
 class StockMovement(db.Model):

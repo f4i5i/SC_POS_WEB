@@ -1,0 +1,224 @@
+<!-- Receipt Options Modal -->
+<div class="modal fade" id="receiptOptionsModal" tabindex="-1" aria-labelledby="receiptOptionsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="receiptOptionsModalLabel">
+                    <i class="fas fa-receipt me-2"></i>Receipt Options
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="receiptSaleId">
+
+                <!-- Receipt Options Grid -->
+                <div class="row g-3">
+                    <div class="col-6">
+                        <button class="btn btn-outline-primary w-100 py-4" onclick="printReceiptOption()">
+                            <i class="fas fa-print fa-3x d-block mb-2"></i>
+                            <span class="fw-semibold">Print</span>
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button class="btn btn-outline-success w-100 py-4" onclick="showWhatsAppInput()">
+                            <i class="fab fa-whatsapp fa-3x d-block mb-2"></i>
+                            <span class="fw-semibold">WhatsApp</span>
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button class="btn btn-outline-info w-100 py-4" onclick="showEmailInput()">
+                            <i class="fas fa-envelope fa-3x d-block mb-2"></i>
+                            <span class="fw-semibold">Email</span>
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button class="btn btn-outline-secondary w-100 py-4" onclick="showQRCode()">
+                            <i class="fas fa-qrcode fa-3x d-block mb-2"></i>
+                            <span class="fw-semibold">QR Code</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- WhatsApp Input Section (hidden by default) -->
+                <div id="whatsappInputSection" class="d-none mt-4">
+                    <hr>
+                    <h6><i class="fab fa-whatsapp text-success me-2"></i>Send via WhatsApp</h6>
+                    <div class="input-group">
+                        <span class="input-group-text">+92</span>
+                        <input type="tel" class="form-control" id="receiptWhatsAppPhone"
+                               placeholder="3001234567" pattern="[0-9]{10}">
+                        <button class="btn btn-success" onclick="sendWhatsAppReceipt()">
+                            <i class="fas fa-paper-plane"></i> Send
+                        </button>
+                    </div>
+                    <small class="text-muted">Enter phone number without country code</small>
+                </div>
+
+                <!-- Email Input Section (hidden by default) -->
+                <div id="emailInputSection" class="d-none mt-4">
+                    <hr>
+                    <h6><i class="fas fa-envelope text-info me-2"></i>Send via Email</h6>
+                    <div class="input-group">
+                        <input type="email" class="form-control" id="receiptEmail"
+                               placeholder="customer@email.com">
+                        <button class="btn btn-info" onclick="sendEmailReceipt()">
+                            <i class="fas fa-paper-plane"></i> Send
+                        </button>
+                    </div>
+                </div>
+
+                <!-- QR Code Display Section (hidden by default) -->
+                <div id="qrCodeSection" class="d-none mt-4 text-center">
+                    <hr>
+                    <h6><i class="fas fa-qrcode me-2"></i>Scan to View Receipt</h6>
+                    <div id="qrCodeContainer" class="my-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <p class="small text-muted">Customer can scan this QR code to view the receipt on their phone</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Receipt Options Functions
+function showReceiptOptionsModal(saleId) {
+    document.getElementById('receiptSaleId').value = saleId;
+
+    // Reset sections
+    document.getElementById('whatsappInputSection').classList.add('d-none');
+    document.getElementById('emailInputSection').classList.add('d-none');
+    document.getElementById('qrCodeSection').classList.add('d-none');
+
+    // Show modal
+    var modal = new bootstrap.Modal(document.getElementById('receiptOptionsModal'));
+    modal.show();
+}
+
+function printReceiptOption() {
+    const saleId = document.getElementById('receiptSaleId').value;
+    window.open('/pos/print-receipt/' + saleId, '_blank', 'width=400,height=600');
+}
+
+function showWhatsAppInput() {
+    document.getElementById('whatsappInputSection').classList.remove('d-none');
+    document.getElementById('emailInputSection').classList.add('d-none');
+    document.getElementById('qrCodeSection').classList.add('d-none');
+    document.getElementById('receiptWhatsAppPhone').focus();
+}
+
+function showEmailInput() {
+    document.getElementById('emailInputSection').classList.remove('d-none');
+    document.getElementById('whatsappInputSection').classList.add('d-none');
+    document.getElementById('qrCodeSection').classList.add('d-none');
+    document.getElementById('receiptEmail').focus();
+}
+
+function showQRCode() {
+    document.getElementById('qrCodeSection').classList.remove('d-none');
+    document.getElementById('whatsappInputSection').classList.add('d-none');
+    document.getElementById('emailInputSection').classList.add('d-none');
+
+    const saleId = document.getElementById('receiptSaleId').value;
+    const container = document.getElementById('qrCodeContainer');
+
+    // Show loading
+    container.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>';
+
+    // Fetch QR code
+    fetch('/receipts/generate-qr/' + saleId)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.qr_code) {
+                container.innerHTML = `<img src="${data.qr_code}" alt="QR Code" class="img-fluid" style="max-width: 200px;">`;
+            } else if (data.url) {
+                container.innerHTML = `<a href="${data.url}" target="_blank" class="btn btn-outline-primary"><i class="fas fa-external-link-alt me-2"></i>View Receipt</a>`;
+            } else {
+                container.innerHTML = '<p class="text-danger">Failed to generate QR code</p>';
+            }
+        })
+        .catch(error => {
+            container.innerHTML = '<p class="text-danger">Error generating QR code</p>';
+        });
+}
+
+function sendWhatsAppReceipt() {
+    const saleId = document.getElementById('receiptSaleId').value;
+    let phone = document.getElementById('receiptWhatsAppPhone').value.trim();
+
+    if (!phone) {
+        showToast('Please enter a phone number', 'error');
+        return;
+    }
+
+    // Format phone
+    phone = phone.replace(/\D/g, '');
+    if (phone.startsWith('0')) {
+        phone = '92' + phone.substring(1);
+    } else if (!phone.startsWith('92')) {
+        phone = '92' + phone;
+    }
+
+    fetch('/receipts/send-whatsapp/' + saleId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({ phone: phone, use_api: false })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.link) {
+            // Open WhatsApp Web link
+            window.open(data.link, '_blank');
+            showToast('WhatsApp opened. Send the message to complete.', 'success');
+        } else if (data.success) {
+            showToast('Receipt sent via WhatsApp!', 'success');
+        } else {
+            showToast('Error: ' + (data.error || 'Failed to send'), 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error sending WhatsApp receipt', 'error');
+    });
+}
+
+function sendEmailReceipt() {
+    const saleId = document.getElementById('receiptSaleId').value;
+    const email = document.getElementById('receiptEmail').value.trim();
+
+    if (!email) {
+        showToast('Please enter an email address', 'error');
+        return;
+    }
+
+    fetch('/receipts/send-email/' + saleId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({ email: email })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Receipt sent to ' + email, 'success');
+        } else {
+            showToast('Error: ' + (data.error || 'Failed to send email'), 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error sending email receipt', 'error');
+    });
+}
+</script>

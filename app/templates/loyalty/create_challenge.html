@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}Create Challenge - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-trophy me-2"></i>Create New Challenge</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('loyalty.create_challenge') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="mb-3">
+                            <label class="form-label">Challenge Name *</label>
+                            <input type="text" class="form-control" name="name" required
+                                   placeholder="e.g., January Shopping Spree">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" name="description" rows="2"
+                                      placeholder="Describe what customers need to do"></textarea>
+                        </div>
+
+                        <hr>
+
+                        <h6 class="mb-3"><i class="fas fa-bullseye me-2"></i>Challenge Goal</h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Challenge Type *</label>
+                                <select class="form-select" name="challenge_type" id="challengeType" required onchange="updateTargetLabel()">
+                                    <option value="spending_goal">Spending Goal</option>
+                                    <option value="visit_count">Visit Count</option>
+                                    <option value="referral_count">Referral Count</option>
+                                    <option value="product_count">Products Purchased</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" id="targetLabel">Target Amount (Rs.) *</label>
+                                <input type="number" class="form-control" name="target_value" required
+                                       value="5000" min="1" id="targetValue">
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <h6 class="mb-3"><i class="fas fa-calendar-alt me-2"></i>Duration</h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Start Date *</label>
+                                <input type="date" class="form-control" name="start_date" required
+                                       value="{{ now().strftime('%Y-%m-%d') if now else '' }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">End Date *</label>
+                                <input type="date" class="form-control" name="end_date" required>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <h6 class="mb-3"><i class="fas fa-gift me-2"></i>Reward</h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Reward Type *</label>
+                                <select class="form-select" name="reward_type" id="rewardType" required onchange="updateRewardLabel()">
+                                    <option value="points">Bonus Points</option>
+                                    <option value="discount">Discount Percentage</option>
+                                    <option value="badge">Special Badge</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3" id="rewardValueGroup">
+                                <label class="form-label" id="rewardLabel">Bonus Points *</label>
+                                <input type="number" class="form-control" name="reward_value" required
+                                       value="100" min="1" id="rewardValue">
+                            </div>
+                        </div>
+
+                        {% if badges %}
+                        <div class="mb-3 d-none" id="badgeSelectGroup">
+                            <label class="form-label">Select Badge</label>
+                            <select class="form-select" name="badge_reward_id" id="badgeSelect">
+                                {% for badge in badges %}
+                                <option value="{{ badge.id }}">
+                                    {{ badge.name }} ({{ badge.code }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+
+                        <!-- Preview Card -->
+                        <div class="card bg-light mb-4">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-2">Preview</h6>
+                                <div class="d-flex align-items-center">
+                                    <div class="me-3">
+                                        <i class="fas fa-trophy text-warning" style="font-size: 2rem;"></i>
+                                    </div>
+                                    <div>
+                                        <strong id="previewName">Challenge Name</strong>
+                                        <p class="mb-0 text-muted small" id="previewDetails">
+                                            Spend Rs. 5,000 to earn 100 Points
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>Create Challenge
+                            </button>
+                            <a href="{{ url_for('loyalty.challenges') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateTargetLabel() {
+    const type = document.getElementById('challengeType').value;
+    const label = document.getElementById('targetLabel');
+    const input = document.getElementById('targetValue');
+
+    switch(type) {
+        case 'spending_goal':
+            label.textContent = 'Target Amount (Rs.) *';
+            input.placeholder = '5000';
+            break;
+        case 'visit_count':
+            label.textContent = 'Number of Visits *';
+            input.placeholder = '5';
+            break;
+        case 'referral_count':
+            label.textContent = 'Number of Referrals *';
+            input.placeholder = '3';
+            break;
+        case 'product_count':
+            label.textContent = 'Number of Products *';
+            input.placeholder = '10';
+            break;
+    }
+    updatePreview();
+}
+
+function updateRewardLabel() {
+    const type = document.getElementById('rewardType').value;
+    const label = document.getElementById('rewardLabel');
+    const valueGroup = document.getElementById('rewardValueGroup');
+    const badgeGroup = document.getElementById('badgeSelectGroup');
+
+    switch(type) {
+        case 'points':
+            label.textContent = 'Bonus Points *';
+            valueGroup.classList.remove('d-none');
+            if (badgeGroup) badgeGroup.classList.add('d-none');
+            break;
+        case 'discount':
+            label.textContent = 'Discount Percentage *';
+            valueGroup.classList.remove('d-none');
+            if (badgeGroup) badgeGroup.classList.add('d-none');
+            break;
+        case 'badge':
+            valueGroup.classList.add('d-none');
+            if (badgeGroup) badgeGroup.classList.remove('d-none');
+            break;
+    }
+    updatePreview();
+}
+
+function updatePreview() {
+    const name = document.querySelector('input[name="name"]').value || 'Challenge Name';
+    const challengeType = document.getElementById('challengeType').value;
+    const targetValue = document.getElementById('targetValue').value;
+    const rewardType = document.getElementById('rewardType').value;
+    const rewardValue = document.getElementById('rewardValue').value;
+
+    let goalText = '';
+    switch(challengeType) {
+        case 'spending_goal':
+            goalText = `Spend Rs. ${Number(targetValue).toLocaleString()}`;
+            break;
+        case 'visit_count':
+            goalText = `Make ${targetValue} visits`;
+            break;
+        case 'referral_count':
+            goalText = `Refer ${targetValue} friends`;
+            break;
+        case 'product_count':
+            goalText = `Buy ${targetValue} products`;
+            break;
+    }
+
+    let rewardText = '';
+    switch(rewardType) {
+        case 'points':
+            rewardText = `earn ${rewardValue} Points`;
+            break;
+        case 'discount':
+            rewardText = `get ${rewardValue}% Discount`;
+            break;
+        case 'badge':
+            rewardText = 'earn a Special Badge';
+            break;
+    }
+
+    document.getElementById('previewName').textContent = name;
+    document.getElementById('previewDetails').textContent = `${goalText} to ${rewardText}`;
+}
+
+// Live preview updates
+document.querySelector('input[name="name"]').addEventListener('input', updatePreview);
+document.getElementById('targetValue').addEventListener('input', updatePreview);
+document.getElementById('rewardValue').addEventListener('input', updatePreview);
+
+// Set default end date to 30 days from now
+const today = new Date();
+const endDate = new Date(today);
+endDate.setDate(endDate.getDate() + 30);
+document.querySelector('input[name="end_date"]').value = endDate.toISOString().split('T')[0];
+document.querySelector('input[name="start_date"]').value = today.toISOString().split('T')[0];
+
+// Initialize
+updatePreview();
+</script>
+{% endblock %}

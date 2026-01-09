@@ -309,6 +309,63 @@
                 </button>
             </div>
         </div>
+
+        <!-- Gamified Loyalty Dashboard -->
+        <div class="card info-card mt-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-trophy text-warning"></i> Loyalty Dashboard</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="refreshLoyaltyDashboard()">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+            <div class="card-body" id="loyaltyDashboard">
+                <!-- Tier Progress -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-semibold">Tier Progress</span>
+                        <span class="badge bg-{{ customer.loyalty_tier_color }}">{{ customer.loyalty_tier }}</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar bg-{{ customer.loyalty_tier_color }}" role="progressbar"
+                             id="tierProgressBar" style="width: 0%"></div>
+                    </div>
+                    <small class="text-muted" id="tierProgressText">Loading...</small>
+                </div>
+
+                <!-- Badges Earned -->
+                <div class="mb-4">
+                    <h6 class="mb-2"><i class="fas fa-award me-1"></i>Badges Earned</h6>
+                    <div id="earnedBadges" class="d-flex flex-wrap gap-2">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Challenges -->
+                <div class="mb-4">
+                    <h6 class="mb-2"><i class="fas fa-flag-checkered me-1"></i>Active Challenges</h6>
+                    <div id="activeChallenges">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Referral Code -->
+                <div class="p-3 bg-light rounded">
+                    <h6 class="mb-2"><i class="fas fa-share-alt me-1"></i>Referral Code</h6>
+                    <div class="input-group">
+                        <input type="text" class="form-control text-center fw-bold" id="referralCode" readonly
+                               value="Loading..." style="font-family: monospace; letter-spacing: 2px;">
+                        <button class="btn btn-outline-secondary" type="button" onclick="copyReferralCode()">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <small class="text-muted d-block mt-1" id="referralStats">Earn 100 points for each referral!</small>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Purchase History -->
@@ -483,5 +540,136 @@ function sendMessage() {
     const message = `Dear {{ customer.name }}, thank you for being a valued customer at {{ business_name }}!`;
     alert(`SMS functionality coming soon!\n\nWill send to: ${phone}\nMessage: ${message}`);
 }
+
+// Gamified Loyalty Dashboard Functions
+function refreshLoyaltyDashboard() {
+    fetch(`/loyalty/customer/{{ customer.id }}/dashboard`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderLoyaltyDashboard(data);
+            } else {
+                console.error('Error loading loyalty data:', data.error);
+                showLoyaltyError();
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching loyalty data:', error);
+            showLoyaltyError();
+        });
+}
+
+function showLoyaltyError() {
+    document.getElementById('earnedBadges').innerHTML = '<span class="text-muted small">Unable to load badges</span>';
+    document.getElementById('activeChallenges').innerHTML = '<span class="text-muted small">Unable to load challenges</span>';
+    document.getElementById('referralCode').value = 'N/A';
+    document.getElementById('tierProgressText').textContent = 'Unable to load progress';
+}
+
+function renderLoyaltyDashboard(data) {
+    // Tier Progress
+    const tierProgress = data.tier_progress;
+    document.getElementById('tierProgressBar').style.width = tierProgress.progress_percent + '%';
+    if (tierProgress.next_tier) {
+        document.getElementById('tierProgressText').textContent =
+            `${tierProgress.points_to_next} points to ${tierProgress.next_tier}`;
+    } else {
+        document.getElementById('tierProgressText').textContent = 'Maximum tier reached!';
+    }
+
+    // Earned Badges
+    const badgesContainer = document.getElementById('earnedBadges');
+    if (data.badges.earned && data.badges.earned.length > 0) {
+        badgesContainer.innerHTML = data.badges.earned.map(badge => `
+            <div class="badge-item text-center" style="width: 60px;" title="${badge.description || badge.name}">
+                <div style="width: 45px; height: 45px; background: ${badge.color}20; border-radius: 50%;
+                            display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                    <i class="${badge.icon}" style="color: ${badge.color}; font-size: 1.2rem;"></i>
+                </div>
+                <small class="d-block text-truncate" style="font-size: 0.7rem;">${badge.name}</small>
+            </div>
+        `).join('');
+    } else {
+        badgesContainer.innerHTML = `
+            <div class="text-muted small text-center w-100 py-2">
+                <i class="fas fa-medal opacity-50 d-block mb-1" style="font-size: 1.5rem;"></i>
+                No badges yet. Make a purchase to earn your first badge!
+            </div>
+        `;
+    }
+
+    // Available badges preview (show first 3)
+    if (data.badges.available && data.badges.available.length > 0) {
+        const availableHtml = `
+            <div class="mt-2 pt-2 border-top">
+                <small class="text-muted">Next badges to earn:</small>
+                <div class="d-flex flex-wrap gap-1 mt-1">
+                    ${data.badges.available.slice(0, 3).map(badge => `
+                        <span class="badge bg-light text-dark border" style="opacity: 0.6;">
+                            <i class="${badge.icon} me-1"></i>${badge.name}
+                        </span>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        badgesContainer.innerHTML += availableHtml;
+    }
+
+    // Active Challenges
+    const challengesContainer = document.getElementById('activeChallenges');
+    if (data.challenges && data.challenges.length > 0) {
+        challengesContainer.innerHTML = data.challenges.map(challenge => `
+            <div class="challenge-item mb-2 p-2 border rounded ${challenge.completed ? 'bg-success bg-opacity-10' : ''}">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="fw-semibold small">${challenge.name}</span>
+                    ${challenge.completed ?
+                        '<span class="badge bg-success"><i class="fas fa-check"></i></span>' :
+                        `<span class="small text-muted">${challenge.progress_percent}%</span>`
+                    }
+                </div>
+                <div class="progress mb-1" style="height: 5px;">
+                    <div class="progress-bar ${challenge.completed ? 'bg-success' : 'bg-primary'}"
+                         style="width: ${challenge.progress_percent}%"></div>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">
+                        ${challenge.current_value.toLocaleString()} / ${challenge.target_value.toLocaleString()}
+                    </small>
+                    <small class="text-success">
+                        <i class="fas fa-gift"></i>
+                        ${challenge.reward_type === 'points' ? challenge.reward_value + ' pts' :
+                          challenge.reward_type === 'discount' ? challenge.reward_value + '% off' : 'Badge'}
+                    </small>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        challengesContainer.innerHTML = `
+            <div class="text-muted small text-center py-2">
+                <i class="fas fa-flag-checkered opacity-50 d-block mb-1"></i>
+                No active challenges right now
+            </div>
+        `;
+    }
+
+    // Referral Code
+    document.getElementById('referralCode').value = data.referrals.code || 'N/A';
+    const referralCount = data.referrals.count || 0;
+    document.getElementById('referralStats').innerHTML = referralCount > 0 ?
+        `<i class="fas fa-check-circle text-success"></i> ${referralCount} successful referral${referralCount > 1 ? 's' : ''} - Earn ${data.referrals.points_per_referral} points per referral!` :
+        `Earn ${data.referrals.points_per_referral} points for each friend who makes a purchase!`;
+}
+
+function copyReferralCode() {
+    const codeInput = document.getElementById('referralCode');
+    codeInput.select();
+    document.execCommand('copy');
+    showToast('Referral code copied!', 'success');
+}
+
+// Load loyalty dashboard on page load
+$(document).ready(function() {
+    refreshLoyaltyDashboard();
+});
 </script>
 {% endblock %}

@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+{% block title %}Backup Management - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-database text-primary me-2"></i>Backup Management</h2>
+            <p class="text-muted mb-0">Manage database backups and restoration</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-success" onclick="createBackup()" id="createBackupBtn">
+                <i class="fas fa-plus me-2"></i>Create Backup
+            </button>
+            <a href="{{ url_for('settings.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Backup Settings Card -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary bg-opacity-10 border-primary">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-primary bg-opacity-25 p-3 me-3">
+                            <i class="fas fa-clock text-primary fa-lg"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0">{{ backup_settings.time }}</h5>
+                            <small class="text-muted">Daily Backup Time</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success bg-opacity-10 border-success">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-success bg-opacity-25 p-3 me-3">
+                            <i class="fas fa-check-circle text-success fa-lg"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0">{{ 'Enabled' if backup_settings.enabled else 'Disabled' }}</h5>
+                            <small class="text-muted">Auto Backup Status</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning bg-opacity-10 border-warning">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-warning bg-opacity-25 p-3 me-3">
+                            <i class="fas fa-calendar-alt text-warning fa-lg"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0">{{ backup_settings.retention_days }} Days</h5>
+                            <small class="text-muted">Retention Period</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info bg-opacity-10 border-info">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-info bg-opacity-25 p-3 me-3">
+                            <i class="fas fa-archive text-info fa-lg"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0">{{ backups|length }}</h5>
+                            <small class="text-muted">Available Backups</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backups List -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="fas fa-list me-2"></i>Available Backups</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if backups %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Filename</th>
+                            <th>Created</th>
+                            <th>Size</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for backup in backups %}
+                        <tr>
+                            <td>
+                                <i class="fas fa-file-archive text-primary me-2"></i>
+                                <code>{{ backup.filename }}</code>
+                            </td>
+                            <td>
+                                <small>{{ backup.created.strftime('%b %d, %Y') }}</small><br>
+                                <small class="text-muted">{{ backup.created.strftime('%I:%M:%S %p') }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">
+                                    {{ "%.2f"|format(backup.size / 1024 / 1024) }} MB
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('settings.download_backup', filename=backup.filename) }}"
+                                       class="btn btn-outline-primary"
+                                       title="Download">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                    <button class="btn btn-outline-warning"
+                                            onclick="restoreBackup('{{ backup.filename }}')"
+                                            title="Restore">
+                                        <i class="fas fa-undo"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger"
+                                            onclick="deleteBackup('{{ backup.filename }}')"
+                                            title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-database fa-4x text-muted mb-3"></i>
+                <h4>No Backups Found</h4>
+                <p class="text-muted">Create your first backup to get started.</p>
+                <button class="btn btn-success" onclick="createBackup()">
+                    <i class="fas fa-plus me-2"></i>Create Backup Now
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Warning Card -->
+    <div class="card border-warning mt-4">
+        <div class="card-body">
+            <h6 class="text-warning"><i class="fas fa-exclamation-triangle me-2"></i>Important Notes</h6>
+            <ul class="mb-0 small">
+                <li>Restoring a backup will replace the current database. A backup of the current state will be created automatically before restoration.</li>
+                <li>Automatic backups run daily at {{ backup_settings.time }} when enabled.</li>
+                <li>Backups older than {{ backup_settings.retention_days }} days are automatically deleted.</li>
+                <li>Download important backups regularly for off-site storage.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Restore Confirmation Modal -->
+<div class="modal fade" id="restoreModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Confirm Restore</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to restore from <strong id="restoreFilename"></strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-info-circle me-2"></i>
+                    This will replace all current data. A backup of the current state will be created first.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="confirmRestore()">
+                    <i class="fas fa-undo me-2"></i>Restore
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedBackup = null;
+
+function createBackup() {
+    const btn = document.getElementById('createBackupBtn');
+    const originalContent = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creating...';
+    btn.disabled = true;
+
+    fetch('{{ url_for("settings.create_backup") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Backup created successfully: ' + data.filename, 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showToast('Error: ' + data.error, 'danger');
+            btn.innerHTML = originalContent;
+            btn.disabled = false;
+        }
+    })
+    .catch(error => {
+        showToast('Error creating backup', 'danger');
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+    });
+}
+
+function restoreBackup(filename) {
+    selectedBackup = filename;
+    document.getElementById('restoreFilename').textContent = filename;
+    new bootstrap.Modal(document.getElementById('restoreModal')).show();
+}
+
+function confirmRestore() {
+    if (!selectedBackup) return;
+
+    fetch(`{{ url_for("settings.backup") }}/restore/${selectedBackup}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        bootstrap.Modal.getInstance(document.getElementById('restoreModal')).hide();
+        if (data.success) {
+            showToast(data.message, 'success');
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            showToast('Error: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        showToast('Error restoring backup', 'danger');
+    });
+}
+
+function deleteBackup(filename) {
+    if (!confirm(`Are you sure you want to delete ${filename}? This cannot be undone.`)) {
+        return;
+    }
+
+    fetch(`{{ url_for("settings.backup") }}/delete/${filename}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Backup deleted successfully', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showToast('Error: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        showToast('Error deleting backup', 'danger');
+    });
+}
+
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
+    toast.style.zIndex = '9999';
+    toast.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+}
+</script>
+{% endblock %}
