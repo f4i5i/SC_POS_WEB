@@ -2105,6 +2105,36 @@
     <!-- jQuery (optional, for AJAX) -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
+    <!-- CSRF Token Setup for AJAX -->
+    <script>
+        // Get CSRF token from meta tag
+        var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        // Setup jQuery AJAX to include CSRF token in all requests
+        $.ajaxSetup({
+            beforeSend: function(xhr, settings) {
+                if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                    xhr.setRequestHeader("X-CSRFToken", csrfToken);
+                }
+            }
+        });
+
+        // Setup fetch to include CSRF token
+        var originalFetch = window.fetch;
+        window.fetch = function(url, options) {
+            options = options || {};
+            if (options.method && !/^(GET|HEAD|OPTIONS|TRACE)$/i.test(options.method)) {
+                options.headers = options.headers || {};
+                if (options.headers instanceof Headers) {
+                    options.headers.set('X-CSRFToken', csrfToken);
+                } else {
+                    options.headers['X-CSRFToken'] = csrfToken;
+                }
+            }
+            return originalFetch(url, options);
+        };
+    </script>
+
     <!-- Theme Switching Script -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
