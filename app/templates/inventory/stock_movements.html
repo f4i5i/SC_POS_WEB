@@ -84,7 +84,7 @@
         <div class="col-md-4">
             <div class="product-info-card">
                 {% if product.image_url %}
-                <img src="{{ product.image_url }}" alt="{{ product.name }}" class="img-fluid rounded mb-3" style="max-height: 200px;">
+                <img src="{{ product.image_url }}" alt="{{ product.name }}" class="img-fluid rounded mb-3" style="max-height: 200px;" loading="lazy">
                 {% else %}
                 <div class="text-center mb-3">
                     <i class="fas fa-box fa-4x opacity-50"></i>

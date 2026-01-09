@@ -698,7 +698,7 @@
                     <input type="text"
                            class="form-control form-control-lg"
                            id="productSearch"
-                           placeholder="Search by name, code, or barcode..."
+                           placeholder="Search by name, code, or barcode... [F3]"
                            autofocus>
                     <div class="search-results d-none" id="searchResults"></div>
                 </div>
@@ -734,10 +734,13 @@
                         <span class="badge bg-primary ms-1" id="cartCount">0</span>
                     </h6>
                     <div>
-                        <button class="btn btn-sm btn-warning py-0 px-1" onclick="holdSale()" title="Hold Sale">
+                        <button class="btn btn-sm btn-warning py-0 px-1" onclick="holdSale()" title="Hold Sale (F5)">
                             <i class="fas fa-pause"></i>
                         </button>
-                        <button class="btn btn-sm btn-danger py-0 px-1" onclick="clearCart()" title="Clear Cart">
+                        <button class="btn btn-sm btn-info py-0 px-1" onclick="$('#keyboardShortcutsModal').modal('show')" title="Keyboard Shortcuts (F1)">
+                            <i class="fas fa-keyboard"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger py-0 px-1" onclick="clearCart()" title="Clear Cart (F2)">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -793,8 +796,9 @@
                 <button class="btn btn-success payment-btn w-100 mt-2"
                         onclick="showPaymentModal()"
                         id="checkoutBtn"
-                        disabled>
-                    <i class="fas fa-credit-card"></i> Checkout
+                        disabled
+                        title="Checkout (F8)">
+                    <i class="fas fa-credit-card"></i> Checkout <small class="opacity-75">[F8]</small>
                 </button>
             </div>
         </div>
@@ -896,6 +900,55 @@
             </div>
         </div>
     </div>
+    </div>
+</div>
+
+<!-- Keyboard Shortcuts Help Modal -->
+<div class="modal fade" id="keyboardShortcutsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="fas fa-keyboard me-2"></i>Keyboard Shortcuts</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-6">
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                <tr><td><kbd>F1</kbd></td><td>Show this help</td></tr>
+                                <tr><td><kbd>F2</kbd></td><td>New sale / Clear cart</td></tr>
+                                <tr><td><kbd>F3</kbd></td><td>Search products</td></tr>
+                                <tr><td><kbd>F4</kbd></td><td>Search customers</td></tr>
+                                <tr><td><kbd>F5</kbd></td><td>Hold sale</td></tr>
+                                <tr><td><kbd>F6</kbd></td><td>Recall held sale</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-6">
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                <tr><td><kbd>F7</kbd></td><td>Apply discount</td></tr>
+                                <tr><td><kbd>F8</kbd></td><td>Checkout / Payment</td></tr>
+                                <tr><td><kbd>F9</kbd></td><td>Print last receipt</td></tr>
+                                <tr><td><kbd>F10</kbd></td><td>Calculator</td></tr>
+                                <tr><td><kbd>Esc</kbd></td><td>Cancel / Close modal</td></tr>
+                                <tr><td><kbd>+/-</kbd></td><td>Increase/Decrease qty</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="mt-3 text-center">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Shortcuts work when no input field is focused
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1567,20 +1620,171 @@ function completeSale() {
 function holdSale() {
     if (cart.length === 0) return;
 
-    // Implementation for holding sale
-    showToast('Sale held successfully!', 'success');
+    // Store held sale in localStorage
+    const heldSales = JSON.parse(localStorage.getItem('heldSales') || '[]');
+    heldSales.push({
+        cart: [...cart],
+        customer: currentCustomer,
+        timestamp: new Date().toISOString()
+    });
+    localStorage.setItem('heldSales', JSON.stringify(heldSales));
+
+    // Clear current cart
+    cart = [];
+    renderCart();
+    currentCustomer = null;
+    clearCustomer();
+
+    showToast(`Sale held! (${heldSales.length} held)`, 'success');
 }
 
 // Keyboard shortcuts
 $(document).on('keydown', function(e) {
-    if (e.key === 'F1') {
-        e.preventDefault();
-        $('#productSearch').focus();
-    } else if (e.key === 'F4' && !$('#checkoutBtn').prop('disabled')) {
-        e.preventDefault();
-        showPaymentModal();
+    // Skip if typing in input field (except for function keys)
+    const isInputFocused = $(document.activeElement).is('input, textarea, select');
+    const isFunctionKey = e.key.startsWith('F') && !isNaN(e.key.substring(1));
+
+    if (isInputFocused && !isFunctionKey && e.key !== 'Escape') {
+        return;
+    }
+
+    switch(e.key) {
+        case 'F1':
+            e.preventDefault();
+            // Show keyboard shortcuts help modal
+            $('#keyboardShortcutsModal').modal('show');
+            break;
+
+        case 'F2':
+            e.preventDefault();
+            // New sale / Clear cart
+            if (cart.length > 0) {
+                clearCart();
+            }
+            $('#productSearch').val('').focus();
+            showToast('Ready for new sale', 'info');
+            break;
+
+        case 'F3':
+            e.preventDefault();
+            // Focus on product search
+            $('#productSearch').focus().select();
+            break;
+
+        case 'F4':
+            e.preventDefault();
+            // Focus on customer search
+            $('#customerPhone').focus().select();
+            break;
+
+        case 'F5':
+            e.preventDefault();
+            // Hold current sale
+            if (cart.length > 0) {
+                holdSale();
+            } else {
+                showToast('No items in cart to hold', 'warning');
+            }
+            break;
+
+        case 'F6':
+            e.preventDefault();
+            // Recall held sale
+            recallHeldSale();
+            break;
+
+        case 'F7':
+            e.preventDefault();
+            // Apply discount - toggle discount input visibility
+            const discountInput = $('#discountInput');
+            if (discountInput.is(':visible')) {
+                discountInput.focus().select();
+            } else {
+                showToast('Use discount section in cart', 'info');
+            }
+            break;
+
+        case 'F8':
+            e.preventDefault();
+            // Checkout / Payment
+            if (!$('#checkoutBtn').prop('disabled')) {
+                showPaymentModal();
+            } else {
+                showToast('Add items to cart first', 'warning');
+            }
+            break;
+
+        case 'F9':
+            e.preventDefault();
+            // Print last receipt
+            printLastReceipt();
+            break;
+
+        case 'F10':
+            e.preventDefault();
+            // Open calculator (Windows key behavior, or show mini-calc)
+            showToast('Use system calculator (Win+R, calc)', 'info');
+            break;
+
+        case 'Escape':
+            e.preventDefault();
+            // Close any open modal or clear search
+            const openModal = $('.modal.show');
+            if (openModal.length) {
+                openModal.modal('hide');
+            } else {
+                $('#productSearch').val('');
+                $('#searchResults').addClass('d-none');
+            }
+            break;
+
+        case '+':
+        case '=':
+            if (!isInputFocused && cart.length > 0) {
+                e.preventDefault();
+                // Increase quantity of last item
+                const lastIndex = cart.length - 1;
+                updateQuantity(lastIndex, cart[lastIndex].quantity + 1);
+            }
+            break;
+
+        case '-':
+            if (!isInputFocused && cart.length > 0) {
+                e.preventDefault();
+                // Decrease quantity of last item
+                const lastIdx = cart.length - 1;
+                if (cart[lastIdx].quantity > 1) {
+                    updateQuantity(lastIdx, cart[lastIdx].quantity - 1);
+                }
+            }
+            break;
     }
 });
+
+// Helper function to recall held sale
+function recallHeldSale() {
+    const heldSales = JSON.parse(localStorage.getItem('heldSales') || '[]');
+    if (heldSales.length === 0) {
+        showToast('No held sales to recall', 'warning');
+        return;
+    }
+    // Recall the most recent held sale
+    const heldSale = heldSales.pop();
+    localStorage.setItem('heldSales', JSON.stringify(heldSales));
+    cart = heldSale.cart || [];
+    renderCart();
+    showToast('Sale recalled successfully', 'success');
+}
+
+// Helper function to print last receipt
+function printLastReceipt() {
+    const lastReceiptId = localStorage.getItem('lastReceiptId');
+    if (lastReceiptId) {
+        window.open(`/pos/receipt/${lastReceiptId}`, '_blank');
+    } else {
+        showToast('No recent receipt to print', 'warning');
+    }
+}
 
 // Customer Lookup Functions
 let currentCustomer = null;

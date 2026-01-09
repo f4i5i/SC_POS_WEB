@@ -471,7 +471,19 @@ class TestSQLInjection:
 # ============================================================================
 
 class TestXSSPrevention:
-    """Test XSS attack prevention in authentication forms."""
+    """Test XSS attack prevention in authentication forms.
+
+    These tests verify that Jinja2's auto-escaping properly converts
+    dangerous characters to their HTML entity equivalents:
+    - < becomes &lt;
+    - > becomes &gt;
+    - " becomes &quot;
+    - ' becomes &#39;
+    - & becomes &amp;
+
+    The tests check that RAW (unescaped) dangerous tags don't appear
+    in the HTML response, which would indicate a bypass of auto-escaping.
+    """
 
     XSS_PAYLOADS = [
         "<script>alert('XSS')</script>",
@@ -491,28 +503,52 @@ class TestXSSPrevention:
 
     @pytest.mark.parametrize("payload", XSS_PAYLOADS)
     def test_xss_in_username_escaped(self, security_client, setup_users, payload):
-        """Test that XSS payloads in username are escaped in response."""
+        """Test that XSS payloads in username are escaped in response.
+
+        Jinja2 auto-escaping should convert dangerous tags to HTML entities.
+        Raw script/event handler tags should NOT appear in the response.
+        """
         response = security_client.post('/auth/login', data={
             'username': payload,
             'password': 'password'
         }, follow_redirects=True)
-        # Raw script tags should not appear in response
-        assert b'<script>' not in response.data
-        assert b'onerror=' not in response.data
-        assert b'onload=' not in response.data
+
+        response_lower = response.data.lower()
+
+        # Raw script tags should not appear in response (case-insensitive)
+        assert b'<script>' not in response_lower
+        assert b'</script>' not in response_lower
+
+        # Event handlers should not appear unescaped
+        # Check for pattern: attribute="..." or attribute='...'
+        assert b'onerror=' not in response_lower
+        assert b'onload=' not in response_lower
+        assert b'onmouseover=' not in response_lower
+        assert b'onclick=' not in response_lower
 
     @pytest.mark.parametrize("payload", XSS_PAYLOADS)
     def test_xss_in_flash_messages_escaped(self, security_client, setup_users, payload):
-        """Test that XSS in flash messages is properly escaped."""
+        """Test that XSS in flash messages is properly escaped.
+
+        Flash messages displaying user input must escape dangerous characters.
+        """
         response = security_client.post('/auth/login', data={
             'username': payload,
             'password': 'password'
         }, follow_redirects=True)
-        # Ensure script tags are escaped
-        assert b'<script>' not in response.data
+
+        response_lower = response.data.lower()
+
+        # Ensure script tags are escaped (should appear as &lt;script&gt;)
+        assert b'<script>' not in response_lower
+        assert b'</script>' not in response_lower
 
     def test_special_char_username_display(self, security_app, security_client, setup_users):
-        """Test that special characters in usernames are properly displayed."""
+        """Test that special characters in usernames are properly escaped.
+
+        A user with XSS payload in full_name should have it escaped when displayed.
+        The raw script tag should NOT appear; escaped version (&lt;script&gt;) is OK.
+        """
         # Login with user that has special characters in full_name
         security_client.post('/auth/login', data={
             'username': 'special_user',
@@ -521,8 +557,38 @@ class TestXSSPrevention:
 
         # Access a page that displays user info
         response = security_client.get('/', follow_redirects=True)
-        # The XSS payload in full_name should be escaped
-        assert b"<script>alert('XSS')</script>" not in response.data
+
+        response_lower = response.data.lower()
+
+        # The XSS payload in full_name should be escaped - raw tags should NOT appear
+        assert b"<script>alert('xss')</script>" not in response_lower
+        assert b'<script>' not in response_lower
+
+        # Escaped version may appear (this is safe):
+        # &lt;script&gt;alert('XSS')&lt;/script&gt;
+        # This is expected behavior - we're verifying escaping works
+
+    def test_content_type_header(self, security_client, setup_users):
+        """Test that responses have correct Content-Type header.
+
+        Proper Content-Type with charset prevents some XSS attacks.
+        """
+        response = security_client.get('/auth/login')
+
+        content_type = response.headers.get('Content-Type', '')
+        # Should be text/html with UTF-8 charset
+        assert 'text/html' in content_type
+
+    def test_xss_in_error_page(self, security_client, setup_users):
+        """Test that 404 error pages don't reflect unescaped input."""
+        # Try to access a non-existent page with XSS in URL
+        response = security_client.get('/nonexistent/<script>alert(1)</script>',
+                                       follow_redirects=True)
+
+        response_lower = response.data.lower()
+
+        # Even in error pages, script tags should be escaped
+        assert b'<script>' not in response_lower
 
 
 # ============================================================================

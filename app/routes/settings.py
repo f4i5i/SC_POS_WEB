@@ -248,18 +248,143 @@ def add_category():
 @bp.route('/activity-log')
 @login_required
 def activity_log():
-    """View activity log"""
+    """View activity log with filters"""
     if not current_user.role == 'admin':
         flash('You do not have permission to view activity log', 'danger')
         return redirect(url_for('index'))
 
     page = request.args.get('page', 1, type=int)
-    per_page = current_app.config['ITEMS_PER_PAGE']
+    per_page = request.args.get('per_page', 50, type=int)
 
-    logs = ActivityLog.query.order_by(ActivityLog.timestamp.desc())\
+    # Get filter parameters
+    user_id = request.args.get('user_id', type=int)
+    action_type = request.args.get('action_type', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+
+    # Build query with filters
+    query = ActivityLog.query
+
+    if user_id:
+        query = query.filter(ActivityLog.user_id == user_id)
+
+    if action_type:
+        query = query.filter(ActivityLog.action == action_type)
+
+    if date_from:
+        from datetime import datetime
+        try:
+            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
+            query = query.filter(ActivityLog.timestamp >= date_from_obj)
+        except ValueError:
+            pass
+
+    if date_to:
+        from datetime import datetime, timedelta
+        try:
+            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(ActivityLog.timestamp < date_to_obj)
+        except ValueError:
+            pass
+
+    logs = query.order_by(ActivityLog.timestamp.desc())\
         .paginate(page=page, per_page=per_page, error_out=False)
 
-    return render_template('settings/activity_log.html', logs=logs)
+    # Get unique action types for filter dropdown
+    action_types = db.session.query(ActivityLog.action).distinct().all()
+    action_types = [a[0] for a in action_types if a[0]]
+
+    # Get users for filter dropdown
+    users = User.query.filter_by(is_active=True).order_by(User.full_name).all()
+
+    # Get security stats
+    from datetime import datetime, timedelta
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    failed_logins_today = ActivityLog.query.filter(
+        ActivityLog.action == 'failed_login',
+        ActivityLog.timestamp >= today
+    ).count()
+
+    locked_accounts = User.query.filter(
+        User.locked_until > datetime.utcnow()
+    ).count()
+
+    return render_template('settings/activity_log.html',
+                         logs=logs,
+                         users=users,
+                         action_types=action_types,
+                         current_filters={
+                             'user_id': user_id,
+                             'action_type': action_type,
+                             'date_from': date_from,
+                             'date_to': date_to,
+                             'per_page': per_page
+                         },
+                         failed_logins_today=failed_logins_today,
+                         locked_accounts=locked_accounts)
+
+
+@bp.route('/activity-log/export')
+@login_required
+def export_activity_log():
+    """Export activity log to CSV"""
+    if not current_user.role == 'admin':
+        flash('You do not have permission to export activity log', 'danger')
+        return redirect(url_for('index'))
+
+    import csv
+    from io import StringIO
+    from flask import Response
+
+    # Get filter parameters
+    user_id = request.args.get('user_id', type=int)
+    action_type = request.args.get('action_type', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+
+    query = ActivityLog.query
+
+    if user_id:
+        query = query.filter(ActivityLog.user_id == user_id)
+    if action_type:
+        query = query.filter(ActivityLog.action == action_type)
+    if date_from:
+        from datetime import datetime
+        try:
+            query = query.filter(ActivityLog.timestamp >= datetime.strptime(date_from, '%Y-%m-%d'))
+        except ValueError:
+            pass
+    if date_to:
+        from datetime import datetime, timedelta
+        try:
+            query = query.filter(ActivityLog.timestamp < datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1))
+        except ValueError:
+            pass
+
+    logs = query.order_by(ActivityLog.timestamp.desc()).limit(10000).all()
+
+    # Create CSV
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Timestamp', 'User', 'Action', 'Entity Type', 'Entity ID', 'Details', 'IP Address'])
+
+    for log in logs:
+        writer.writerow([
+            log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            log.user.full_name if log.user else 'System',
+            log.action,
+            log.entity_type or '',
+            log.entity_id or '',
+            log.details or '',
+            log.ip_address or ''
+        ])
+
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=activity_log.csv'}
+    )
 
 
 @bp.route('/sync-status')
@@ -283,3 +408,167 @@ def sync_status():
                          synced=synced,
                          failed=failed,
                          recent_syncs=recent_syncs)
+
+
+@bp.route('/backup')
+@login_required
+@permission_required(Permissions.SETTINGS_VIEW)
+def backup():
+    """Backup management dashboard"""
+    if not current_user.role == 'admin':
+        flash('You do not have permission to manage backups', 'danger')
+        return redirect(url_for('index'))
+
+    from app.services.backup_service import BackupService
+
+    backup_service = BackupService(current_app)
+    backups = backup_service.list_backups()
+
+    # Get backup settings
+    backup_settings = {
+        'enabled': current_app.config.get('BACKUP_ENABLED', True),
+        'time': current_app.config.get('BACKUP_TIME', '23:00'),
+        'retention_days': current_app.config.get('BACKUP_RETENTION_DAYS', 30),
+        'folder': current_app.config.get('BACKUP_FOLDER', 'backups')
+    }
+
+    return render_template('settings/backup.html',
+                         backups=backups,
+                         backup_settings=backup_settings)
+
+
+@bp.route('/backup/create', methods=['POST'])
+@login_required
+@permission_required(Permissions.SETTINGS_VIEW)
+def create_backup():
+    """Create a new backup"""
+    if not current_user.role == 'admin':
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+
+    try:
+        from app.services.backup_service import BackupService
+
+        backup_service = BackupService(current_app)
+        backup_path = backup_service.backup_database()
+
+        if backup_path:
+            # Log the action
+            log = ActivityLog(
+                user_id=current_user.id,
+                action='backup_created',
+                entity_type='system',
+                details=f"Database backup created: {backup_path.split('/')[-1]}",
+                ip_address=request.remote_addr
+            )
+            db.session.add(log)
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'Backup created successfully',
+                'filename': backup_path.split('/')[-1]
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Backup failed'}), 500
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/backup/restore/<filename>', methods=['POST'])
+@login_required
+@permission_required(Permissions.SETTINGS_VIEW)
+def restore_backup(filename):
+    """Restore database from backup"""
+    if not current_user.role == 'admin':
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+
+    try:
+        from app.services.backup_service import BackupService
+
+        backup_service = BackupService(current_app)
+        success = backup_service.restore_backup(filename)
+
+        if success:
+            # Log the action
+            log = ActivityLog(
+                user_id=current_user.id,
+                action='backup_restored',
+                entity_type='system',
+                details=f"Database restored from backup: {filename}",
+                ip_address=request.remote_addr
+            )
+            db.session.add(log)
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'Database restored successfully. Please reload the page.'
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Restore failed'}), 500
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/backup/download/<filename>')
+@login_required
+@permission_required(Permissions.SETTINGS_VIEW)
+def download_backup(filename):
+    """Download a backup file"""
+    if not current_user.role == 'admin':
+        flash('You do not have permission to download backups', 'danger')
+        return redirect(url_for('settings.backup'))
+
+    from flask import send_file
+    import os
+
+    backup_folder = current_app.config.get('BACKUP_FOLDER')
+    backup_path = os.path.join(backup_folder, filename)
+
+    if os.path.exists(backup_path) and filename.startswith('backup_'):
+        return send_file(
+            backup_path,
+            as_attachment=True,
+            download_name=filename
+        )
+    else:
+        flash('Backup file not found', 'danger')
+        return redirect(url_for('settings.backup'))
+
+
+@bp.route('/backup/delete/<filename>', methods=['POST'])
+@login_required
+@permission_required(Permissions.SETTINGS_VIEW)
+def delete_backup(filename):
+    """Delete a backup file"""
+    if not current_user.role == 'admin':
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+
+    import os
+
+    try:
+        backup_folder = current_app.config.get('BACKUP_FOLDER')
+        backup_path = os.path.join(backup_folder, filename)
+
+        if os.path.exists(backup_path) and filename.startswith('backup_'):
+            os.remove(backup_path)
+
+            # Log the action
+            log = ActivityLog(
+                user_id=current_user.id,
+                action='backup_deleted',
+                entity_type='system',
+                details=f"Backup deleted: {filename}",
+                ip_address=request.remote_addr
+            )
+            db.session.add(log)
+            db.session.commit()
+
+            return jsonify({'success': True, 'message': 'Backup deleted successfully'})
+        else:
+            return jsonify({'success': False, 'error': 'Backup not found'}), 404
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

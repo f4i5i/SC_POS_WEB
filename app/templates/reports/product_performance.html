@@ -27,10 +27,23 @@
             </p>
         </div>
         <div>
-            <button onclick="window.print()" class="btn btn-outline-primary">
+            <div class="btn-group no-print">
+                <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="fas fa-download"></i> Export
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ url_for('reports.export_report', report_type='product-performance', start_date=start_date.strftime('%Y-%m-%d'), end_date=end_date.strftime('%Y-%m-%d'), format='excel') }}">
+                        <i class="fas fa-file-excel text-success me-2"></i>Excel (.xlsx)
+                    </a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('reports.export_report', report_type='product-performance', start_date=start_date.strftime('%Y-%m-%d'), end_date=end_date.strftime('%Y-%m-%d'), format='csv') }}">
+                        <i class="fas fa-file-csv text-primary me-2"></i>CSV
+                    </a></li>
+                </ul>
+            </div>
+            <button onclick="window.print()" class="btn btn-outline-primary ms-2 no-print">
                 <i class="fas fa-print"></i> Print
             </button>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2">
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2 no-print">
                 <i class="fas fa-arrow-left"></i> Back
             </a>
         </div>

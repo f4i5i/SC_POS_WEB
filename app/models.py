@@ -31,6 +31,10 @@ class User(UserMixin, db.Model):
     failed_login_attempts = db.Column(db.Integer, default=0)
     locked_until = db.Column(db.DateTime)
 
+    # Force password change on first login
+    force_password_change = db.Column(db.Boolean, default=False)
+    password_changed_at = db.Column(db.DateTime)
+
     # Multi-kiosk support
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'))  # Assigned kiosk/warehouse
     is_global_admin = db.Column(db.Boolean, default=False)  # Can access all locations
@@ -498,8 +502,8 @@ class Sale(db.Model):
     sale_date = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
     # References
-    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), index=True)  # Kiosk where sale occurred
 
     # Amounts
@@ -730,10 +734,14 @@ class Setting(db.Model):
 class ActivityLog(db.Model):
     """Log of all critical activities"""
     __tablename__ = 'activity_logs'
+    __table_args__ = (
+        db.Index('ix_activity_logs_user_timestamp', 'user_id', 'timestamp'),
+        db.Index('ix_activity_logs_action_timestamp', 'action', 'timestamp'),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    action = db.Column(db.String(128), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), index=True)
+    action = db.Column(db.String(128), nullable=False, index=True)
     entity_type = db.Column(db.String(64))  # sale, product, user, etc.
     entity_id = db.Column(db.Integer)
     details = db.Column(db.Text)

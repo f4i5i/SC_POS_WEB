@@ -164,6 +164,11 @@ def login():
 
         log_activity(user.id, 'login', 'user', user.id, 'User logged in')
 
+        # Check if user must change password
+        if user.force_password_change:
+            flash('You must change your password before continuing.', 'warning')
+            return redirect(url_for('auth.change_password'))
+
         # Set current location in session
         if user.location_id:
             session['current_location_id'] = user.location_id
@@ -203,6 +208,15 @@ def logout():
     return redirect(url_for('auth.login'))
 
 
+@bp.route('/keepalive', methods=['POST'])
+@login_required
+def keepalive():
+    """Extend session - called by session timeout warning"""
+    from flask import jsonify
+    session.modified = True
+    return jsonify({'status': 'ok', 'message': 'Session extended'})
+
+
 @bp.route('/change-password', methods=['GET', 'POST'])
 @login_required
 def change_password():
@@ -235,6 +249,8 @@ def change_password():
 
         # Update password
         current_user.set_password(new_password)
+        current_user.force_password_change = False
+        current_user.password_changed_at = datetime.utcnow()
         db.session.commit()
 
         log_activity(current_user.id, 'password_change', 'user', current_user.id, 'Password changed')

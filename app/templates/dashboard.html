@@ -594,27 +594,46 @@
     </div>
 </div>
 
-<!-- Recent Activity & Alerts -->
-<div class="row">
-    <div class="col-lg-6">
-        <div class="activity-card">
+<!-- Charts Section -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="activity-card h-100">
             <div class="card-header">
-                <i class="fas fa-clock me-2"></i>Recent Sales
+                <i class="fas fa-chart-line me-2"></i>Sales Trend (Last 7 Days)
             </div>
             <div class="card-body">
-                <div class="empty-state">
-                    <div class="empty-state-icon pulse">
-                        <i class="fas fa-shopping-cart"></i>
+                <canvas id="salesTrendChart" height="150"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="row">
+            <div class="col-12 mb-3">
+                <div class="activity-card">
+                    <div class="card-header">
+                        <i class="fas fa-pie-chart me-2"></i>Payment Methods
                     </div>
-                    <h5>No sales yet today</h5>
-                    <a href="/pos" class="btn btn-primary btn-sm">
-                        <i class="fas fa-cash-register me-1"></i>Make Sale
-                    </a>
+                    <div class="card-body">
+                        <canvas id="paymentChart" height="120"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="activity-card">
+                    <div class="card-header">
+                        <i class="fas fa-trophy me-2"></i>Top Products
+                    </div>
+                    <div class="card-body">
+                        <canvas id="topProductsChart" height="120"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
+<!-- Recent Activity & Alerts -->
+<div class="row">
     <div class="col-lg-6">
         <div class="activity-card">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -674,6 +693,8 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 // Add active class to current page nav link
 const currentPath = window.location.pathname;
@@ -696,6 +717,142 @@ function animateValue(element, start, end, duration) {
     };
     window.requestAnimationFrame(step);
 }
+
+// Chart.js default configuration
+Chart.defaults.font.family = 'Inter, sans-serif';
+Chart.defaults.font.size = 11;
+Chart.defaults.plugins.legend.display = false;
+
+// Initialize charts
+let salesTrendChart, paymentChart, topProductsChart;
+
+function initCharts(data) {
+    // Sales Trend Line Chart
+    const salesCtx = document.getElementById('salesTrendChart').getContext('2d');
+    salesTrendChart = new Chart(salesCtx, {
+        type: 'line',
+        data: {
+            labels: data.salesTrend.labels,
+            datasets: [{
+                label: 'Sales (Rs.)',
+                data: data.salesTrend.sales,
+                borderColor: '#3B82F6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#3B82F6',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Rs. ' + context.raw.toLocaleString();
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return 'Rs. ' + value.toLocaleString();
+                        }
+                    },
+                    grid: { color: 'rgba(0,0,0,0.05)' }
+                },
+                x: {
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+
+    // Payment Methods Doughnut Chart
+    const paymentCtx = document.getElementById('paymentChart').getContext('2d');
+    paymentChart = new Chart(paymentCtx, {
+        type: 'doughnut',
+        data: {
+            labels: data.paymentMethods.labels,
+            datasets: [{
+                data: data.paymentMethods.values,
+                backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            cutout: '60%',
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: { boxWidth: 12, padding: 8, font: { size: 10 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ': Rs. ' + context.raw.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Top Products Bar Chart
+    const topCtx = document.getElementById('topProductsChart').getContext('2d');
+    topProductsChart = new Chart(topCtx, {
+        type: 'bar',
+        data: {
+            labels: data.topProducts.labels,
+            datasets: [{
+                label: 'Units Sold',
+                data: data.topProducts.values,
+                backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'],
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            indexAxis: 'y',
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.05)' }
+                },
+                y: {
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+}
+
+// Fetch chart data and render
+fetch('/api/dashboard/chart-data')
+    .then(response => response.json())
+    .then(data => {
+        if (!data.error) {
+            initCharts(data);
+        }
+    })
+    .catch(error => {
+        console.error('Error loading chart data:', error);
+    });
 
 // Auto-refresh dashboard every 5 minutes
 setTimeout(function() {

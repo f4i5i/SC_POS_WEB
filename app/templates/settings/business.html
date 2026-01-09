@@ -15,7 +15,7 @@
         <div class="card">
             <div class="card-body">
                 <div class="text-center mb-4">
-                    <img src="{{ url_for('static', filename='images/SC - Main.png') }}" alt="Business Logo" style="max-width: 200px; height: auto;">
+                    <img src="{{ url_for('static', filename='images/SC - Main.png') }}" alt="Business Logo" style="max-width: 200px; height: auto;" loading="lazy">
                     <p class="text-muted mt-2">Current Business Logo</p>
                 </div>
                 <form method="POST" action="{{ url_for('settings.update_business_settings') }}">

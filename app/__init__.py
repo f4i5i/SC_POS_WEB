@@ -58,6 +58,28 @@ def create_app(config_name='default'):
     if LIMITER_AVAILABLE and limiter:
         limiter.init_app(app)
 
+    # Initialize cache if available
+    try:
+        from app.utils.cache import init_cache
+        init_cache(app)
+    except Exception as e:
+        app.logger.warning(f"Cache initialization failed: {e}")
+
+    # Initialize Sentry if configured
+    if app.config.get('SENTRY_DSN'):
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.flask import FlaskIntegration
+            sentry_sdk.init(
+                dsn=app.config['SENTRY_DSN'],
+                integrations=[FlaskIntegration()],
+                traces_sample_rate=0.1,
+                environment=config_name
+            )
+            app.logger.info("Sentry error tracking initialized")
+        except ImportError:
+            app.logger.warning("sentry-sdk not installed. Error tracking disabled.")
+
     # Configure login manager
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Please log in to access this page.'
@@ -192,6 +214,122 @@ def create_app(config_name='default'):
                                    low_stock_alerts=low_stock_alerts,
                                    stock_summary=stock_summary)
         return render_template('index.html')
+
+    @app.route('/api/dashboard/chart-data')
+    def dashboard_chart_data():
+        """API endpoint for dashboard charts data"""
+        from flask_login import current_user
+        from flask import jsonify
+        from datetime import datetime, timedelta
+        from app.models import Sale, SaleItem, Product, Location
+        from sqlalchemy import func
+
+        if not current_user.is_authenticated:
+            return jsonify({'error': 'Unauthorized'}), 401
+
+        # Get location context
+        location_id = current_user.location_id
+
+        # Get sales data for last 7 days
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=6)
+
+        # Build base query
+        sales_query = db.session.query(
+            func.date(Sale.created_at).label('date'),
+            func.sum(Sale.total).label('total'),
+            func.count(Sale.id).label('count')
+        ).filter(
+            func.date(Sale.created_at) >= start_date,
+            func.date(Sale.created_at) <= end_date
+        )
+
+        if location_id and not current_user.is_global_admin:
+            sales_query = sales_query.filter(Sale.location_id == location_id)
+
+        sales_by_day = sales_query.group_by(func.date(Sale.created_at)).all()
+
+        # Build daily data
+        daily_labels = []
+        daily_sales = []
+        daily_counts = []
+
+        for i in range(7):
+            day = start_date + timedelta(days=i)
+            daily_labels.append(day.strftime('%a'))  # Mon, Tue, etc.
+            day_sale = next((s for s in sales_by_day if s.date == day), None)
+            daily_sales.append(float(day_sale.total) if day_sale and day_sale.total else 0)
+            daily_counts.append(int(day_sale.count) if day_sale else 0)
+
+        # Payment methods breakdown (today)
+        payment_query = db.session.query(
+            Sale.payment_method,
+            func.sum(Sale.total).label('total')
+        ).filter(
+            func.date(Sale.created_at) == end_date
+        )
+
+        if location_id and not current_user.is_global_admin:
+            payment_query = payment_query.filter(Sale.location_id == location_id)
+
+        payment_data = payment_query.group_by(Sale.payment_method).all()
+
+        payment_labels = []
+        payment_values = []
+        for p in payment_data:
+            label = (p.payment_method or 'Cash').title()
+            payment_labels.append(label)
+            payment_values.append(float(p.total) if p.total else 0)
+
+        # If no sales today, show placeholder
+        if not payment_labels:
+            payment_labels = ['No Sales']
+            payment_values = [0]
+
+        # Top 5 products (last 7 days)
+        top_products_query = db.session.query(
+            Product.name,
+            func.sum(SaleItem.quantity).label('qty')
+        ).join(SaleItem.product).join(SaleItem.sale).filter(
+            func.date(Sale.created_at) >= start_date
+        )
+
+        if location_id and not current_user.is_global_admin:
+            top_products_query = top_products_query.filter(Sale.location_id == location_id)
+
+        top_products = top_products_query.group_by(Product.id).order_by(
+            func.sum(SaleItem.quantity).desc()
+        ).limit(5).all()
+
+        top_product_labels = [p.name[:15] + '...' if len(p.name) > 15 else p.name for p in top_products]
+        top_product_values = [int(p.qty) for p in top_products]
+
+        # If no products sold, show placeholder
+        if not top_product_labels:
+            top_product_labels = ['No Sales']
+            top_product_values = [0]
+
+        return jsonify({
+            'salesTrend': {
+                'labels': daily_labels,
+                'sales': daily_sales,
+                'counts': daily_counts
+            },
+            'paymentMethods': {
+                'labels': payment_labels,
+                'values': payment_values
+            },
+            'topProducts': {
+                'labels': top_product_labels,
+                'values': top_product_values
+            }
+        })
+
+    # API Documentation route
+    @app.route('/api/docs')
+    def api_docs():
+        """Serve API documentation with Swagger UI"""
+        return render_template('api_docs.html')
 
     # Error handlers
     @app.errorhandler(404)

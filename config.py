@@ -88,6 +88,14 @@ class Config:
     LOG_FOLDER = os.path.join(basedir, 'logs')
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
 
+    # Caching
+    CACHE_TYPE = os.environ.get('CACHE_TYPE', 'SimpleCache')  # SimpleCache, RedisCache, MemcachedCache
+    CACHE_DEFAULT_TIMEOUT = int(os.environ.get('CACHE_DEFAULT_TIMEOUT', 300))  # 5 minutes
+    CACHE_REDIS_URL = os.environ.get('CACHE_REDIS_URL', 'redis://localhost:6379/0')
+
+    # Sentry Error Tracking (optional)
+    SENTRY_DSN = os.environ.get('SENTRY_DSN', '')
+
 
 class DevelopmentConfig(Config):
     """Development configuration"""

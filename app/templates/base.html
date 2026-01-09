@@ -2196,6 +2196,142 @@
         });
     </script>
 
+    <!-- Session Timeout Warning Modal -->
+    {% if current_user.is_authenticated %}
+    <div class="modal fade" id="sessionTimeoutModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title"><i class="fas fa-clock me-2"></i>Session Expiring</h5>
+                </div>
+                <div class="modal-body text-center py-4">
+                    <i class="fas fa-hourglass-half fa-3x text-warning mb-3"></i>
+                    <p class="lead">Your session will expire in <strong id="timeoutCountdown">5:00</strong></p>
+                    <p class="text-muted">Click below to stay logged in</p>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" onclick="logoutNow()">
+                        <i class="fas fa-sign-out-alt me-2"></i>Logout Now
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="extendSession()">
+                        <i class="fas fa-refresh me-2"></i>Stay Logged In
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        // Session timeout configuration (in seconds)
+        const SESSION_TIMEOUT = {{ config.get('PERMANENT_SESSION_LIFETIME', 3600)|int }};
+        const WARNING_BEFORE = 300; // Show warning 5 minutes before expiry
+
+        let timeoutTimer, countdownTimer, countdownValue;
+        let sessionModal;
+
+        function initSessionTimeout() {
+            sessionModal = new bootstrap.Modal(document.getElementById('sessionTimeoutModal'));
+            resetTimer();
+
+            // Reset timer on user activity
+            ['click', 'keypress', 'scroll', 'mousemove'].forEach(function(event) {
+                document.addEventListener(event, throttle(resetTimer, 30000)); // Throttle to every 30s
+            });
+        }
+
+        function throttle(func, limit) {
+            let inThrottle;
+            return function() {
+                if (!inThrottle) {
+                    func.apply(this, arguments);
+                    inThrottle = true;
+                    setTimeout(() => inThrottle = false, limit);
+                }
+            };
+        }
+
+        function resetTimer() {
+            clearTimeout(timeoutTimer);
+            clearInterval(countdownTimer);
+
+            // Set timer to show warning
+            timeoutTimer = setTimeout(showWarning, (SESSION_TIMEOUT - WARNING_BEFORE) * 1000);
+        }
+
+        function showWarning() {
+            countdownValue = WARNING_BEFORE;
+            updateCountdown();
+            sessionModal.show();
+
+            countdownTimer = setInterval(function() {
+                countdownValue--;
+                updateCountdown();
+
+                if (countdownValue <= 0) {
+                    clearInterval(countdownTimer);
+                    logoutNow();
+                }
+            }, 1000);
+        }
+
+        function updateCountdown() {
+            const minutes = Math.floor(countdownValue / 60);
+            const seconds = countdownValue % 60;
+            document.getElementById('timeoutCountdown').textContent =
+                minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+        }
+
+        window.extendSession = function() {
+            fetch('{{ url_for("auth.keepalive") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                }
+            }).then(function(response) {
+                if (response.ok) {
+                    sessionModal.hide();
+                    resetTimer();
+                    // Show success toast
+                    showToast('Session extended successfully', 'success');
+                }
+            }).catch(function() {
+                showToast('Failed to extend session', 'danger');
+            });
+        };
+
+        window.logoutNow = function() {
+            window.location.href = '{{ url_for("auth.logout") }}';
+        };
+
+        function showToast(message, type) {
+            const container = document.querySelector('.toast-container') || createToastContainer();
+            const toast = document.createElement('div');
+            toast.className = 'alert alert-' + type + ' fade show';
+            toast.style.cssText = 'min-width: 200px; animation: slideInUp 0.3s ease;';
+            toast.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check' : 'exclamation') + '-circle me-2"></i>' + message;
+            container.appendChild(toast);
+            setTimeout(function() { toast.remove(); }, 3000);
+        }
+
+        function createToastContainer() {
+            const container = document.createElement('div');
+            container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+            document.body.appendChild(container);
+            return container;
+        }
+
+        // Initialize on page load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initSessionTimeout);
+        } else {
+            initSessionTimeout();
+        }
+    })();
+    </script>
+    {% endif %}
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

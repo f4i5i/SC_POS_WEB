@@ -510,7 +510,7 @@
                         <tr class="product-row" style="animation-delay: {{ loop.index * 0.05 }}s;">
                             <td>
                                 {% if product.image_url %}
-                                <img src="{{ product.image_url }}" alt="{{ product.name }}" class="product-image">
+                                <img src="{{ product.image_url }}" alt="{{ product.name }}" class="product-image" loading="lazy">
                                 {% else %}
                                 <div class="product-image d-flex align-items-center justify-content-center bg-light">
                                     <i class="fas fa-image text-muted"></i>

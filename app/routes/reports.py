@@ -953,3 +953,132 @@ def customer_analysis():
                          tier_breakdown=tier_breakdown,
                          new_customers=new_customers,
                          user_location=user_location)
+
+
+@bp.route('/export/<report_type>')
+@login_required
+@permission_required(Permissions.REPORT_VIEW_SALES)
+def export_report(report_type):
+    """
+    Generic export endpoint for reports
+
+    Args:
+        report_type: Type of report (daily, weekly, monthly, inventory, customers)
+
+    Query params:
+        format: excel or csv (default: excel)
+        date: Report date (for daily reports)
+        start_date, end_date: Date range (for period reports)
+    """
+    from app.utils.export import export_to_excel, export_to_csv, export_sales_report, export_inventory_report, export_customer_report
+    from app.models import Location
+
+    export_format = request.args.get('format', 'excel')
+    date_str = request.args.get('date')
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+
+    # Determine date range
+    if date_str:
+        report_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        start_date = report_date
+        end_date = report_date
+    elif start_date_str and end_date_str:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    else:
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=7)
+
+    # Location filter for non-global admins
+    location_filter = None
+    if not current_user.is_global_admin and current_user.location_id:
+        location_filter = current_user.location_id
+
+    try:
+        if report_type == 'daily' or report_type == 'sales':
+            # Sales export
+            query = Sale.query.filter(
+                func.date(Sale.sale_date) >= start_date,
+                func.date(Sale.sale_date) <= end_date,
+                Sale.status == 'completed'
+            )
+            if location_filter:
+                query = query.filter(Sale.location_id == location_filter)
+            sales = query.order_by(Sale.sale_date.desc()).all()
+
+            output = export_sales_report(sales, format_type=export_format)
+            filename = f"sales_report_{start_date}_{end_date}.{'xlsx' if export_format == 'excel' else 'csv'}"
+            mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' if export_format == 'excel' else 'text/csv'
+
+        elif report_type == 'inventory':
+            # Inventory export
+            products = Product.query.filter(Product.is_active == True).order_by(Product.name).all()
+            output = export_inventory_report(products, format_type=export_format)
+            filename = f"inventory_report_{datetime.now().strftime('%Y%m%d')}.{'xlsx' if export_format == 'excel' else 'csv'}"
+            mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' if export_format == 'excel' else 'text/csv'
+
+        elif report_type == 'customers':
+            # Customer export
+            customers = Customer.query.order_by(Customer.name).all()
+            output = export_customer_report(customers, format_type=export_format)
+            filename = f"customer_report_{datetime.now().strftime('%Y%m%d')}.{'xlsx' if export_format == 'excel' else 'csv'}"
+            mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' if export_format == 'excel' else 'text/csv'
+
+        elif report_type == 'product-performance':
+            # Product performance export
+            products_query = db.session.query(
+                Product.code,
+                Product.name,
+                Product.brand,
+                func.sum(SaleItem.quantity).label('units_sold'),
+                func.sum(SaleItem.subtotal).label('revenue'),
+                func.count(func.distinct(Sale.id)).label('transactions')
+            ).join(SaleItem).join(Sale).filter(
+                func.date(Sale.sale_date) >= start_date,
+                func.date(Sale.sale_date) <= end_date,
+                Sale.status == 'completed'
+            )
+            if location_filter:
+                products_query = products_query.filter(Sale.location_id == location_filter)
+
+            products_data = products_query.group_by(Product.id).order_by(func.sum(SaleItem.subtotal).desc()).all()
+
+            columns = {
+                'code': 'Product Code',
+                'name': 'Product Name',
+                'brand': 'Brand',
+                'units_sold': 'Units Sold',
+                'revenue': 'Revenue',
+                'transactions': 'Transactions'
+            }
+            data = [{
+                'code': p.code,
+                'name': p.name,
+                'brand': p.brand or '',
+                'units_sold': int(p.units_sold) if p.units_sold else 0,
+                'revenue': float(p.revenue) if p.revenue else 0,
+                'transactions': int(p.transactions) if p.transactions else 0
+            } for p in products_data]
+
+            if export_format == 'excel':
+                output = export_to_excel(data, columns, title=f"Product Performance Report ({start_date} to {end_date})")
+            else:
+                output = export_to_csv(data, columns)
+
+            filename = f"product_performance_{start_date}_{end_date}.{'xlsx' if export_format == 'excel' else 'csv'}"
+            mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' if export_format == 'excel' else 'text/csv'
+
+        else:
+            return jsonify({'error': 'Invalid report type'}), 400
+
+        return send_file(
+            output,
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        current_app.logger.error(f"Export error: {str(e)}")
+        return jsonify({'error': 'Export failed', 'message': str(e)}), 500
