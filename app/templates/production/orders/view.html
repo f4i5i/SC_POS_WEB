@@ -240,6 +240,7 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             <form method="POST" action="{{ url_for('production.approve_order', id=order.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <input type="hidden" name="action" value="approve">
                                 <button type="submit" class="btn btn-success w-100"
                                         {% if not availability.all_available %}disabled{% endif %}>
@@ -257,6 +258,7 @@
 
                     {% if order.status == 'approved' and current_user.has_permission('production.execute') %}
                     <form method="POST" action="{{ url_for('production.start_order', id=order.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" class="btn btn-warning w-100">
                             <i class="fas fa-play me-2"></i>Start Production
                         </button>
@@ -265,6 +267,7 @@
 
                     {% if order.status == 'in_progress' and current_user.has_permission('production.execute') %}
                     <form method="POST" action="{{ url_for('production.complete_order', id=order.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label">Quantity Actually Produced</label>
@@ -372,6 +375,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="POST" action="{{ url_for('production.approve_order', id=order.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="action" value="reject">
                 <div class="modal-header bg-danger text-white">
                     <h5 class="modal-title"><i class="fas fa-times-circle me-2"></i>Reject Order</h5>
@@ -401,6 +405,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="POST" action="{{ url_for('production.cancel_order', id=order.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="modal-header bg-warning text-dark">
                     <h5 class="modal-title"><i class="fas fa-ban me-2"></i>Cancel Order</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

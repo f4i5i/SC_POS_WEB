@@ -131,6 +131,7 @@
             <p class="text-muted mb-0">Enable or disable features for your POS system</p>
         </div>
         <form action="{{ url_for('features.initialize_flags') }}" method="POST" style="display: inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <button type="submit" class="btn btn-outline-primary">
                 <i class="fas fa-sync"></i> Reset to Defaults
             </button>
@@ -245,6 +246,9 @@
 
 {% block extra_js %}
 <script>
+// Get CSRF token
+var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
 function toggleFeature(featureId, enable) {
     console.log('toggleFeature called:', featureId, 'enable:', enable);
 
@@ -258,6 +262,9 @@ function toggleFeature(featureId, enable) {
         url: '/features/toggle/' + featureId,
         method: 'POST',
         contentType: 'application/json',
+        headers: {
+            'X-CSRFToken': csrfToken
+        },
         success: function(response) {
             console.log('Toggle response:', response);
             if (response.success) {

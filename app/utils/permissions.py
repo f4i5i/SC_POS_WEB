@@ -127,7 +127,7 @@ def all_permissions_required(*permission_names):
 
 def admin_required(f):
     """
-    Decorator to require admin role
+    Decorator to require admin role or global admin status
     Shortcut for @role_required('admin')
 
     Usage:
@@ -143,7 +143,9 @@ def admin_required(f):
             flash('Please log in to access this page.', 'warning')
             return redirect(url_for('auth.login'))
 
-        if not current_user.has_role('admin'):
+        # Check for admin role OR global admin status
+        is_admin = current_user.has_role('admin') or getattr(current_user, 'is_global_admin', False)
+        if not is_admin:
             if request.is_json:
                 return jsonify({'error': 'Admin access required'}), 403
             flash('This page requires administrator access.', 'danger')

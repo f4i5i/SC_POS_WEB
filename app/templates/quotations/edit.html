@@ -21,6 +21,7 @@
         </div>
         <div class="card-body">
             <form method="POST" action="{{ url_for('quotations.edit', quotation_id=quotation.id) }}" id="quoteForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="row mb-4">
                     <div class="col-md-4">
                         <label class="form-label">Customer</label>

@@ -73,6 +73,7 @@
 
                 <div class="config-body">
                     <form method="POST" action="{{ url_for('features.configure_feature', feature_id=feature.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         {% if feature.name == 'sms_notifications' %}
                         <!-- SMS Configuration -->
                         <div class="config-section">

@@ -126,6 +126,7 @@
         </div>
 
         <form method="POST" action="{{ url_for('customers.add_customer') }}" id="customerForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="card form-card">
                 <div class="card-body p-4">
                     <!-- Basic Information -->

@@ -206,7 +206,7 @@ def update_business_settings():
 @login_required
 def categories():
     """Manage product categories"""
-    if not current_user.role in ['admin', 'manager']:
+    if not (current_user.role in ['admin', 'manager'] or current_user.is_global_admin):
         flash('You do not have permission to manage categories', 'danger')
         return redirect(url_for('index'))
 
@@ -218,31 +218,92 @@ def categories():
 @login_required
 def add_category():
     """Add new category"""
-    if not current_user.role in ['admin', 'manager']:
-        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    if not (current_user.role in ['admin', 'manager'] or current_user.is_global_admin):
+        if request.is_json:
+            return jsonify({'success': False, 'error': 'Permission denied'}), 403
+        flash('Permission denied', 'danger')
+        return redirect(url_for('settings.categories'))
 
     try:
-        data = request.get_json()
+        # Handle both JSON and form data
+        if request.is_json:
+            data = request.get_json()
+            name = data.get('name')
+            description = data.get('description')
+        else:
+            name = request.form.get('name')
+            description = request.form.get('description')
+
+        if not name:
+            if request.is_json:
+                return jsonify({'success': False, 'error': 'Category name is required'}), 400
+            flash('Category name is required', 'danger')
+            return redirect(url_for('settings.categories'))
+
         category = Category(
-            name=data.get('name'),
-            description=data.get('description'),
-            parent_id=data.get('parent_id')
+            name=name,
+            description=description
         )
 
         db.session.add(category)
         db.session.commit()
 
-        return jsonify({
-            'success': True,
-            'category': {
-                'id': category.id,
-                'name': category.name
-            }
-        })
+        if request.is_json:
+            return jsonify({
+                'success': True,
+                'category': {
+                    'id': category.id,
+                    'name': category.name
+                }
+            })
+
+        flash(f'Category "{name}" added successfully!', 'success')
+        return redirect(url_for('settings.categories'))
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        if request.is_json:
+            return jsonify({'success': False, 'error': str(e)}), 500
+        flash(f'Error adding category: {str(e)}', 'danger')
+        return redirect(url_for('settings.categories'))
+
+
+@bp.route('/categories/delete/<int:category_id>', methods=['POST'])
+@login_required
+def delete_category(category_id):
+    """Delete a category"""
+    if not (current_user.role in ['admin', 'manager'] or current_user.is_global_admin):
+        if request.is_json:
+            return jsonify({'success': False, 'error': 'Permission denied'}), 403
+        flash('Permission denied', 'danger')
+        return redirect(url_for('settings.categories'))
+
+    try:
+        category = Category.query.get_or_404(category_id)
+        category_name = category.name
+
+        # Check if category has products
+        if hasattr(category, 'products') and category.products:
+            error_msg = f'Cannot delete category with {len(category.products)} products. Move products first.'
+            if request.is_json:
+                return jsonify({'success': False, 'error': error_msg}), 400
+            flash(error_msg, 'danger')
+            return redirect(url_for('settings.categories'))
+
+        db.session.delete(category)
+        db.session.commit()
+
+        if request.is_json:
+            return jsonify({'success': True})
+
+        flash(f'Category "{category_name}" deleted successfully!', 'success')
+        return redirect(url_for('settings.categories'))
+    except Exception as e:
+        db.session.rollback()
+        if request.is_json:
+            return jsonify({'success': False, 'error': str(e)}), 500
+        flash(f'Error deleting category: {str(e)}', 'danger')
+        return redirect(url_for('settings.categories'))
 
 
 @bp.route('/activity-log')

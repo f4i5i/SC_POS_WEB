@@ -19,6 +19,7 @@
                 </div>
                 <div class="card-body">
                     <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <!-- Product Info -->
                         <div class="mb-4 p-3 bg-light rounded">
                             <div class="row">

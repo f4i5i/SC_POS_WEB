@@ -67,6 +67,7 @@
                 </div>
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('production.adjust_raw_material', id=material.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="mb-3">
                             <label class="form-label">Adjustment Type</label>
                             <select name="type" class="form-select">

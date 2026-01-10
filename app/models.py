@@ -88,6 +88,13 @@ class User(UserMixin, db.Model):
 
     def has_role(self, role_name):
         """Check if user has a specific role"""
+        # Check the simple role string field first
+        if self.role == role_name:
+            return True
+        # Also check global admin for admin role requests
+        if role_name == 'admin' and getattr(self, 'is_global_admin', False):
+            return True
+        # Check the roles relationship if it exists
         return any(role.name == role_name for role in self.roles)
 
     def get_all_permissions(self):

@@ -5,7 +5,7 @@ Initializes and configures the Flask application
 
 import os
 import secrets
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, flash
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
@@ -349,6 +349,21 @@ def create_app(config_name='default'):
     def internal_error(error):
         db.session.rollback()
         return render_template('errors/500.html'), 500
+
+    # CSRF error handler - returns JSON for API calls
+    from flask_wtf.csrf import CSRFError
+    @app.errorhandler(CSRFError)
+    def handle_csrf_error(error):
+        from flask import jsonify, request
+        # Return JSON for AJAX/API requests
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or '/api/' in request.path:
+            return jsonify({
+                'error': 'CSRF token missing or invalid',
+                'message': 'Please refresh the page and try again'
+            }), 400
+        # Flash message and redirect for regular requests
+        flash('Session expired. Please try again.', 'warning')
+        return redirect(request.url)
 
     # Context processors
     @app.context_processor

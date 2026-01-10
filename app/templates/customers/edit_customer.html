@@ -105,6 +105,7 @@
         </div>
 
         <form method="POST" action="{{ url_for('customers.edit_customer', customer_id=customer.id) }}" id="customerForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="card form-card">
                 <div class="card-body p-4">
                     <!-- Basic Information -->

@@ -360,6 +360,7 @@
         </div>
 
         <form method="POST" action="{{ url_for('inventory.edit_product', product_id=product.id) }}" enctype="multipart/form-data" id="productForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="card form-card">
                 <div class="card-body p-4">
                     <!-- Basic Information -->

@@ -232,6 +232,7 @@
                 </div>
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('warehouse.update_gate_pass_status', id=gate_pass.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="mb-3">
                             <label class="form-label">Update Status</label>
                             <select name="status" class="form-select">

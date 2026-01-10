@@ -28,6 +28,7 @@
             </div>
 
             <form method="POST" action="{{ url_for('pos.process_return', sale_id=sale.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <h6 class="mb-3">Select Items to Return:</h6>
                 <table class="table">
                     <thead class="table-light">

@@ -84,6 +84,11 @@ class Config:
     LOGIN_ATTEMPTS_LIMIT = int(os.environ.get('LOGIN_ATTEMPTS_LIMIT', 5))
     LOGIN_TIMEOUT_MINUTES = int(os.environ.get('LOGIN_TIMEOUT_MINUTES', 15))
 
+    # CSRF Configuration
+    WTF_CSRF_TIME_LIMIT = None  # CSRF token doesn't expire (valid for session lifetime)
+    WTF_CSRF_SSL_STRICT = False  # Don't require HTTPS for CSRF
+    WTF_CSRF_HEADERS = ['X-CSRFToken', 'X-CSRF-Token']  # Accept token from these headers
+
     # Logging
     LOG_FOLDER = os.path.join(basedir, 'logs')
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
