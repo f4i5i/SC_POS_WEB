@@ -7,6 +7,7 @@ import re
 from urllib.parse import urlparse, urljoin
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, current_app
 from flask_login import login_user, logout_user, current_user, login_required
+from flask_wtf.csrf import generate_csrf
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from app.models import db, User, ActivityLog
@@ -116,6 +117,12 @@ def login():
     """User login with security protections"""
     if current_user.is_authenticated:
         return redirect(url_for('index'))
+
+    # Ensure session is established for CSRF token persistence
+    # This fixes "CSRF session token is missing" errors by explicitly
+    # generating and storing the CSRF token in the session before rendering
+    if request.method == 'GET':
+        generate_csrf()  # Forces CSRF token creation and session save
 
     if request.method == 'POST':
         username = request.form.get('username', '').strip()

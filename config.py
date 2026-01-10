@@ -120,13 +120,14 @@ class ProductionConfig(Config):
     """Production configuration"""
     DEBUG = False
     # Production should use HTTPS with secure cookies
-    SESSION_COOKIE_SECURE = True
+    # Respect environment variable to allow HTTP in local production setups
+    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'True').lower() == 'true'
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = 'Strict'
+    SESSION_COOKIE_SAMESITE = 'Lax'  # Lax allows cookies on same-site navigations
     SQLALCHEMY_ECHO = False
 
     # Additional production security settings
-    PREFERRED_URL_SCHEME = 'https'
+    PREFERRED_URL_SCHEME = 'https' if SESSION_COOKIE_SECURE else 'http'
 
 
 class TestingConfig(Config):

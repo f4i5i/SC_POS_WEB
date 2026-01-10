@@ -2257,7 +2257,8 @@
     <script>
     (function() {
         // Session timeout configuration (in seconds)
-        const SESSION_TIMEOUT = {{ config.get('PERMANENT_SESSION_LIFETIME', 3600)|int }};
+        // PERMANENT_SESSION_LIFETIME is a timedelta, so use .total_seconds()
+        const SESSION_TIMEOUT = {{ config.get('PERMANENT_SESSION_LIFETIME').total_seconds()|int }};
         const WARNING_BEFORE = 300; // Show warning 5 minutes before expiry
 
         let timeoutTimer, countdownTimer, countdownValue;
