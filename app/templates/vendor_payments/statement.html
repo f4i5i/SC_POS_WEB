@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+
+{% block title %}Statement - {{ supplier.name }} - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media print {
+        .no-print { display: none !important; }
+        body { padding: 0; }
+        .statement-container { box-shadow: none !important; }
+    }
+
+    .statement-container {
+        background: white;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    .statement-header {
+        border-bottom: 2px solid #111827;
+        padding-bottom: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .company-name {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #111827;
+    }
+
+    .statement-title {
+        font-size: 1.25rem;
+        color: #6B7280;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+    }
+
+    .supplier-details {
+        background: #F9FAFB;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+
+    .statement-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1.5rem;
+    }
+
+    .statement-table th {
+        background: #F3F4F6;
+        padding: 0.75rem;
+        text-align: left;
+        border-bottom: 2px solid #E5E7EB;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+    }
+
+    .statement-table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #E5E7EB;
+    }
+
+    .statement-table .text-end {
+        text-align: right;
+    }
+
+    .statement-table tfoot td {
+        font-weight: bold;
+        background: #F9FAFB;
+    }
+
+    .debit-col { color: #DC2626; }
+    .credit-col { color: #059669; }
+
+    .summary-box {
+        background: #F3F4F6;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-top: 1.5rem;
+    }
+
+    .balance-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #E5E7EB;
+    }
+
+    .balance-row:last-child {
+        border-bottom: none;
+        font-weight: bold;
+        font-size: 1.1rem;
+    }
+
+    .print-btn {
+        text-align: center;
+        margin: 1.5rem 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="print-btn no-print">
+        <button onclick="window.print()" class="btn btn-primary btn-lg me-2">
+            <i class="fas fa-print me-1"></i> Print Statement
+        </button>
+        <a href="{{ url_for('vendor_payments.supplier_ledger', supplier_id=supplier.id) }}" class="btn btn-outline-secondary btn-lg">
+            <i class="fas fa-arrow-left me-1"></i> Back
+        </a>
+    </div>
+
+    <div class="statement-container">
+        <!-- Header -->
+        <div class="statement-header">
+            <div class="row">
+                <div class="col-6">
+                    <div class="company-name">{{ business_name }}</div>
+                    <div class="text-muted">{{ business_address }}</div>
+                    <div class="text-muted">{{ business_phone }}</div>
+                </div>
+                <div class="col-6 text-end">
+                    <div class="statement-title">Supplier Statement</div>
+                    <div class="text-muted mt-2">
+                        Date: {{ now().strftime('%B %d, %Y') }}
+                    </div>
+                    {% if date_from or date_to %}
+                    <div class="text-muted">
+                        Period: {{ date_from or 'Beginning' }} to {{ date_to or 'Now' }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Supplier Details -->
+        <div class="supplier-details">
+            <div class="row">
+                <div class="col-6">
+                    <strong>Supplier:</strong> {{ supplier.name }}<br>
+                    {% if supplier.contact_person %}
+                    <small class="text-muted">Contact: {{ supplier.contact_person }}</small><br>
+                    {% endif %}
+                    {% if supplier.phone %}
+                    <small class="text-muted">Phone: {{ supplier.phone }}</small>
+                    {% endif %}
+                </div>
+                <div class="col-6 text-end">
+                    <strong>Payment Terms:</strong> {{ supplier.payment_terms or 'Not specified' }}<br>
+                    <strong>Account Balance:</strong>
+                    <span class="{{ 'text-danger' if supplier.current_balance and supplier.current_balance > 0 else 'text-success' }}">
+                        Rs. {{ "{:,.2f}".format(supplier.current_balance or 0) }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transaction Table -->
+        {% if entries %}
+        <table class="statement-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Reference</th>
+                    <th class="text-end">Debit</th>
+                    <th class="text-end">Credit</th>
+                    <th class="text-end">Balance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set running_balance = 0 %}
+                {% for entry in entries %}
+                {% set running_balance = entry.balance %}
+                <tr>
+                    <td>{{ entry.transaction_date.strftime('%b %d, %Y') if entry.transaction_date else '-' }}</td>
+                    <td>{{ entry.description or entry.transaction_type|title }}</td>
+                    <td>{{ entry.reference_number or '-' }}</td>
+                    <td class="text-end debit-col">
+                        {% if entry.debit and entry.debit > 0 %}
+                        Rs. {{ "{:,.2f}".format(entry.debit) }}
+                        {% endif %}
+                    </td>
+                    <td class="text-end credit-col">
+                        {% if entry.credit and entry.credit > 0 %}
+                        Rs. {{ "{:,.2f}".format(entry.credit) }}
+                        {% endif %}
+                    </td>
+                    <td class="text-end">Rs. {{ "{:,.2f}".format(entry.balance) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3" class="text-end">Total:</td>
+                    <td class="text-end debit-col">
+                        Rs. {{ "{:,.2f}".format(entries|sum(attribute='debit', default=0)) }}
+                    </td>
+                    <td class="text-end credit-col">
+                        Rs. {{ "{:,.2f}".format(entries|sum(attribute='credit', default=0)) }}
+                    </td>
+                    <td class="text-end">Rs. {{ "{:,.2f}".format(supplier.current_balance or 0) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="fas fa-inbox fa-3x mb-3"></i>
+            <p>No transactions found for the selected period</p>
+        </div>
+        {% endif %}
+
+        <!-- Summary -->
+        <div class="summary-box">
+            <div class="balance-row">
+                <span>Total Purchases (Debit):</span>
+                <span class="debit-col">Rs. {{ "{:,.2f}".format(entries|sum(attribute='debit', default=0)) }}</span>
+            </div>
+            <div class="balance-row">
+                <span>Total Payments (Credit):</span>
+                <span class="credit-col">Rs. {{ "{:,.2f}".format(entries|sum(attribute='credit', default=0)) }}</span>
+            </div>
+            <div class="balance-row">
+                <span>Outstanding Balance:</span>
+                <span class="{{ 'text-danger' if supplier.current_balance and supplier.current_balance > 0 else 'text-success' }}">
+                    Rs. {{ "{:,.2f}".format(supplier.current_balance or 0) }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-4 text-muted">
+            <small>This is a computer-generated statement and does not require a signature.</small>
+            <br>
+            <small>Generated on {{ now().strftime('%B %d, %Y at %I:%M %p') }}</small>
+        </div>
+    </div>
+</div>
+
+{% macro now() %}{{ import_datetime() }}{% endmacro %}
+{% endblock %}

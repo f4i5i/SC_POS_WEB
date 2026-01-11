@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Create Location - {{ business_name }}{% endblock %}
+{% block title %}Edit {{ location.name }} - {{ business_name }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -8,125 +8,146 @@
         <div class="col-lg-8">
             <div class="card">
                 <div class="card-header">
-                    <h4 class="mb-0"><i class="fas fa-plus me-2"></i>Create New Location</h4>
+                    <h4 class="mb-0"><i class="fas fa-edit me-2"></i>Edit Location: {{ location.name }}</h4>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="{{ url_for('locations.create') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <form method="POST" action="{{ url_for('locations.edit', id=location.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="code" class="form-label">Location Code *</label>
-                                <input type="text" class="form-control" id="code" name="code" required
-                                       placeholder="e.g., WH-001 or K-001" pattern="[A-Za-z0-9-]+"
-                                       style="text-transform: uppercase;">
-                                <small class="text-muted">Unique identifier (letters, numbers, hyphens only)</small>
+                                <label for="code" class="form-label">Location Code</label>
+                                <input type="text" class="form-control" id="code" value="{{ location.code }}" disabled>
+                                <small class="text-muted">Code cannot be changed</small>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="name" class="form-label">Location Name *</label>
                                 <input type="text" class="form-control" id="name" name="name" required
-                                       placeholder="e.g., Main Warehouse or Mall Kiosk">
+                                       value="{{ location.name }}">
                             </div>
                         </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="location_type" class="form-label">Location Type *</label>
-                                <select class="form-select" id="location_type" name="location_type" required>
-                                    <option value="kiosk">Kiosk (Retail Location)</option>
-                                    <option value="warehouse">Warehouse (Central Stock)</option>
-                                </select>
+                                <label class="form-label">Location Type</label>
+                                <input type="text" class="form-control" value="{{ location.location_type|title }}" disabled>
                             </div>
-                            <div class="col-md-6 mb-3" id="warehouse_select_container">
+                            {% if location.is_kiosk %}
+                            <div class="col-md-6 mb-3">
                                 <label for="parent_warehouse_id" class="form-label">Parent Warehouse</label>
                                 <select class="form-select" id="parent_warehouse_id" name="parent_warehouse_id">
-                                    <option value="">-- Select Warehouse --</option>
+                                    <option value="">-- No Parent Warehouse --</option>
                                     {% for wh in warehouses %}
-                                    <option value="{{ wh.id }}">{{ wh.name }} ({{ wh.code }})</option>
+                                    <option value="{{ wh.id }}" {{ 'selected' if location.parent_warehouse_id == wh.id else '' }}>
+                                        {{ wh.name }} ({{ wh.code }})
+                                    </option>
                                     {% endfor %}
                                 </select>
-                                <small class="text-muted">Warehouse that supplies this kiosk</small>
                             </div>
+                            {% endif %}
                         </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="city" class="form-label">City</label>
-                                <input type="text" class="form-control" id="city" name="city" placeholder="City name">
+                                <input type="text" class="form-control" id="city" name="city"
+                                       value="{{ location.city or '' }}">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="phone" class="form-label">Phone</label>
-                                <input type="text" class="form-control" id="phone" name="phone" placeholder="Contact phone">
+                                <input type="text" class="form-control" id="phone" name="phone"
+                                       value="{{ location.phone or '' }}">
                             </div>
                         </div>
 
                         <div class="mb-3">
                             <label for="address" class="form-label">Address</label>
-                            <textarea class="form-control" id="address" name="address" rows="2" placeholder="Full address"></textarea>
+                            <textarea class="form-control" id="address" name="address" rows="2">{{ location.address or '' }}</textarea>
                         </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="email" class="form-label">Email</label>
-                                <input type="email" class="form-control" id="email" name="email" placeholder="Contact email">
+                                <input type="email" class="form-control" id="email" name="email"
+                                       value="{{ location.email or '' }}">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="manager_id" class="form-label">Manager</label>
                                 <select class="form-select" id="manager_id" name="manager_id">
-                                    <option value="">-- Select Manager --</option>
+                                    <option value="">-- No Manager --</option>
                                     {% for user in users %}
-                                    <option value="{{ user.id }}">{{ user.full_name }} ({{ user.username }})</option>
+                                    <option value="{{ user.id }}" {{ 'selected' if location.manager_id == user.id else '' }}>
+                                        {{ user.full_name }} ({{ user.username }})
+                                    </option>
                                     {% endfor %}
                                 </select>
                             </div>
                         </div>
 
+                        {% if location.is_kiosk %}
                         <!-- Kiosk Charge Section -->
-                        <div class="card bg-light mb-3" id="kiosk_charge_container">
+                        <div class="card bg-light mt-3 mb-3">
                             <div class="card-header py-2">
                                 <h6 class="mb-0"><i class="fas fa-percentage me-2"></i>Kiosk Charges</h6>
-                                <small class="text-muted">Set additional charges for this location</small>
+                                <small class="text-muted">Set additional charges for this location (applied to product landed costs)</small>
                             </div>
                             <div class="card-body">
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <label for="kiosk_charge_type" class="form-label">Charge Type</label>
                                         <select class="form-select" id="kiosk_charge_type" name="kiosk_charge_type">
-                                            <option value="percentage">Percentage (%)</option>
-                                            <option value="fixed">Fixed Amount (Rs.)</option>
+                                            <option value="percentage" {{ 'selected' if location.kiosk_charge_type == 'percentage' else '' }}>
+                                                Percentage (%)
+                                            </option>
+                                            <option value="fixed" {{ 'selected' if location.kiosk_charge_type == 'fixed' else '' }}>
+                                                Fixed Amount (Rs.)
+                                            </option>
                                         </select>
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label for="kiosk_charge_rate" class="form-label">Charge Rate</label>
+                                        <label for="kiosk_charge_rate" class="form-label">
+                                            <span id="charge_label">Charge Rate</span>
+                                        </label>
                                         <div class="input-group">
                                             <input type="number" class="form-control" id="kiosk_charge_rate"
-                                                   name="kiosk_charge_rate" step="0.01" min="0" max="100" value="0">
+                                                   name="kiosk_charge_rate" step="0.01" min="0" max="100"
+                                                   value="{{ location.kiosk_charge_rate or 0 }}">
                                             <span class="input-group-text" id="charge_suffix">%</span>
                                         </div>
-                                        <small class="text-muted" id="charge_help">
-                                            e.g., 5% means Rs.100 product becomes Rs.105
+                                        <small class="text-muted">
+                                            <span id="charge_help">e.g., 5% means Rs.100 product becomes Rs.105</span>
                                         </small>
                                     </div>
+                                </div>
+
+                                <div class="alert alert-info py-2 mb-0">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    <strong>How it works:</strong> Kiosk charges are added to the product's landed cost
+                                    (base + packaging + delivery + bottle) to calculate the final cost for this location.
+                                    This helps track location-specific margins.
                                 </div>
                             </div>
                         </div>
 
-                        <div class="mb-3" id="can_sell_container">
+                        <div class="mb-3">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="can_sell" name="can_sell" checked>
+                                <input class="form-check-input" type="checkbox" id="can_sell" name="can_sell"
+                                       {{ 'checked' if location.can_sell else '' }}>
                                 <label class="form-check-label" for="can_sell">
                                     Can process sales (POS enabled)
                                 </label>
                             </div>
                         </div>
+                        {% endif %}
 
                         <hr>
 
                         <div class="d-flex justify-content-between">
-                            <a href="{{ url_for('locations.index') }}" class="btn btn-secondary">
+                            <a href="{{ url_for('locations.view', id=location.id) }}" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left me-2"></i>Cancel
                             </a>
                             <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-2"></i>Create Location
+                                <i class="fas fa-save me-2"></i>Save Changes
                             </button>
                         </div>
                     </form>
@@ -139,17 +160,6 @@
 
 {% block extra_js %}
 <script>
-document.getElementById('location_type').addEventListener('change', function() {
-    const isWarehouse = this.value === 'warehouse';
-    document.getElementById('warehouse_select_container').style.display = isWarehouse ? 'none' : 'block';
-    document.getElementById('can_sell_container').style.display = isWarehouse ? 'none' : 'block';
-    document.getElementById('kiosk_charge_container').style.display = isWarehouse ? 'none' : 'block';
-
-    if (isWarehouse) {
-        document.getElementById('can_sell').checked = false;
-    }
-});
-
 document.getElementById('kiosk_charge_type').addEventListener('change', function() {
     const isPercentage = this.value === 'percentage';
     const suffix = document.getElementById('charge_suffix');

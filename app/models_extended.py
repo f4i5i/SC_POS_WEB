@@ -629,6 +629,68 @@ class SupplierLedger(db.Model):
 
 
 # ============================================================
+# PRODUCT COST TRACKING
+# ============================================================
+
+class ProductCostHistory(db.Model):
+    """Track historical cost changes for products"""
+    __tablename__ = 'product_cost_history'
+
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False, index=True)
+    purchase_order_id = db.Column(db.Integer, db.ForeignKey('purchase_orders.id'))
+
+    # Cost snapshot at time of change
+    base_cost = db.Column(db.Numeric(10, 2))
+    packaging_cost = db.Column(db.Numeric(10, 2))
+    delivery_cost = db.Column(db.Numeric(10, 2))
+    bottle_cost = db.Column(db.Numeric(10, 2))
+    landed_cost = db.Column(db.Numeric(10, 2))
+
+    effective_date = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    changed_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    change_reason = db.Column(db.String(256))
+
+    # Relationships
+    product = db.relationship('Product', backref=db.backref('cost_history', lazy='dynamic'))
+    purchase_order = db.relationship('PurchaseOrder')
+    user = db.relationship('User')
+
+    def __repr__(self):
+        return f'<ProductCostHistory {self.product_id} - {self.landed_cost}>'
+
+
+class LocationProductCost(db.Model):
+    """Store location-specific final costs (with kiosk charges applied)"""
+    __tablename__ = 'location_product_costs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False, index=True)
+
+    landed_cost = db.Column(db.Numeric(10, 2))  # Product's landed cost
+    kiosk_charge = db.Column(db.Numeric(10, 2))  # Applied kiosk charge
+    final_cost = db.Column(db.Numeric(10, 2))  # landed + kiosk charge
+
+    # For margin calculation
+    suggested_selling_price = db.Column(db.Numeric(10, 2))
+    margin_percentage = db.Column(db.Numeric(5, 2))
+
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('location_id', 'product_id', name='uix_location_product_cost'),
+    )
+
+    # Relationships
+    location = db.relationship('Location', backref=db.backref('product_costs', lazy='dynamic'))
+    product = db.relationship('Product', backref=db.backref('location_costs', lazy='dynamic'))
+
+    def __repr__(self):
+        return f'<LocationProductCost {self.location_id}-{self.product_id}>'
+
+
+# ============================================================
 # CUSTOMER CREDIT & DUE PAYMENTS
 # ============================================================
 

@@ -133,18 +133,26 @@ def start_background_services():
 
 
 if __name__ == '__main__':
+    # Check if running in development mode
+    is_dev = os.environ.get('FLASK_ENV', 'development') == 'development'
+    use_reloader = os.environ.get('FLASK_USE_RELOADER', 'true').lower() == 'true'
+
     with app.app_context():
         # Create tables if they don't exist
         db.create_all()
         logger.info("Database tables created")
 
-        # Start background services
-        start_background_services()
+        # Start background services (only if not using reloader to avoid duplicate services)
+        if not use_reloader or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+            start_background_services()
 
     # Run the application
     logger.info(f"Starting {app.config['BUSINESS_NAME']} POS System...")
+    logger.info(f"Debug mode: {is_dev}, Auto-reload: {use_reloader}")
+
     app.run(
         host='0.0.0.0',
         port=5001,
-        debug=app.config['DEBUG']
+        debug=is_dev,
+        use_reloader=use_reloader
     )

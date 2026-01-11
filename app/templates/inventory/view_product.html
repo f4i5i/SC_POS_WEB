@@ -121,11 +121,11 @@
                 </div>
                 {% endif %}
 
-                <div class="price-display mb-2">Rs. {{ "{:,.2f}".format(product.selling_price) }}</div>
+                <div class="price-display mb-2">Rs. {{ "{:,.2f}".format(product.selling_price or 0) }}</div>
                 {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
-                <div class="cost-display mb-3">Cost: Rs. {{ "{:,.2f}".format(product.cost_price) }}</div>
+                <div class="cost-display mb-3">Cost: Rs. {{ "{:,.2f}".format(product.cost_price or 0) }}</div>
 
-                {% set margin = ((product.selling_price - product.cost_price) / product.cost_price * 100) if product.cost_price > 0 else 0 %}
+                {% set margin = ((product.selling_price or 0) - (product.cost_price or 0)) / (product.cost_price or 1) * 100 if (product.cost_price or 0) > 0 else 0 %}
                 <span class="badge bg-info fs-6">{{ "{:.1f}".format(margin) }}% Margin</span>
                 {% endif %}
 
@@ -198,11 +198,11 @@
 
                         {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
                         <div class="detail-label">Stock Value</div>
-                        <div class="detail-value">Rs. {{ "{:,.2f}".format(store_quantity * product.cost_price) }}</div>
+                        <div class="detail-value">Rs. {{ "{:,.2f}".format((store_quantity or 0) * (product.cost_price or 0)) }}</div>
                         {% endif %}
 
                         <div class="detail-label">Potential Revenue</div>
-                        <div class="detail-value">Rs. {{ "{:,.2f}".format(store_quantity * product.selling_price) }}</div>
+                        <div class="detail-value">Rs. {{ "{:,.2f}".format((store_quantity or 0) * (product.selling_price or 0)) }}</div>
 
                         <div class="detail-label">Status</div>
                         <div class="detail-value">
@@ -261,8 +261,8 @@
                         {% for item in recent_sales %}
                         <div class="movement-item">
                             <div class="d-flex justify-content-between">
-                                <span>{{ item.quantity }} x Rs. {{ "{:,.0f}".format(item.unit_price) }}</span>
-                                <strong>Rs. {{ "{:,.0f}".format(item.total) }}</strong>
+                                <span>{{ item.quantity }} x Rs. {{ "{:,.0f}".format(item.unit_price or 0) }}</span>
+                                <strong>Rs. {{ "{:,.0f}".format(item.subtotal or 0) }}</strong>
                             </div>
                             <small class="text-muted">
                                 {{ item.sale.created_at.strftime('%d %b %Y %H:%M') if item.sale else '' }}

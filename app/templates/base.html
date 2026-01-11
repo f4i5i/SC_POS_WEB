@@ -1790,7 +1790,7 @@
                                     <i class="fas fa-receipt"></i> Sales List
                                 </a>
                             </li>
-                            {% if is_feature_enabled('returns_management') and current_user.role in ['admin', 'manager', 'kiosk_manager'] or current_user.is_global_admin %}
+                            {% if is_feature_enabled('returns_management') and current_user.role in ['admin', 'manager'] or current_user.is_global_admin %}
                             <li class="nav-item">
                                 <a class="nav-link" href="/returns">
                                     <i class="fas fa-undo"></i> Returns
@@ -1926,7 +1926,7 @@
                                 </a>
                             </li>
                             {% endif %}
-                            {% if is_feature_enabled('expense_tracking') and (current_user.role in ['admin', 'accountant', 'manager', 'kiosk_manager'] or current_user.is_global_admin) %}
+                            {% if is_feature_enabled('expense_tracking') and (current_user.role in ['admin', 'accountant', 'manager'] or current_user.is_global_admin) %}
                             <li class="nav-item">
                                 <a class="nav-link" href="/expenses">
                                     <i class="fas fa-wallet"></i> Expenses
@@ -1937,6 +1937,16 @@
                             <li class="nav-item">
                                 <a class="nav-link" href="/suppliers">
                                     <i class="fas fa-truck"></i> Suppliers
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/vendor-payments">
+                                    <i class="fas fa-money-check-alt"></i> Vendor Payments
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/vendor-payments/reminders">
+                                    <i class="fas fa-bell"></i> Payment Reminders
                                 </a>
                             </li>
                             {% endif %}
@@ -2102,8 +2112,8 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- jQuery (optional, for AJAX) -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- jQuery (optional, for AJAX) - using cdnjs to comply with CSP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 
     <!-- CSRF Token Setup for AJAX -->
     <script>

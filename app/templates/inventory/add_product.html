@@ -364,28 +364,104 @@
                         </div>
                     </div>
 
-                    <!-- Pricing -->
+                    <!-- Cost Breakdown -->
                     <div class="form-section" style="animation-delay: 0.2s;">
-                        <h5><i class="fas fa-tags"></i> Pricing</h5>
+                        <h5><i class="fas fa-calculator"></i> Cost Breakdown</h5>
+                        <p class="text-muted small mb-3">Break down the total cost into components for accurate landed cost calculation</p>
+
                         <div class="row">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="cost_price" class="form-label required-field">Cost Price</label>
+                                    <label for="base_cost" class="form-label required-field">Base Cost (Supplier)</label>
                                     <div class="input-group">
                                         <span class="input-group-text">Rs.</span>
                                         <input type="number"
                                                class="form-control"
-                                               id="cost_price"
-                                               name="cost_price"
+                                               id="base_cost"
+                                               name="base_cost"
                                                step="0.01"
                                                min="0"
                                                required
                                                placeholder="0.00"
-                                               onchange="calculateProfit()">
+                                               onchange="calculateLandedCost()">
                                     </div>
-                                    <small class="help-text">Price you paid for the product</small>
+                                    <small class="help-text">Price from supplier</small>
                                 </div>
                             </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="packaging_cost" class="form-label">Packaging Cost</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">Rs.</span>
+                                        <input type="number"
+                                               class="form-control"
+                                               id="packaging_cost"
+                                               name="packaging_cost"
+                                               step="0.01"
+                                               min="0"
+                                               value="0"
+                                               placeholder="0.00"
+                                               onchange="calculateLandedCost()">
+                                    </div>
+                                    <small class="help-text">Box, wrapper, etc.</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="delivery_cost" class="form-label">Delivery Cost</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">Rs.</span>
+                                        <input type="number"
+                                               class="form-control"
+                                               id="delivery_cost"
+                                               name="delivery_cost"
+                                               step="0.01"
+                                               min="0"
+                                               value="0"
+                                               placeholder="0.00"
+                                               onchange="calculateLandedCost()">
+                                    </div>
+                                    <small class="help-text">Freight/shipping per unit</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="bottle_cost" class="form-label">Bottle Cost</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">Rs.</span>
+                                        <input type="number"
+                                               class="form-control"
+                                               id="bottle_cost"
+                                               name="bottle_cost"
+                                               step="0.01"
+                                               min="0"
+                                               value="0"
+                                               placeholder="0.00"
+                                               onchange="calculateLandedCost()">
+                                    </div>
+                                    <small class="help-text">Perfume bottles</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="alert alert-success mb-0">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <strong><i class="fas fa-box-open me-1"></i> Landed Cost:</strong>
+                                        <span id="landed_cost_display" class="fs-5 fw-bold">Rs. 0.00</span>
+                                    </div>
+                                    <small class="text-muted">Base + Packaging + Delivery + Bottle</small>
+                                    <input type="hidden" id="cost_price" name="cost_price" value="0">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pricing -->
+                    <div class="form-section" style="animation-delay: 0.25s;">
+                        <h5><i class="fas fa-tags"></i> Selling Price</h5>
+                        <div class="row">
                             <div class="col-md-4">
                                 <div class="mb-3">
                                     <label for="selling_price" class="form-label required-field">Selling Price</label>
@@ -413,9 +489,6 @@
                                     <small class="help-text">Automatically calculated</small>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="row">
                             <div class="col-md-4">
                                 <div class="mb-3">
                                     <label for="tax_rate" class="form-label">Tax Rate (%)</label>
@@ -579,6 +652,21 @@ function generateBarcode() {
     setTimeout(() => {
         $('#barcode').removeClass('bg-success text-white');
     }, 500);
+}
+
+function calculateLandedCost() {
+    const baseCost = parseFloat($('#base_cost').val()) || 0;
+    const packagingCost = parseFloat($('#packaging_cost').val()) || 0;
+    const deliveryCost = parseFloat($('#delivery_cost').val()) || 0;
+    const bottleCost = parseFloat($('#bottle_cost').val()) || 0;
+
+    const landedCost = baseCost + packagingCost + deliveryCost + bottleCost;
+
+    $('#landed_cost_display').text('Rs. ' + landedCost.toFixed(2));
+    $('#cost_price').val(landedCost.toFixed(2));
+
+    // Recalculate profit
+    calculateProfit();
 }
 
 function calculateProfit() {

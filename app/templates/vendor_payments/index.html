@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+
+{% block title %}Vendor Payments - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .payment-card {
+        transition: all 0.3s;
+        border-radius: 10px;
+        border: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        animation: fadeIn 0.4s;
+    }
+
+    .payment-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+
+    .stat-card {
+        border-radius: 12px;
+        padding: 1.5rem;
+        background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+        color: white;
+    }
+
+    .stat-card.success {
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    }
+
+    .stat-card.warning {
+        background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+    }
+
+    .stat-card.danger {
+        background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+    }
+
+    .payment-method-badge {
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .payment-method-badge.cash {
+        background: #D1FAE5;
+        color: #059669;
+    }
+
+    .payment-method-badge.bank_transfer {
+        background: #DBEAFE;
+        color: #2563EB;
+    }
+
+    .payment-method-badge.cheque {
+        background: #FEF3C7;
+        color: #D97706;
+    }
+
+    .status-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+
+    .status-badge.completed {
+        background: #D1FAE5;
+        color: #059669;
+    }
+
+    .status-badge.cancelled {
+        background: #FEE2E2;
+        color: #DC2626;
+    }
+
+    .status-badge.pending {
+        background: #FEF3C7;
+        color: #D97706;
+    }
+
+    .filter-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .page-header {
+        background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="mb-1"><i class="fas fa-money-check-alt me-2"></i>Vendor Payments</h1>
+                <p class="mb-0 opacity-75">Manage and track supplier payments</p>
+            </div>
+            <div>
+                <a href="{{ url_for('vendor_payments.reminders') }}" class="btn btn-light me-2">
+                    <i class="fas fa-bell me-1"></i> Reminders
+                </a>
+                <a href="{{ url_for('vendor_payments.create') }}" class="btn btn-success">
+                    <i class="fas fa-plus me-1"></i> Record Payment
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stat-card success">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="opacity-75 small">Total Payments (Page)</div>
+                        <div class="stat-value">Rs. {{ "{:,.0f}".format(total_amount) }}</div>
+                    </div>
+                    <i class="fas fa-coins fa-2x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="opacity-75 small">Total Records</div>
+                        <div class="stat-value">{{ payments.total }}</div>
+                    </div>
+                    <i class="fas fa-receipt fa-2x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-card">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold">Supplier</label>
+                <select name="supplier_id" class="form-select">
+                    <option value="">All Suppliers</option>
+                    {% for supplier in suppliers %}
+                    <option value="{{ supplier.id }}" {{ 'selected' if request.args.get('supplier_id')|int == supplier.id }}>
+                        {{ supplier.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold">Payment Method</label>
+                <select name="payment_method" class="form-select">
+                    <option value="">All Methods</option>
+                    <option value="cash" {{ 'selected' if request.args.get('payment_method') == 'cash' }}>Cash</option>
+                    <option value="bank_transfer" {{ 'selected' if request.args.get('payment_method') == 'bank_transfer' }}>Bank Transfer</option>
+                    <option value="cheque" {{ 'selected' if request.args.get('payment_method') == 'cheque' }}>Cheque</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold">Status</label>
+                <select name="status" class="form-select">
+                    <option value="">All Status</option>
+                    <option value="completed" {{ 'selected' if request.args.get('status') == 'completed' }}>Completed</option>
+                    <option value="cancelled" {{ 'selected' if request.args.get('status') == 'cancelled' }}>Cancelled</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold">From Date</label>
+                <input type="date" name="date_from" class="form-control" value="{{ request.args.get('date_from', '') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold">To Date</label>
+                <input type="date" name="date_to" class="form-control" value="{{ request.args.get('date_to', '') }}">
+            </div>
+            <div class="col-md-1">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Payments Table -->
+    <div class="card payment-card">
+        <div class="card-body">
+            {% if payments.items %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Payment #</th>
+                            <th>Date</th>
+                            <th>Supplier</th>
+                            <th>Method</th>
+                            <th>Reference</th>
+                            <th class="text-end">Amount</th>
+                            <th>Status</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in payments.items %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('vendor_payments.view', id=payment.id) }}" class="fw-semibold text-decoration-none">
+                                    {{ payment.payment_number }}
+                                </a>
+                            </td>
+                            <td>{{ payment.payment_date.strftime('%b %d, %Y') if payment.payment_date else '-' }}</td>
+                            <td>
+                                <a href="{{ url_for('vendor_payments.supplier_ledger', supplier_id=payment.supplier_id) }}" class="text-decoration-none">
+                                    {{ payment.supplier.name if payment.supplier else '-' }}
+                                </a>
+                            </td>
+                            <td>
+                                <span class="payment-method-badge {{ payment.payment_method }}">
+                                    {{ payment.payment_method.replace('_', ' ') }}
+                                </span>
+                            </td>
+                            <td>{{ payment.reference_number or '-' }}</td>
+                            <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(payment.amount) }}</td>
+                            <td>
+                                <span class="status-badge {{ payment.status }}">{{ payment.status }}</span>
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ url_for('vendor_payments.view', id=payment.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if payments.pages > 1 %}
+            <nav class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if payments.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('vendor_payments.index', page=payments.prev_num, **request.args) }}">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {% for page_num in payments.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if page_num %}
+                            <li class="page-item {{ 'active' if page_num == payments.page }}">
+                                <a class="page-link" href="{{ url_for('vendor_payments.index', page=page_num, **request.args) }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if payments.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('vendor_payments.index', page=payments.next_num, **request.args) }}">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-receipt fa-4x text-muted mb-3"></i>
+                <h5 class="text-muted">No payments found</h5>
+                <p class="text-muted">No payments match your filter criteria</p>
+                <a href="{{ url_for('vendor_payments.create') }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i> Record First Payment
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

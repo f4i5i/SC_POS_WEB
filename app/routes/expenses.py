@@ -49,7 +49,7 @@ def index():
     query = Expense.query
 
     # Filter by location for store managers (not admin/accountant)
-    if not current_user.is_global_admin and current_user.role in ['manager', 'kiosk_manager']:
+    if not current_user.is_global_admin and current_user.role in ['manager']:
         if current_user.location_id:
             query = query.filter(Expense.location_id == current_user.location_id)
         else:
@@ -110,7 +110,7 @@ def add_expense():
                 notes=request.form.get('notes'),
                 created_by=current_user.id,
                 location_id=current_user.location_id,  # Link to user's location
-                status='pending' if current_user.role in ['cashier', 'manager', 'kiosk_manager'] else 'approved'
+                status='pending' if current_user.role in ['cashier', 'manager'] else 'approved'
             )
 
             # Auto-approve for admins only (store managers create pending expenses)
@@ -138,7 +138,7 @@ def add_expense():
 def edit_expense(expense_id):
     """Edit expense - Admin/Accountant only"""
     # Store managers can only add, not edit expenses
-    if current_user.role in ['manager', 'kiosk_manager'] and not current_user.is_global_admin:
+    if current_user.role in ['manager'] and not current_user.is_global_admin:
         flash('You do not have permission to edit expenses.', 'danger')
         return redirect(url_for('expenses.index'))
 

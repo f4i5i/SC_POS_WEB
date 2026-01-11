@@ -705,11 +705,13 @@
 
                 <!-- Quick Categories -->
                 <div class="mb-3">
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button class="btn btn-outline-secondary active" onclick="filterCategory('all')">All</button>
-                        <button class="btn btn-outline-secondary" onclick="filterCategory('perfumes')">Perfumes</button>
-                        <button class="btn btn-outline-secondary" onclick="filterCategory('attars')">Attars</button>
-                        <button class="btn btn-outline-secondary" onclick="filterCategory('oils')">Oils</button>
+                    <div class="btn-group btn-group-sm flex-wrap" role="group">
+                        <button class="btn btn-outline-secondary active" onclick="filterCategory('all', this)">All</button>
+                        <button class="btn btn-outline-secondary" onclick="filterCategory('attars', this)">Attars</button>
+                        <button class="btn btn-outline-secondary" onclick="filterCategory('perfumes', this)">Perfumes</button>
+                        <button class="btn btn-outline-secondary" onclick="filterCategory('oils', this)">Oils</button>
+                        <button class="btn btn-outline-secondary" onclick="filterCategory('burners', this)">Burners</button>
+                        <button class="btn btn-outline-secondary" onclick="filterCategory('bakhoor', this)">Bakhoor</button>
                     </div>
                 </div>
 
@@ -733,9 +735,13 @@
                         <i class="fas fa-shopping-cart"></i> Cart
                         <span class="badge bg-primary ms-1" id="cartCount">0</span>
                     </h6>
-                    <div>
+                    <div class="d-flex gap-1">
                         <button class="btn btn-sm btn-warning py-0 px-1" onclick="holdSale()" title="Hold Sale (F5)">
                             <i class="fas fa-pause"></i>
+                        </button>
+                        <button class="btn btn-sm btn-success py-0 px-1 position-relative" onclick="showHeldSales()" title="View Held Sales (F6)">
+                            <i class="fas fa-list"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="heldSalesCount" style="font-size: 0.6rem; display: none;">0</span>
                         </button>
                         <button class="btn btn-sm btn-info py-0 px-1" onclick="$('#keyboardShortcutsModal').modal('show')" title="Keyboard Shortcuts (F1)">
                             <i class="fas fa-keyboard"></i>
@@ -773,10 +779,10 @@
                             <label class="btn btn-outline-primary py-0 px-1" for="discountAmount" style="font-size: 0.7rem;">Rs</label>
                         </div>
                     </div>
-                    <div class="d-flex align-items-center gap-1">
-                        <input type="number" class="form-control form-control-sm text-end py-0"
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="number" class="form-control form-control-sm text-end"
                                id="discountValue" value="0" min="0" step="0.01"
-                               style="width: 50px; height: 24px; font-size: 0.8rem;"
+                               style="width: 80px; font-size: 0.9rem;"
                                onchange="updateTotals()" oninput="updateTotals()">
                         <span class="text-danger small" id="discountAmountDisplay">-Rs. 0</span>
                     </div>
@@ -952,6 +958,32 @@
     </div>
 </div>
 
+<!-- Held Sales Modal -->
+<div class="modal fade" id="heldSalesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-pause-circle me-2"></i>Held Sales</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="heldSalesList">
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                        <p>No held sales</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-danger" onclick="clearAllHeldSales()">
+                    <i class="fas fa-trash"></i> Clear All
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Payment Modal -->
 <div class="modal fade" id="paymentModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -1021,7 +1053,7 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Amount Paid</label>
-                            <input type="number" class="form-control form-control-lg text-end" id="amountPaid" onchange="calculateChange()">
+                            <input type="number" class="form-control form-control-lg text-end" id="amountPaid" oninput="calculateChange()" onchange="calculateChange()">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Change</label>
@@ -1229,17 +1261,99 @@ $(document).ready(function() {
     loadCartFromStorage();
 });
 
-// Product Search
-$('#productSearch').on('input', function() {
-    const query = $(this).val();
-    if (query.length < 2) {
-        $('#searchResults').addClass('d-none');
+// Category Filter
+function filterCategory(category, btn) {
+    // Update active button
+    $('.btn-group .btn').removeClass('active');
+    if (btn) {
+        $(btn).addClass('active');
+    }
+
+    // Clear search box
+    $('#productSearch').val('');
+    $('#searchResults').addClass('d-none');
+
+    // Fetch products by category
+    let url = '/pos/search-products?q=';
+    if (category === 'all') {
+        url += '*';  // Get all products
+    } else {
+        url += 'category:' + category;  // Filter by category
+    }
+
+    $.get(url, function(data) {
+        displayCategoryProducts(data.products);
+    }).fail(function(xhr, status, error) {
+        console.error('Search error:', error);
+    });
+}
+
+function displayCategoryProducts(products) {
+    const container = $('#popularProducts');
+
+    if (products.length === 0) {
+        container.html(`
+            <div class="col-12 text-center text-muted">
+                <i class="fas fa-box-open fa-3x mb-3"></i>
+                <p>No products found in this category</p>
+            </div>
+        `);
         return;
     }
 
-    $.get('/pos/search-products?q=' + query, function(data) {
-        displaySearchResults(data.products);
+    let html = '';
+    products.forEach(product => {
+        const isOutOfStock = product.quantity <= 0;
+        html += `
+            <div class="col-6 col-md-4 col-lg-3">
+                <div class="card product-card ${isOutOfStock ? 'opacity-50' : ''}"
+                     onclick="${isOutOfStock ? '' : 'addToCart(' + JSON.stringify(product).replace(/"/g, '&quot;') + ')'}"
+                     style="cursor: ${isOutOfStock ? 'not-allowed' : 'pointer'}">
+                    <div class="card-body p-2 text-center">
+                        <div class="fw-bold small text-truncate">${product.name}</div>
+                        <div class="text-muted small">${product.code}</div>
+                        <div class="text-primary fw-bold">Rs. ${product.selling_price.toFixed(2)}</div>
+                        <div class="small ${product.quantity <= 0 ? 'text-danger' : 'text-success'}">
+                            Stock: ${product.quantity}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     });
+
+    container.html(html);
+}
+
+// Product Search - wrapped in document.ready
+$(document).ready(function() {
+    console.log('Setting up product search...');
+
+    var searchInput = $('#productSearch');
+    console.log('Search input found:', searchInput.length > 0);
+
+    searchInput.on('input', function() {
+        const query = $(this).val();
+        console.log('Search query:', query);
+
+        if (query.length < 2) {
+            $('#searchResults').addClass('d-none');
+            return;
+        }
+
+        console.log('Making search request...');
+        $.get('/pos/search-products?q=' + encodeURIComponent(query))
+            .done(function(data) {
+                console.log('Search results:', data.products.length, 'products');
+                displaySearchResults(data.products);
+            })
+            .fail(function(xhr, status, error) {
+                console.error('Search error:', status, error);
+                $('#searchResults').addClass('d-none');
+            });
+    });
+
+    console.log('POS JavaScript loaded successfully');
 });
 
 function displaySearchResults(products) {
@@ -1673,11 +1787,19 @@ function updateSplitRemaining() {
 }
 
 function calculateChange() {
-    const total = parseFloat($('#total').text().replace('Rs. ', ''));
+    // Remove "Rs. " and any commas from the total, then parse
+    const totalText = $('#total').text().replace('Rs.', '').replace(/,/g, '').trim();
+    const total = parseFloat(totalText) || 0;
     const paid = parseFloat($('#amountPaid').val()) || 0;
     const change = paid - total;
 
-    $('#change').val('Rs. ' + Math.max(0, change).toFixed(2));
+    console.log('Calculate change: total=' + total + ', paid=' + paid + ', change=' + change);
+
+    if (change >= 0) {
+        $('#change').val('Rs. ' + change.toFixed(2)).removeClass('text-danger').addClass('text-success');
+    } else {
+        $('#change').val('Rs. ' + change.toFixed(2)).removeClass('text-success').addClass('text-danger');
+    }
 }
 
 function completeSale() {
@@ -1782,14 +1904,26 @@ function completeSale() {
 }
 
 function holdSale() {
-    if (cart.length === 0) return;
+    if (cart.length === 0) {
+        showToast('Cart is empty', 'warning');
+        return;
+    }
+
+    // Calculate cart total for display
+    const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
     // Store held sale in localStorage
     const heldSales = JSON.parse(localStorage.getItem('heldSales') || '[]');
     heldSales.push({
+        id: Date.now(),
         cart: [...cart],
         customer: currentCustomer,
-        timestamp: new Date().toISOString()
+        customerName: currentCustomer ? currentCustomer.name : 'Walk-in',
+        customerPhone: currentCustomer ? currentCustomer.phone : '',
+        timestamp: new Date().toISOString(),
+        total: cartTotal,
+        itemCount: itemCount
     });
     localStorage.setItem('heldSales', JSON.stringify(heldSales));
 
@@ -1798,9 +1932,134 @@ function holdSale() {
     renderCart();
     currentCustomer = null;
     clearCustomer();
+    clearCartStorage();
 
+    updateHeldSalesCount();
     showToast(`Sale held! (${heldSales.length} held)`, 'success');
 }
+
+function showHeldSales() {
+    const heldSales = JSON.parse(localStorage.getItem('heldSales') || '[]');
+    const container = $('#heldSalesList');
+
+    if (heldSales.length === 0) {
+        container.html(`
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-inbox fa-3x mb-3"></i>
+                <p>No held sales</p>
+            </div>
+        `);
+    } else {
+        let html = '<div class="list-group">';
+        heldSales.forEach((sale, index) => {
+            const time = new Date(sale.timestamp).toLocaleTimeString();
+            const date = new Date(sale.timestamp).toLocaleDateString();
+            html += `
+                <div class="list-group-item list-group-item-action">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">
+                                <i class="fas fa-user me-1"></i> ${sale.customerName || 'Walk-in'}
+                                ${sale.customerPhone ? '<small class="text-muted">(' + sale.customerPhone + ')</small>' : ''}
+                            </h6>
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>${date} ${time}
+                            </small>
+                            <div class="mt-1">
+                                <span class="badge bg-primary">${sale.itemCount || sale.cart.length} items</span>
+                                <span class="badge bg-success">Rs. ${(sale.total || 0).toFixed(2)}</span>
+                            </div>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-primary" onclick="recallHeldSaleById(${sale.id})" title="Recall this sale">
+                                <i class="fas fa-undo"></i> Recall
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteHeldSale(${sale.id})" title="Delete this sale">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-2 small">
+                        ${sale.cart.slice(0, 3).map(item => `<span class="badge bg-light text-dark me-1">${item.name} x${item.quantity}</span>`).join('')}
+                        ${sale.cart.length > 3 ? `<span class="badge bg-secondary">+${sale.cart.length - 3} more</span>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.html(html);
+    }
+
+    $('#heldSalesModal').modal('show');
+}
+
+function recallHeldSaleById(saleId) {
+    const heldSales = JSON.parse(localStorage.getItem('heldSales') || '[]');
+    const saleIndex = heldSales.findIndex(s => s.id === saleId);
+
+    if (saleIndex === -1) {
+        showToast('Sale not found', 'error');
+        return;
+    }
+
+    // If current cart has items, confirm before replacing
+    if (cart.length > 0) {
+        if (!confirm('Current cart has items. Replace with held sale?')) {
+            return;
+        }
+    }
+
+    const heldSale = heldSales.splice(saleIndex, 1)[0];
+    localStorage.setItem('heldSales', JSON.stringify(heldSales));
+
+    // Restore cart and customer
+    cart = heldSale.cart || [];
+    if (heldSale.customer) {
+        currentCustomer = heldSale.customer;
+        displayCustomer(heldSale.customer);
+    }
+
+    renderCart();
+    updateHeldSalesCount();
+    $('#heldSalesModal').modal('hide');
+    showToast('Sale recalled successfully', 'success');
+}
+
+function deleteHeldSale(saleId) {
+    if (!confirm('Delete this held sale?')) return;
+
+    const heldSales = JSON.parse(localStorage.getItem('heldSales') || '[]');
+    const filtered = heldSales.filter(s => s.id !== saleId);
+    localStorage.setItem('heldSales', JSON.stringify(filtered));
+
+    updateHeldSalesCount();
+    showHeldSales(); // Refresh the list
+    showToast('Held sale deleted', 'success');
+}
+
+function clearAllHeldSales() {
+    if (!confirm('Clear all held sales? This cannot be undone.')) return;
+
+    localStorage.setItem('heldSales', '[]');
+    updateHeldSalesCount();
+    showHeldSales(); // Refresh the list
+    showToast('All held sales cleared', 'success');
+}
+
+function updateHeldSalesCount() {
+    const heldSales = JSON.parse(localStorage.getItem('heldSales') || '[]');
+    const badge = $('#heldSalesCount');
+    if (heldSales.length > 0) {
+        badge.text(heldSales.length).show();
+    } else {
+        badge.hide();
+    }
+}
+
+// Initialize held sales count on page load
+$(document).ready(function() {
+    updateHeldSalesCount();
+});
 
 // Keyboard shortcuts
 $(document).on('keydown', function(e) {

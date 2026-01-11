@@ -57,21 +57,25 @@
     <div class="print-summary">
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
             <tr>
-                <td style="border: 1px solid #000; padding: 10px; width: 25%; text-align: center;">
+                <td style="border: 1px solid #000; padding: 10px; width: 20%; text-align: center;">
                     <div style="font-size: 9pt; color: #666;">TOTAL SALES</div>
                     <div style="font-size: 14pt; font-weight: bold;">Rs. {{ "{:,.2f}".format(total_sales) }}</div>
                 </td>
-                <td style="border: 1px solid #000; padding: 10px; width: 25%; text-align: center;">
+                <td style="border: 1px solid #000; padding: 10px; width: 20%; text-align: center;">
+                    <div style="font-size: 9pt; color: #666;">REFUNDS ({{ refund_count }})</div>
+                    <div style="font-size: 14pt; font-weight: bold; color: #dc3545;">Rs. {{ "{:,.2f}".format(total_refunds) }}</div>
+                </td>
+                <td style="border: 1px solid #000; padding: 10px; width: 20%; text-align: center; background: #d4edda;">
+                    <div style="font-size: 9pt; color: #155724;">NET SALES</div>
+                    <div style="font-size: 14pt; font-weight: bold; color: #155724;">Rs. {{ "{:,.2f}".format(net_sales) }}</div>
+                </td>
+                <td style="border: 1px solid #000; padding: 10px; width: 20%; text-align: center;">
                     <div style="font-size: 9pt; color: #666;">TRANSACTIONS</div>
                     <div style="font-size: 14pt; font-weight: bold;">{{ total_transactions }}</div>
                 </td>
-                <td style="border: 1px solid #000; padding: 10px; width: 25%; text-align: center;">
+                <td style="border: 1px solid #000; padding: 10px; width: 20%; text-align: center;">
                     <div style="font-size: 9pt; color: #666;">AVG. TRANSACTION</div>
                     <div style="font-size: 14pt; font-weight: bold;">Rs. {{ "{:,.2f}".format(avg_transaction) }}</div>
-                </td>
-                <td style="border: 1px solid #000; padding: 10px; width: 25%; text-align: center;">
-                    <div style="font-size: 9pt; color: #666;">LOW STOCK ITEMS</div>
-                    <div style="font-size: 14pt; font-weight: bold; color: #dc3545;">{{ low_stock|length }}</div>
                 </td>
             </tr>
         </table>
@@ -79,7 +83,7 @@
 
     <!-- Summary Cards (Screen only) -->
     <div class="row g-3 mb-4 no-print">
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
                     <h6 class="text-muted mb-1">Total Sales</h6>
@@ -87,7 +91,23 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
+            <div class="card border-0 shadow-sm border-danger">
+                <div class="card-body">
+                    <h6 class="text-muted mb-1">Refunds ({{ refund_count }})</h6>
+                    <h3 class="mb-0 text-danger">Rs. {{ "{:,.2f}".format(total_refunds) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-0 shadow-sm bg-success text-white">
+                <div class="card-body">
+                    <h6 class="mb-1 text-white-50">Net Sales</h6>
+                    <h3 class="mb-0">Rs. {{ "{:,.2f}".format(net_sales) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
                     <h6 class="text-muted mb-1">Transactions</h6>
@@ -95,7 +115,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
                     <h6 class="text-muted mb-1">Avg. Transaction</h6>
@@ -103,7 +123,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
                     <h6 class="text-muted mb-1">Low Stock Items</h6>
@@ -245,25 +265,45 @@
                                     <th>Time</th>
                                     <th>Customer</th>
                                     <th>Payment</th>
+                                    <th>Status</th>
                                     <th class="text-end">Amount</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for sale in sales %}
-                                <tr>
+                                <tr class="{{ 'table-danger' if sale.status == 'refunded' else '' }}">
                                     <td><code>{{ sale.sale_number }}</code></td>
                                     <td>{{ sale.sale_date.strftime('%I:%M %p') }}</td>
                                     <td>{{ sale.customer.name if sale.customer else 'Walk-in' }}</td>
                                     <td class="text-capitalize">{{ sale.payment_method.replace('_', ' ') }}</td>
-                                    <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(sale.total) }}</td>
+                                    <td>
+                                        {% if sale.status == 'refunded' %}
+                                        <span class="badge bg-danger">Refunded</span>
+                                        {% else %}
+                                        <span class="badge bg-success">Completed</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end fw-bold {{ 'text-danger' if sale.status == 'refunded' else '' }}">
+                                        {% if sale.status == 'refunded' %}-{% endif %}Rs. {{ "{:,.2f}".format(sale.total or 0) }}
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                             <tfoot>
-                                <tr class="table-light fw-bold">
-                                    <td colspan="4">Total</td>
-                                    <td class="text-end">Rs. {{ "{:,.2f}".format(total_sales) }}</td>
+                                <tr class="table-light">
+                                    <td colspan="5">Total Sales</td>
+                                    <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(total_sales) }}</td>
                                 </tr>
+                                {% if refund_count > 0 %}
+                                <tr class="table-danger">
+                                    <td colspan="5">Total Refunds ({{ refund_count }})</td>
+                                    <td class="text-end fw-bold text-danger">-Rs. {{ "{:,.2f}".format(total_refunds) }}</td>
+                                </tr>
+                                <tr class="table-success fw-bold">
+                                    <td colspan="5">Net Sales</td>
+                                    <td class="text-end text-success">Rs. {{ "{:,.2f}".format(net_sales) }}</td>
+                                </tr>
+                                {% endif %}
                             </tfoot>
                         </table>
                     </div>

@@ -66,6 +66,14 @@ def create():
                 flash(f'Location with code {code} already exists.', 'danger')
                 return redirect(url_for('locations.create'))
 
+            # Get kiosk charge settings
+            kiosk_charge_type = request.form.get('kiosk_charge_type', 'percentage')
+            kiosk_charge_rate = request.form.get('kiosk_charge_rate', '0')
+            try:
+                kiosk_charge_rate = float(kiosk_charge_rate) if kiosk_charge_rate else 0
+            except ValueError:
+                kiosk_charge_rate = 0
+
             # Create location
             location = Location(
                 code=code,
@@ -78,6 +86,8 @@ def create():
                 parent_warehouse_id=int(parent_warehouse_id) if parent_warehouse_id else None,
                 manager_id=int(manager_id) if manager_id else None,
                 can_sell=can_sell if location_type == 'kiosk' else False,
+                kiosk_charge_type=kiosk_charge_type if location_type == 'kiosk' else 'percentage',
+                kiosk_charge_rate=kiosk_charge_rate if location_type == 'kiosk' else 0,
                 is_active=True
             )
 
@@ -156,6 +166,16 @@ def edit(id):
 
             if location.is_kiosk:
                 location.can_sell = request.form.get('can_sell') == 'on'
+
+                # Handle kiosk charge fields
+                kiosk_charge_type = request.form.get('kiosk_charge_type', 'percentage')
+                kiosk_charge_rate = request.form.get('kiosk_charge_rate', '0')
+
+                location.kiosk_charge_type = kiosk_charge_type
+                try:
+                    location.kiosk_charge_rate = float(kiosk_charge_rate) if kiosk_charge_rate else 0
+                except ValueError:
+                    location.kiosk_charge_rate = 0
 
             db.session.commit()
             flash('Location updated successfully.', 'success')

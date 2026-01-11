@@ -43,7 +43,7 @@ def index():
     query = Return.query
 
     # Filter by location for store managers
-    if not current_user.is_global_admin and current_user.role in ['manager', 'kiosk_manager', 'cashier']:
+    if not current_user.is_global_admin and current_user.role in ['manager', 'cashier']:
         if current_user.location_id:
             query = query.filter(Return.location_id == current_user.location_id)
         else:
@@ -61,7 +61,7 @@ def index():
     # Stats - also filter by location for store managers
     today = date.today()
     stats_query = Return.query
-    if not current_user.is_global_admin and current_user.role in ['manager', 'kiosk_manager', 'cashier']:
+    if not current_user.is_global_admin and current_user.role in ['manager', 'cashier']:
         if current_user.location_id:
             stats_query = stats_query.filter(Return.location_id == current_user.location_id)
 
@@ -77,7 +77,7 @@ def index():
     total_refunded = db.session.query(
         db.func.coalesce(db.func.sum(Return.refund_amount), 0)
     ).filter(Return.status == 'completed')
-    if not current_user.is_global_admin and current_user.role in ['manager', 'kiosk_manager', 'cashier']:
+    if not current_user.is_global_admin and current_user.role in ['manager', 'cashier']:
         if current_user.location_id:
             total_refunded = total_refunded.filter(Return.location_id == current_user.location_id)
     total_refunded = total_refunded.scalar() or 0
@@ -323,7 +323,7 @@ def find_sale():
     )
 
     # Filter by location for store managers
-    if not current_user.is_global_admin and current_user.role in ['manager', 'kiosk_manager', 'cashier']:
+    if not current_user.is_global_admin and current_user.role in ['manager', 'cashier']:
         if current_user.location_id:
             sales_query = sales_query.filter(Sale.location_id == current_user.location_id)
 

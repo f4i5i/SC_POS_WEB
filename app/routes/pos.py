@@ -50,9 +50,11 @@ def index():
 @permission_required(Permissions.POS_VIEW)
 def search_products():
     """Search products for POS with location-aware stock"""
+    from app.models import Category
+
     query = request.args.get('q', '').strip()
 
-    if len(query) < 2:
+    if len(query) < 1:
         return jsonify({'products': []})
 
     # Get current location for stock lookup
@@ -63,6 +65,39 @@ def search_products():
     if location and location.location_type == 'kiosk' and location.parent_warehouse_id:
         can_reorder = True
 
+    # Handle special queries
+    is_all = query == '*'
+    is_category_filter = query.startswith('category:')
+    category_name = query.replace('category:', '') if is_category_filter else None
+
+    # Build filter conditions
+    if is_all:
+        # Get all active products
+        filter_condition = Product.is_active == True
+    elif is_category_filter:
+        # Filter by category name (case-insensitive)
+        category = Category.query.filter(Category.name.ilike(category_name)).first()
+        if category:
+            filter_condition = db.and_(
+                Product.is_active == True,
+                Product.category_id == category.id
+            )
+        else:
+            return jsonify({'products': []})
+    else:
+        # Normal search by code, barcode, name, or brand
+        if len(query) < 2:
+            return jsonify({'products': []})
+        filter_condition = db.and_(
+            Product.is_active == True,
+            db.or_(
+                Product.code.ilike(f'%{query}%'),
+                Product.barcode.ilike(f'%{query}%'),
+                Product.name.ilike(f'%{query}%'),
+                Product.brand.ilike(f'%{query}%')
+            )
+        )
+
     # Search by code, barcode, name, or brand
     if location:
         # Location-aware query with stock from LocationStock
@@ -72,15 +107,7 @@ def search_products():
                 LocationStock.product_id == Product.id,
                 LocationStock.location_id == location.id
             )
-        ).filter(
-            Product.is_active == True,
-            db.or_(
-                Product.code.ilike(f'%{query}%'),
-                Product.barcode.ilike(f'%{query}%'),
-                Product.name.ilike(f'%{query}%'),
-                Product.brand.ilike(f'%{query}%')
-            )
-        ).limit(20).all()
+        ).filter(filter_condition).limit(50).all()
 
         results = []
         for product, stock in products:
@@ -104,17 +131,7 @@ def search_products():
             })
     else:
         # Fallback: use product.quantity for backward compatibility
-        products = Product.query.filter(
-            db.and_(
-                Product.is_active == True,
-                db.or_(
-                    Product.code.ilike(f'%{query}%'),
-                    Product.barcode.ilike(f'%{query}%'),
-                    Product.name.ilike(f'%{query}%'),
-                    Product.brand.ilike(f'%{query}%')
-                )
-            )
-        ).limit(20).all()
+        products = Product.query.filter(filter_condition).limit(50).all()
 
         results = []
         for product in products:

@@ -56,7 +56,7 @@
 </div>
 
 <div class="row">
-    <!-- Daily Report -->
+    <!-- Daily Report - Visible to all with report.view_sales -->
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="report-card report-card-1">
             <div class="report-icon" style="background: #EFF6FF; color: #3B82F6;">
@@ -70,7 +70,8 @@
         </div>
     </div>
 
-    <!-- Weekly Report -->
+    {% if current_user.role not in ['store_manager'] %}
+    <!-- Weekly Report - Visible to manager and above -->
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="report-card report-card-2">
             <div class="report-icon" style="background: #D1FAE5; color: #10B981;">
@@ -97,8 +98,10 @@
             </a>
         </div>
     </div>
+    {% endif %}
 
-    <!-- Custom Report -->
+    {% if current_user.role not in ['store_manager', 'manager'] %}
+    <!-- Custom Report - Hidden from store_manager and manager -->
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="report-card report-card-4">
             <div class="report-icon" style="background: #FEE2E2; color: #EF4444;">
@@ -209,8 +212,10 @@
             </button>
         </div>
     </div>
+    {% endif %}
 </div>
 
+{% if current_user.role != 'store_manager' %}
 <!-- Quick Stats -->
 <div class="card mt-4">
     <div class="card-header">
@@ -240,6 +245,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <!-- Export Modal -->
 <div class="modal fade" id="exportModal" tabindex="-1">

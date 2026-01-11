@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Reminders - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        color: white;
+    }
+
+    .reminder-card {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        transition: all 0.3s;
+    }
+
+    .reminder-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+    }
+
+    .stat-card {
+        border-radius: 12px;
+        padding: 1.5rem;
+        color: white;
+    }
+
+    .stat-card.overdue {
+        background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+    }
+
+    .stat-card.upcoming {
+        background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+    }
+
+    .overdue-badge {
+        background: #FEE2E2;
+        color: #DC2626;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .upcoming-badge {
+        background: #FEF3C7;
+        color: #D97706;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .supplier-item {
+        border: 1px solid #E5E7EB;
+        border-radius: 10px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        transition: all 0.2s;
+    }
+
+    .supplier-item:hover {
+        border-color: #6366F1;
+        background: #F5F3FF;
+    }
+
+    .supplier-item.overdue {
+        border-left: 4px solid #DC2626;
+    }
+
+    .supplier-item.upcoming {
+        border-left: 4px solid #F59E0B;
+    }
+
+    .days-badge {
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+
+    .days-badge.overdue {
+        background: #FEE2E2;
+        color: #DC2626;
+    }
+
+    .days-badge.upcoming {
+        background: #FEF3C7;
+        color: #D97706;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #6B7280;
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="mb-1"><i class="fas fa-bell me-2"></i>Payment Reminders</h1>
+                <p class="mb-0 opacity-75">Track overdue and upcoming vendor payments</p>
+            </div>
+            <a href="{{ url_for('vendor_payments.index') }}" class="btn btn-light">
+                <i class="fas fa-arrow-left me-1"></i> Back to Payments
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="stat-card overdue">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="opacity-75 small">Overdue Payments</div>
+                        <div class="stat-value">{{ overdue_suppliers|length }}</div>
+                        <div class="small">Rs. {{ "{:,.0f}".format(total_overdue) }}</div>
+                    </div>
+                    <i class="fas fa-exclamation-circle fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card upcoming">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="opacity-75 small">Due Within 7 Days</div>
+                        <div class="stat-value">{{ upcoming_suppliers|length }}</div>
+                        <div class="small">Rs. {{ "{:,.0f}".format(total_upcoming) }}</div>
+                    </div>
+                    <i class="fas fa-clock fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%);">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="opacity-75 small">Total Outstanding</div>
+                        <div class="stat-value">Rs. {{ "{:,.0f}".format(total_overdue + total_upcoming) }}</div>
+                        <div class="small">From {{ overdue_suppliers|length + upcoming_suppliers|length }} suppliers</div>
+                    </div>
+                    <i class="fas fa-money-bill-wave fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Overdue Section -->
+        <div class="col-lg-6">
+            <div class="card reminder-card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Overdue Payments
+                        <span class="badge bg-white text-danger ms-2">{{ overdue_suppliers|length }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if overdue_suppliers %}
+                    {% for item in overdue_suppliers %}
+                    <div class="supplier-item overdue">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="mb-1">{{ item.supplier.name }}</h6>
+                                <small class="text-muted">Due: {{ item.due_date.strftime('%b %d, %Y') }}</small>
+                            </div>
+                            <span class="days-badge overdue">
+                                {{ item.days_overdue }} days overdue
+                            </span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-bold text-danger fs-5">Rs. {{ "{:,.0f}".format(item.amount_due) }}</span>
+                                <br>
+                                <small class="text-muted">Oldest PO: {{ item.oldest_po.po_number }}</small>
+                            </div>
+                            <a href="{{ url_for('vendor_payments.create') }}?supplier_id={{ item.supplier.id }}" class="btn btn-danger btn-sm">
+                                <i class="fas fa-plus me-1"></i> Pay Now
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <h5>No Overdue Payments</h5>
+                        <p>All payments are up to date</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Upcoming Section -->
+        <div class="col-lg-6">
+            <div class="card reminder-card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock me-2"></i>
+                        Upcoming Payments (7 Days)
+                        <span class="badge bg-dark text-warning ms-2">{{ upcoming_suppliers|length }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if upcoming_suppliers %}
+                    {% for item in upcoming_suppliers %}
+                    <div class="supplier-item upcoming">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="mb-1">{{ item.supplier.name }}</h6>
+                                <small class="text-muted">Due: {{ item.due_date.strftime('%b %d, %Y') }}</small>
+                            </div>
+                            <span class="days-badge upcoming">
+                                {% if item.days_overdue == 0 %}
+                                Due Today!
+                                {% else %}
+                                {{ -item.days_overdue }} days left
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-bold text-warning fs-5">Rs. {{ "{:,.0f}".format(item.amount_due) }}</span>
+                                <br>
+                                <small class="text-muted">PO: {{ item.oldest_po.po_number }}</small>
+                            </div>
+                            <a href="{{ url_for('vendor_payments.create') }}?supplier_id={{ item.supplier.id }}" class="btn btn-warning btn-sm">
+                                <i class="fas fa-plus me-1"></i> Pay Now
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-calendar-check text-success"></i>
+                        <h5>No Upcoming Payments</h5>
+                        <p>No payments due in the next 7 days</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -21,7 +21,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     full_name = db.Column(db.String(128), nullable=False)
     role = db.Column(db.String(32), nullable=False, default='cashier')
-    # Roles: admin, manager, cashier, stock_manager, accountant, warehouse_manager, kiosk_manager
+    # Roles: admin, manager, store_manager, cashier, inventory_manager, accountant, warehouse_manager, regional_manager
     is_active = db.Column(db.Boolean, default=True)
     last_login = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -207,12 +207,27 @@ class Supplier(db.Model):
     payment_terms = db.Column(db.String(128))  # e.g., "Net 30", "Cash on delivery"
     notes = db.Column(db.Text)
     is_active = db.Column(db.Boolean, default=True)
+
+    # Payment tracking
+    credit_limit = db.Column(db.Numeric(12, 2), default=0.00)
+    current_balance = db.Column(db.Numeric(12, 2), default=0.00)  # Outstanding amount
+    payment_due_days = db.Column(db.Integer, default=30)  # Days for payment
+    reminder_enabled = db.Column(db.Boolean, default=True)
+    last_payment_date = db.Column(db.Date)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     products = db.relationship('Product', backref='supplier', lazy='dynamic')
     purchase_orders = db.relationship('PurchaseOrder', backref='supplier', lazy='dynamic')
+
+    @property
+    def is_over_credit_limit(self):
+        """Check if supplier is over credit limit"""
+        if not self.credit_limit or self.credit_limit <= 0:
+            return False
+        return (self.current_balance or 0) > self.credit_limit
 
     def __repr__(self):
         return f'<Supplier {self.name}>'
@@ -236,7 +251,13 @@ class Product(db.Model):
     unit = db.Column(db.String(32), default='piece')  # piece, ml, box, etc.
     image_url = db.Column(db.String(512))
 
-    # Pricing
+    # Pricing - Cost Breakdown
+    base_cost = db.Column(db.Numeric(10, 2), default=0.00)  # Supplier price
+    packaging_cost = db.Column(db.Numeric(10, 2), default=0.00)  # Box, wrapper, etc.
+    delivery_cost = db.Column(db.Numeric(10, 2), default=0.00)  # Freight per unit
+    bottle_cost = db.Column(db.Numeric(10, 2), default=0.00)  # Optional bottle cost
+
+    # Computed/cached landed cost (for backward compatibility)
     cost_price = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     selling_price = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     tax_rate = db.Column(db.Numeric(5, 2), default=0.00)
@@ -263,6 +284,21 @@ class Product(db.Model):
     # Relationships
     sale_items = db.relationship('SaleItem', backref='product', lazy='dynamic')
     stock_movements = db.relationship('StockMovement', backref='product', lazy='dynamic')
+
+    @property
+    def landed_cost(self):
+        """Calculate total landed cost from all cost components"""
+        from decimal import Decimal
+        return (
+            (self.base_cost or Decimal('0')) +
+            (self.packaging_cost or Decimal('0')) +
+            (self.delivery_cost or Decimal('0')) +
+            (self.bottle_cost or Decimal('0'))
+        )
+
+    def update_cost_price(self):
+        """Update cached cost_price from landed_cost components"""
+        self.cost_price = self.landed_cost
 
     @property
     def profit_margin(self):
@@ -706,9 +742,24 @@ class PurchaseOrder(db.Model):
     expected_date = db.Column(db.DateTime)
     received_date = db.Column(db.DateTime)
 
+    # Basic totals
     subtotal = db.Column(db.Numeric(10, 2), default=0.00)
     tax = db.Column(db.Numeric(10, 2), default=0.00)
     total = db.Column(db.Numeric(10, 2), default=0.00)
+
+    # Cost breakdown totals
+    total_packaging_cost = db.Column(db.Numeric(10, 2), default=0.00)
+    total_delivery_cost = db.Column(db.Numeric(10, 2), default=0.00)
+    total_bottle_cost = db.Column(db.Numeric(10, 2), default=0.00)
+    grand_total_landed = db.Column(db.Numeric(12, 2), default=0.00)
+
+    # Warehouse receiving
+    receiving_location_id = db.Column(db.Integer, db.ForeignKey('locations.id'))
+
+    # Payment tracking
+    amount_paid = db.Column(db.Numeric(12, 2), default=0.00)
+    amount_due = db.Column(db.Numeric(12, 2), default=0.00)
+    payment_status = db.Column(db.String(32), default='unpaid')  # unpaid, partial, paid
 
     status = db.Column(db.String(32), default='pending')
     # pending, ordered, partial, received, cancelled
@@ -720,6 +771,30 @@ class PurchaseOrder(db.Model):
     # Relationships
     items = db.relationship('PurchaseOrderItem', backref='purchase_order', lazy='dynamic',
                           cascade='all, delete-orphan')
+    receiving_location = db.relationship('Location', foreign_keys=[receiving_location_id])
+
+    def calculate_totals(self):
+        """Calculate all totals from items"""
+        from decimal import Decimal
+        total_base = Decimal('0')
+        total_packaging = Decimal('0')
+        total_delivery = Decimal('0')
+        total_bottle = Decimal('0')
+
+        for item in self.items:
+            qty = item.quantity_received or item.quantity_ordered
+            total_base += (item.base_cost or Decimal('0')) * qty
+            total_packaging += (item.packaging_cost or Decimal('0')) * qty
+            total_delivery += (item.delivery_cost or Decimal('0')) * qty
+            total_bottle += (item.bottle_cost or Decimal('0')) * qty
+
+        self.subtotal = total_base
+        self.total_packaging_cost = total_packaging
+        self.total_delivery_cost = total_delivery
+        self.total_bottle_cost = total_bottle
+        self.grand_total_landed = total_base + total_packaging + total_delivery + total_bottle
+        self.total = self.grand_total_landed + (self.tax or Decimal('0'))
+        self.amount_due = self.total - (self.amount_paid or Decimal('0'))
 
     def __repr__(self):
         return f'<PurchaseOrder {self.po_number}>'
@@ -738,10 +813,34 @@ class PurchaseOrderItem(db.Model):
     unit_cost = db.Column(db.Numeric(10, 2), nullable=False)
     subtotal = db.Column(db.Numeric(10, 2), nullable=False)
 
+    # Cost breakdown per item (at time of receiving)
+    base_cost = db.Column(db.Numeric(10, 2), default=0.00)
+    packaging_cost = db.Column(db.Numeric(10, 2), default=0.00)
+    delivery_cost = db.Column(db.Numeric(10, 2), default=0.00)
+    bottle_cost = db.Column(db.Numeric(10, 2), default=0.00)
+    landed_cost = db.Column(db.Numeric(10, 2), default=0.00)  # Total per unit
+
+    # Receiving details
+    received_at = db.Column(db.DateTime)
+    received_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    receiving_notes = db.Column(db.Text)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Relationship
+    # Relationships
     product = db.relationship('Product')
+    receiver = db.relationship('User', foreign_keys=[received_by])
+
+    def calculate_landed_cost(self):
+        """Calculate landed cost from components"""
+        from decimal import Decimal
+        self.landed_cost = (
+            (self.base_cost or Decimal('0')) +
+            (self.packaging_cost or Decimal('0')) +
+            (self.delivery_cost or Decimal('0')) +
+            (self.bottle_cost or Decimal('0'))
+        )
+        return self.landed_cost
 
     def __repr__(self):
         return f'<PurchaseOrderItem {self.id}>'
@@ -906,6 +1005,10 @@ class Location(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     can_sell = db.Column(db.Boolean, default=True)  # Kiosks can sell, warehouses typically cannot
 
+    # Kiosk charges (per-location pricing)
+    kiosk_charge_rate = db.Column(db.Numeric(5, 2), default=0.00)  # Percentage (0-100)
+    kiosk_charge_type = db.Column(db.String(32), default='percentage')  # 'percentage' or 'fixed'
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -923,6 +1026,14 @@ class Location(db.Model):
     def is_kiosk(self):
         """Check if this location is a kiosk"""
         return self.location_type == 'kiosk'
+
+    def get_final_cost_for_product(self, product):
+        """Calculate final cost including kiosk charges"""
+        landed_cost = float(product.landed_cost or product.cost_price or 0)
+        if self.kiosk_charge_type == 'percentage':
+            return landed_cost + (landed_cost * float(self.kiosk_charge_rate or 0) / 100)
+        else:
+            return landed_cost + float(self.kiosk_charge_rate or 0)
 
     def get_stock_for_product(self, product_id):
         """Get stock level for a specific product at this location"""

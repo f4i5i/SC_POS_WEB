@@ -363,7 +363,8 @@
     </table>
 
     <div class="items-count">
-        Total Items: {{ sale.items|sum(attribute='quantity') }} ({{ sale.items|length }} line{{ 's' if sale.items|length > 1 else '' }})
+        {% set items_list = sale.items|list %}
+        Total Items: {{ items_list|sum(attribute='quantity') }} ({{ items_list|length }} line{{ 's' if items_list|length > 1 else '' }})
     </div>
 
     <!-- Totals -->

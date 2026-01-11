@@ -371,11 +371,11 @@ def get_default_roles():
             'is_system': True
         },
         'manager': {
-            'display_name': 'Store Manager',
-            'description': 'Manage store operations, process returns, view expenses (no financial/confidential data)',
+            'display_name': 'Manager',
+            'description': 'Manage store/kiosk operations, process returns and refunds, view sales reports, handle expenses and production',
             'permissions': [
-                # POS - can sell, close day, apply discount, but NO void/refund (only returns)
-                'pos.view', 'pos.create_sale', 'pos.close_day', 'pos.hold_sale', 'pos.apply_discount',
+                # POS - can sell, close day, apply discount, refund
+                'pos.view', 'pos.create_sale', 'pos.close_day', 'pos.hold_sale', 'pos.apply_discount', 'pos.refund',
                 # Inventory - view and adjust stock for own store
                 'inventory.view', 'inventory.adjust_stock',
                 # Customers - full access
@@ -384,12 +384,25 @@ def get_default_roles():
                 'transfer.view', 'transfer.request', 'transfer.receive',
                 # Location - view own location only
                 'location.view',
-                # Reports - sales only
+                # Reports - sales reports (daily, weekly, monthly)
                 'report.view_sales',
-                # Expenses - can view and add store expenses
+                # Expenses - can view and create expenses
                 'expense.view', 'expense.create',
                 # Returns - can process returns
-                'returns.view', 'returns.create'
+                'returns.view', 'returns.create',
+                # Production - can view, create orders, and execute attar production
+                'production.view', 'production.create_order', 'production.execute',
+                'raw_material.view', 'raw_material.adjust_stock',
+                'recipe.view'
+            ],
+            'is_system': True
+        },
+        'store_manager': {
+            'display_name': 'Store Manager',
+            'description': 'View-only access to daily sales reports for their location',
+            'permissions': [
+                # Reports - daily sales only
+                'report.view_sales'
             ],
             'is_system': True
         },
@@ -436,33 +449,6 @@ def get_default_roles():
                 'production.view', 'production.create_order', 'production.approve_order', 'production.execute',
                 'raw_material.view', 'raw_material.create', 'raw_material.adjust_stock',
                 'recipe.view', 'recipe.create', 'recipe.edit'
-            ],
-            'is_system': True
-        },
-        'kiosk_manager': {
-            'display_name': 'Kiosk Manager',
-            'description': 'Manages a specific kiosk location with attar production capability',
-            'permissions': [
-                # POS - can sell, close day, apply discount, but NO void/refund (only returns)
-                'pos.view', 'pos.create_sale', 'pos.close_day', 'pos.hold_sale', 'pos.apply_discount',
-                # Inventory - view only, no direct stock updates
-                'inventory.view',
-                # Customers - full access
-                'customer.view', 'customer.create', 'customer.edit', 'customer.view_history',
-                # Transfers - can request and receive stock
-                'transfer.view', 'transfer.request', 'transfer.receive',
-                # Location - view own location only
-                'location.view',
-                # Reports - sales only
-                'report.view_sales',
-                # Expenses - can view and add store expenses
-                'expense.view', 'expense.create',
-                # Returns - can process returns
-                'returns.view', 'returns.create',
-                # Production - can view, create orders, and execute attar production
-                'production.view', 'production.create_order', 'production.execute',
-                'raw_material.view', 'raw_material.adjust_stock',
-                'recipe.view'
             ],
             'is_system': True
         },

@@ -38,11 +38,11 @@ def daily_report():
     else:
         report_date = datetime.now().date()
 
-    # Build query with location filter
+    # Build query with location filter - include both completed and refunded
     query = Sale.query.filter(
         and_(
             func.date(Sale.sale_date) == report_date,
-            Sale.status == 'completed'
+            Sale.status.in_(['completed', 'refunded'])
         )
     )
 
@@ -56,20 +56,31 @@ def daily_report():
             query = query.filter(False)  # No location = no data
 
     # Get sales for the day
-    sales = query.all()
+    all_sales = query.all()
 
-    # Calculate summary
-    total_sales = sum(sale.total for sale in sales)
-    total_transactions = len(sales)
+    # Separate completed and refunded sales
+    completed_sales = [s for s in all_sales if s.status == 'completed']
+    refunded_sales = [s for s in all_sales if s.status == 'refunded']
+
+    # Calculate summary for completed sales
+    total_sales = sum(sale.total or 0 for sale in completed_sales)
+    total_transactions = len(completed_sales)
     avg_transaction = total_sales / total_transactions if total_transactions > 0 else 0
 
-    # Payment method breakdown
+    # Calculate refund summary
+    total_refunds = sum(sale.total or 0 for sale in refunded_sales)
+    refund_count = len(refunded_sales)
+
+    # Net sales = total - refunds
+    net_sales = total_sales - total_refunds
+
+    # Payment method breakdown (for completed sales only)
     payment_methods = {}
-    for sale in sales:
+    for sale in completed_sales:
         method = sale.payment_method
         if method not in payment_methods:
             payment_methods[method] = 0
-        payment_methods[method] += float(sale.total)
+        payment_methods[method] += float(sale.total or 0)
 
     # Top products - filter by location
     top_products_query = db.session.query(
@@ -136,8 +147,13 @@ def daily_report():
 
     return render_template('reports/daily_report.html',
                          report_date=report_date,
-                         sales=sales,
+                         sales=all_sales,
+                         completed_sales=completed_sales,
+                         refunded_sales=refunded_sales,
                          total_sales=total_sales,
+                         total_refunds=total_refunds,
+                         refund_count=refund_count,
+                         net_sales=net_sales,
                          total_transactions=total_transactions,
                          avg_transaction=avg_transaction,
                          payment_methods=payment_methods,
@@ -297,7 +313,12 @@ def monthly_report():
     )
     if not current_user.is_global_admin and current_user.location_id:
         category_query = category_query.filter(Sale.location_id == current_user.location_id)
-    category_sales = category_query.group_by('category').all()
+    category_sales_rows = category_query.group_by('category').all()
+    # Convert to serializable format
+    category_sales = [
+        {'category': row.category or 'Uncategorized', 'total': float(row.total or 0)}
+        for row in category_sales_rows
+    ]
 
     # Top customers - with location filter
     customers_query = db.session.query(
@@ -313,7 +334,12 @@ def monthly_report():
     )
     if not current_user.is_global_admin and current_user.location_id:
         customers_query = customers_query.filter(Sale.location_id == current_user.location_id)
-    top_customers = customers_query.group_by(Customer.id).order_by(func.sum(Sale.total).desc()).limit(10).all()
+    top_customers_rows = customers_query.group_by(Customer.id).order_by(func.sum(Sale.total).desc()).limit(10).all()
+    # Convert to serializable format
+    top_customers = [
+        {'name': row.name or 'Unknown', 'transactions': int(row.transactions or 0), 'total': float(row.total or 0)}
+        for row in top_customers_rows
+    ]
 
     return render_template('reports/monthly_report.html',
                          year=year,
@@ -604,7 +630,7 @@ def sales_by_category():
         base_filter = and_(base_filter, Sale.location_id == current_user.location_id)
 
     # Sales by category
-    category_sales = db.session.query(
+    category_sales_rows = db.session.query(
         func.coalesce(Category.name, 'Uncategorized').label('category'),
         func.sum(SaleItem.quantity).label('units_sold'),
         func.sum(SaleItem.subtotal).label('revenue'),
@@ -614,10 +640,22 @@ def sales_by_category():
         base_filter
     ).group_by('category').order_by(func.sum(SaleItem.subtotal).desc()).all()
 
+    # Convert to serializable format
+    category_sales = [
+        {
+            'category': row.category or 'Uncategorized',
+            'units_sold': int(row.units_sold or 0),
+            'revenue': float(row.revenue or 0),
+            'transactions': int(row.transactions or 0),
+            'profit': float(row.profit or 0)
+        }
+        for row in category_sales_rows
+    ]
+
     # Calculate totals
-    total_revenue = sum(cat.revenue or 0 for cat in category_sales)
-    total_profit = sum(cat.profit or 0 for cat in category_sales)
-    total_units = sum(cat.units_sold or 0 for cat in category_sales)
+    total_revenue = sum(cat['revenue'] for cat in category_sales)
+    total_profit = sum(cat['profit'] for cat in category_sales)
+    total_units = sum(cat['units_sold'] for cat in category_sales)
 
     return render_template('reports/sales_by_category.html',
                          start_date=start_date,

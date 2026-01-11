@@ -130,6 +130,22 @@ def add_product():
                 except ValueError:
                     pass
 
+            # Cost breakdown fields
+            base_cost = Decimal(request.form.get('base_cost', 0) or 0)
+            packaging_cost = Decimal(request.form.get('packaging_cost', 0) or 0)
+            delivery_cost = Decimal(request.form.get('delivery_cost', 0) or 0)
+            bottle_cost = Decimal(request.form.get('bottle_cost', 0) or 0)
+
+            # Calculate landed cost (or use manually entered cost_price for backward compatibility)
+            cost_price_input = request.form.get('cost_price', 0) or 0
+            if base_cost > 0:
+                # If cost breakdown is provided, calculate landed cost
+                landed_cost = base_cost + packaging_cost + delivery_cost + bottle_cost
+            else:
+                # Fallback: use manual cost_price input
+                landed_cost = Decimal(cost_price_input)
+                base_cost = landed_cost  # Set base_cost = cost_price for backward compatibility
+
             product = Product(
                 code=request.form.get('code'),
                 barcode=request.form.get('barcode'),
@@ -140,7 +156,11 @@ def add_product():
                 description=request.form.get('description'),
                 size=request.form.get('size'),
                 unit=request.form.get('unit', 'piece'),
-                cost_price=Decimal(request.form.get('cost_price', 0)),
+                base_cost=base_cost,
+                packaging_cost=packaging_cost,
+                delivery_cost=delivery_cost,
+                bottle_cost=bottle_cost,
+                cost_price=landed_cost,
                 selling_price=Decimal(request.form.get('selling_price', 0)),
                 tax_rate=Decimal(request.form.get('tax_rate', 0)),
                 quantity=int(request.form.get('quantity', 0)),
@@ -269,7 +289,26 @@ def edit_product(product_id):
             product.description = request.form.get('description')
             product.size = request.form.get('size')
             product.unit = request.form.get('unit', 'piece')
-            product.cost_price = Decimal(request.form.get('cost_price', 0))
+
+            # Cost breakdown fields
+            base_cost = Decimal(request.form.get('base_cost', 0) or 0)
+            packaging_cost = Decimal(request.form.get('packaging_cost', 0) or 0)
+            delivery_cost = Decimal(request.form.get('delivery_cost', 0) or 0)
+            bottle_cost = Decimal(request.form.get('bottle_cost', 0) or 0)
+
+            # Calculate landed cost (or use manually entered cost_price for backward compatibility)
+            cost_price_input = request.form.get('cost_price', 0) or 0
+            if base_cost > 0:
+                landed_cost = base_cost + packaging_cost + delivery_cost + bottle_cost
+            else:
+                landed_cost = Decimal(cost_price_input)
+                base_cost = landed_cost
+
+            product.base_cost = base_cost
+            product.packaging_cost = packaging_cost
+            product.delivery_cost = delivery_cost
+            product.bottle_cost = bottle_cost
+            product.cost_price = landed_cost
             product.selling_price = Decimal(request.form.get('selling_price', 0))
             product.tax_rate = Decimal(request.form.get('tax_rate', 0))
             product.reorder_level = int(request.form.get('reorder_level', 10))

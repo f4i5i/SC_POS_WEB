@@ -125,6 +125,20 @@
                                 {% endif %}
                             </td>
                         </tr>
+                        <tr>
+                            <th>Kiosk Charge:</th>
+                            <td>
+                                {% if location.kiosk_charge_rate and location.kiosk_charge_rate > 0 %}
+                                    {% if location.kiosk_charge_type == 'percentage' %}
+                                    <span class="badge bg-info">{{ location.kiosk_charge_rate }}%</span>
+                                    {% else %}
+                                    <span class="badge bg-info">Rs. {{ "{:,.2f}".format(location.kiosk_charge_rate) }}</span>
+                                    {% endif %}
+                                {% else %}
+                                <span class="text-muted">No charge</span>
+                                {% endif %}
+                            </td>
+                        </tr>
                         {% endif %}
                         {% if location.is_warehouse %}
                         <tr>

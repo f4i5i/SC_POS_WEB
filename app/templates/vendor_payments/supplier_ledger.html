@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}{{ supplier.name }} - Ledger - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        color: white;
+    }
+
+    .ledger-card {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+
+    .balance-card {
+        border-radius: 12px;
+        padding: 1.5rem;
+        background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
+    }
+
+    .balance-card.positive {
+        background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%);
+    }
+
+    .balance-amount {
+        font-size: 2rem;
+        font-weight: bold;
+    }
+
+    .balance-amount.due {
+        color: #DC2626;
+    }
+
+    .balance-amount.clear {
+        color: #059669;
+    }
+
+    .transaction-row {
+        border-bottom: 1px solid #E5E7EB;
+        padding: 1rem 0;
+    }
+
+    .transaction-row:last-child {
+        border-bottom: none;
+    }
+
+    .transaction-type {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .transaction-type.purchase {
+        background: #FEE2E2;
+        color: #DC2626;
+    }
+
+    .transaction-type.payment {
+        background: #D1FAE5;
+        color: #059669;
+    }
+
+    .transaction-type.adjustment {
+        background: #FEF3C7;
+        color: #D97706;
+    }
+
+    .debit-col {
+        color: #DC2626;
+    }
+
+    .credit-col {
+        color: #059669;
+    }
+
+    .filter-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .summary-row {
+        background: #F3F4F6;
+        font-weight: bold;
+    }
+
+    .unpaid-po {
+        border: 1px solid #E5E7EB;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .unpaid-po:hover {
+        border-color: #6366F1;
+        background: #F5F3FF;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="mb-1"><i class="fas fa-book me-2"></i>{{ supplier.name }}</h1>
+                <p class="mb-0 opacity-75">Supplier Ledger</p>
+            </div>
+            <div>
+                <a href="{{ url_for('vendor_payments.supplier_statement', supplier_id=supplier.id) }}" class="btn btn-light me-2">
+                    <i class="fas fa-file-alt me-1"></i> Print Statement
+                </a>
+                <a href="{{ url_for('vendor_payments.create') }}?supplier_id={{ supplier.id }}" class="btn btn-success">
+                    <i class="fas fa-plus me-1"></i> Record Payment
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Filter -->
+            <div class="filter-card">
+                <form method="get" class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">From Date</label>
+                        <input type="date" name="date_from" class="form-control" value="{{ request.args.get('date_from', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">To Date</label>
+                        <input type="date" name="date_to" class="form-control" value="{{ request.args.get('date_to', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-filter me-1"></i> Filter
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Ledger Table -->
+            <div class="card ledger-card">
+                <div class="card-header">
+                    <h5 class="mb-0">Transaction History</h5>
+                </div>
+                <div class="card-body">
+                    {% if entries %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Reference</th>
+                                    <th>Description</th>
+                                    <th class="text-end">Debit</th>
+                                    <th class="text-end">Credit</th>
+                                    <th class="text-end">Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in entries %}
+                                <tr>
+                                    <td>{{ entry.transaction_date.strftime('%b %d, %Y') if entry.transaction_date else '-' }}</td>
+                                    <td>
+                                        <span class="transaction-type {{ entry.transaction_type }}">
+                                            {{ entry.transaction_type }}
+                                        </span>
+                                    </td>
+                                    <td>{{ entry.reference_number or '-' }}</td>
+                                    <td>{{ entry.description or '-' }}</td>
+                                    <td class="text-end debit-col">
+                                        {% if entry.debit and entry.debit > 0 %}
+                                        Rs. {{ "{:,.2f}".format(entry.debit) }}
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end credit-col">
+                                        {% if entry.credit and entry.credit > 0 %}
+                                        Rs. {{ "{:,.2f}".format(entry.credit) }}
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(entry.balance) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="summary-row">
+                                <tr>
+                                    <td colspan="4" class="text-end">Totals:</td>
+                                    <td class="text-end debit-col">Rs. {{ "{:,.2f}".format(total_debit) }}</td>
+                                    <td class="text-end credit-col">Rs. {{ "{:,.2f}".format(total_credit) }}</td>
+                                    <td class="text-end">Rs. {{ "{:,.2f}".format(supplier.current_balance or 0) }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-book-open fa-4x text-muted mb-3"></i>
+                        <h5 class="text-muted">No transactions found</h5>
+                        <p class="text-muted">There are no ledger entries for this supplier</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Balance Card -->
+            <div class="balance-card {{ 'positive' if not supplier.current_balance or supplier.current_balance <= 0 else '' }} mb-3">
+                <div class="text-center">
+                    <small class="text-muted">Current Balance</small>
+                    <div class="balance-amount {{ 'due' if supplier.current_balance and supplier.current_balance > 0 else 'clear' }}">
+                        Rs. {{ "{:,.2f}".format(supplier.current_balance or 0) }}
+                    </div>
+                    <small class="text-muted">
+                        {% if supplier.current_balance and supplier.current_balance > 0 %}
+                        Amount owed to supplier
+                        {% else %}
+                        No outstanding dues
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+
+            <!-- Supplier Info -->
+            <div class="card ledger-card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-building me-2"></i>Supplier Details</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <small class="text-muted">Contact Person</small>
+                        <div>{{ supplier.contact_person or '-' }}</div>
+                    </div>
+                    <div class="mb-2">
+                        <small class="text-muted">Phone</small>
+                        <div>{{ supplier.phone or '-' }}</div>
+                    </div>
+                    <div class="mb-2">
+                        <small class="text-muted">Payment Terms</small>
+                        <div>{{ supplier.payment_terms or '-' }}</div>
+                    </div>
+                    <div>
+                        <small class="text-muted">Last Payment</small>
+                        <div>{{ supplier.last_payment_date.strftime('%b %d, %Y') if supplier.last_payment_date else 'No payments yet' }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Unpaid POs -->
+            {% if unpaid_pos %}
+            <div class="card ledger-card">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="mb-0"><i class="fas fa-file-invoice me-2"></i>Unpaid Purchase Orders</h6>
+                </div>
+                <div class="card-body p-2">
+                    {% for po in unpaid_pos %}
+                    <div class="unpaid-po">
+                        <div class="d-flex justify-content-between">
+                            <strong>{{ po.po_number }}</strong>
+                            <span class="badge bg-{{ 'warning' if po.payment_status == 'partial' else 'danger' }}">
+                                {{ po.payment_status }}
+                            </span>
+                        </div>
+                        <small class="text-muted">{{ po.order_date.strftime('%b %d, %Y') if po.order_date else '-' }}</small>
+                        <div class="d-flex justify-content-between mt-1">
+                            <span class="small">Total: Rs. {{ "{:,.0f}".format(po.total or 0) }}</span>
+                            <span class="fw-bold text-danger">Due: Rs. {{ "{:,.0f}".format(po.amount_due or 0) }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
