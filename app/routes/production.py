@@ -25,6 +25,29 @@ from app.services.production_service import ProductionService
 bp = Blueprint('production', __name__, url_prefix='/production')
 
 
+def init_raw_material_categories():
+    """Initialize default raw material categories if they don't exist"""
+    default_categories = [
+        {'code': 'OIL', 'name': 'Base Oils', 'unit': 'grams', 'description': 'Essential and fragrance oils'},
+        {'code': 'ETHANOL', 'name': 'Ethanol/Alcohol', 'unit': 'ml', 'description': 'Perfume grade ethanol'},
+        {'code': 'BOTTLE', 'name': 'Bottles & Packaging', 'unit': 'pieces', 'description': 'Bottles, caps, and packaging'},
+    ]
+
+    for cat_data in default_categories:
+        existing = RawMaterialCategory.query.filter_by(code=cat_data['code']).first()
+        if not existing:
+            category = RawMaterialCategory(
+                code=cat_data['code'],
+                name=cat_data['name'],
+                unit=cat_data['unit'],
+                description=cat_data['description'],
+                is_active=True
+            )
+            db.session.add(category)
+
+    db.session.commit()
+
+
 # ============================================================
 # Dashboard
 # ============================================================
@@ -64,6 +87,10 @@ def index():
 def raw_materials():
     """List all raw materials"""
     location = get_current_location()
+
+    # Initialize default categories if none exist
+    if RawMaterialCategory.query.count() == 0:
+        init_raw_material_categories()
 
     categories = RawMaterialCategory.query.filter_by(is_active=True).all()
     category_filter = request.args.get('category')
@@ -136,6 +163,10 @@ def add_raw_material():
         except Exception as e:
             db.session.rollback()
             flash(f'Error adding material: {str(e)}', 'danger')
+
+    # Initialize default categories if none exist
+    if RawMaterialCategory.query.count() == 0:
+        init_raw_material_categories()
 
     categories = RawMaterialCategory.query.filter_by(is_active=True).all()
     return render_template('production/raw_materials/add.html', categories=categories)
