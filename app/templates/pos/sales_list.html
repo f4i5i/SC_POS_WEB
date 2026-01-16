@@ -34,18 +34,57 @@
 <div class="card mb-4">
     <div class="card-body">
         <form method="GET" action="{{ url_for('pos.sales_list') }}">
-            <div class="row g-3">
-                <div class="col-md-4">
+            <div class="row g-3 align-items-end">
+                {% if current_user.is_global_admin and locations %}
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Location</label>
+                    <select class="form-select" name="location_id">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location == loc.id %}selected{% endif %}>
+                            {{ loc.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted">From Date</label>
                     <input type="date" class="form-control" name="from_date" value="{{ request.args.get('from_date', '') }}">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-2">
+                    <label class="form-label small text-muted">To Date</label>
                     <input type="date" class="form-control" name="to_date" value="{{ request.args.get('to_date', '') }}">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-2">
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="fas fa-filter"></i> Filter
                     </button>
                 </div>
+                <div class="col-md-3">
+                    <a href="{{ url_for('pos.sales_list') }}" class="btn btn-outline-secondary w-100">
+                        <i class="fas fa-times"></i> Clear
+                    </a>
+                </div>
+                {% else %}
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">From Date</label>
+                    <input type="date" class="form-control" name="from_date" value="{{ request.args.get('from_date', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">To Date</label>
+                    <input type="date" class="form-control" name="to_date" value="{{ request.args.get('to_date', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i> Filter
+                    </button>
+                </div>
+                <div class="col-md-3">
+                    <a href="{{ url_for('pos.sales_list') }}" class="btn btn-outline-secondary w-100">
+                        <i class="fas fa-times"></i> Clear
+                    </a>
+                </div>
+                {% endif %}
             </div>
         </form>
     </div>
@@ -57,31 +96,43 @@
     <div class="card sale-card">
         <div class="card-body">
             <div class="row align-items-center">
-                <div class="col-md-3">
-                    <h6><i class="fas fa-file-invoice"></i> {{ sale.sale_number }}</h6>
+                <div class="col-md-2">
+                    <h6 class="mb-1"><i class="fas fa-file-invoice"></i> {{ sale.sale_number }}</h6>
                     <small class="text-muted">{{ sale.sale_date.strftime('%b %d, %Y %I:%M %p') }}</small>
                 </div>
+                {% if current_user.is_global_admin %}
+                <div class="col-md-2">
+                    <small class="text-muted d-block">Location</small>
+                    <span class="badge bg-secondary">
+                        <i class="fas fa-store"></i> {{ sale.location.name if sale.location else 'N/A' }}
+                    </span>
+                </div>
+                {% endif %}
                 <div class="col-md-2">
                     {% if sale.customer %}
+                        <small class="text-muted d-block">Customer</small>
                         <i class="fas fa-user"></i> {{ sale.customer.name }}
                     {% else %}
-                        <span class="text-muted">Walk-in Customer</span>
+                        <small class="text-muted d-block">Customer</small>
+                        <span class="text-muted">Walk-in</span>
                     {% endif %}
                 </div>
                 <div class="col-md-2">
+                    <small class="text-muted d-block">Amount</small>
                     <strong>Rs. {{ "{:,.2f}".format(sale.total) }}</strong>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-1">
+                    <small class="text-muted d-block">Status</small>
                     <span class="badge badge-{{ sale.payment_status }}">
                         {{ sale.payment_status|title }}
                     </span>
                 </div>
-                <div class="col-md-3 text-end">
+                <div class="col-md-{% if current_user.is_global_admin %}3{% else %}3{% endif %} text-end">
                     <a href="{{ url_for('pos.sale_details', sale_id=sale.id) }}" class="btn btn-sm btn-info text-white">
-                        <i class="fas fa-eye"></i> View
+                        <i class="fas fa-eye"></i>
                     </a>
                     <button class="btn btn-sm btn-warning" onclick="printReceipt({{ sale.id }})">
-                        <i class="fas fa-print"></i> Print
+                        <i class="fas fa-print"></i>
                     </button>
                 </div>
             </div>

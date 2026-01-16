@@ -261,7 +261,16 @@ def create_app(config_name='default'):
 
         sales_by_day = sales_query.group_by(func.date(Sale.created_at)).all()
 
-        # Build daily data
+        # Build daily data - convert query results to dict for easier lookup
+        sales_dict = {}
+        for s in sales_by_day:
+            # Handle different date formats from database
+            if isinstance(s.date, str):
+                sale_date = datetime.strptime(s.date, '%Y-%m-%d').date()
+            else:
+                sale_date = s.date
+            sales_dict[sale_date] = {'total': s.total, 'count': s.count}
+
         daily_labels = []
         daily_sales = []
         daily_counts = []
@@ -269,16 +278,17 @@ def create_app(config_name='default'):
         for i in range(7):
             day = start_date + timedelta(days=i)
             daily_labels.append(day.strftime('%a'))  # Mon, Tue, etc.
-            day_sale = next((s for s in sales_by_day if s.date == day), None)
-            daily_sales.append(float(day_sale.total) if day_sale and day_sale.total else 0)
-            daily_counts.append(int(day_sale.count) if day_sale else 0)
+            day_sale = sales_dict.get(day)
+            daily_sales.append(float(day_sale['total']) if day_sale and day_sale['total'] else 0)
+            daily_counts.append(int(day_sale['count']) if day_sale else 0)
 
-        # Payment methods breakdown (today)
+        # Payment methods breakdown (last 7 days)
         payment_query = db.session.query(
             Sale.payment_method,
             func.sum(Sale.total).label('total')
         ).filter(
-            func.date(Sale.created_at) == end_date
+            func.date(Sale.created_at) >= start_date,
+            func.date(Sale.created_at) <= end_date
         )
 
         if location_id and not current_user.is_global_admin:
@@ -293,7 +303,7 @@ def create_app(config_name='default'):
             payment_labels.append(label)
             payment_values.append(float(p.total) if p.total else 0)
 
-        # If no sales today, show placeholder
+        # If no sales, show placeholder
         if not payment_labels:
             payment_labels = ['No Sales']
             payment_values = [0]

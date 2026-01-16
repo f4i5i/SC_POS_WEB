@@ -556,37 +556,58 @@ def print_receipt(sale_id):
 @permission_required(Permissions.POS_VIEW)
 def sales_list():
     """List all sales - filtered by location for non-global admins"""
+    from datetime import datetime, timedelta
+    from app.models import Location
+
     page = request.args.get('page', 1, type=int)
     per_page = current_app.config['ITEMS_PER_PAGE']
 
-    # Filter by date if provided
-    from_date = request.args.get('from_date')
-    to_date = request.args.get('to_date')
+    # Filter parameters
+    from_date_str = request.args.get('from_date')
+    to_date_str = request.args.get('to_date')
+    location_filter = request.args.get('location_id', type=int)
 
     query = Sale.query.order_by(Sale.sale_date.desc())
 
-    # Filter by location for non-global admins
-    if not current_user.is_global_admin:
-        if current_user.location_id:
-            query = query.filter(Sale.location_id == current_user.location_id)
-        else:
-            # No location assigned - show no sales
-            query = query.filter(False)
+    # Location filtering
+    locations = []
+    if current_user.is_global_admin:
+        # Global admin can filter by any location
+        locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+        if location_filter:
+            query = query.filter(Sale.location_id == location_filter)
+    elif current_user.location_id:
+        # Non-global admin only sees their location's sales
+        query = query.filter(Sale.location_id == current_user.location_id)
 
-    if from_date:
-        query = query.filter(Sale.sale_date >= from_date)
-    if to_date:
-        query = query.filter(Sale.sale_date <= to_date)
+    # Apply date filters with proper datetime handling
+    if from_date_str:
+        try:
+            from_date = datetime.strptime(from_date_str, '%Y-%m-%d')
+            query = query.filter(Sale.sale_date >= from_date)
+        except ValueError:
+            pass
+
+    if to_date_str:
+        try:
+            # Add 1 day to include the entire end date
+            to_date = datetime.strptime(to_date_str, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(Sale.sale_date < to_date)
+        except ValueError:
+            pass
 
     sales = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    # Get location name for display
-    from app.models import Location
+    # Get user's location for display
     user_location = None
     if current_user.location_id:
         user_location = Location.query.get(current_user.location_id)
 
-    return render_template('pos/sales_list.html', sales=sales, user_location=user_location)
+    return render_template('pos/sales_list.html',
+                           sales=sales,
+                           user_location=user_location,
+                           locations=locations,
+                           selected_location=location_filter)
 
 
 @bp.route('/sale-details/<int:sale_id>')

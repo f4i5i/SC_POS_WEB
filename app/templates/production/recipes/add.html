@@ -69,13 +69,23 @@
 
                             <div class="col-md-6">
                                 <label class="form-label">Output Product</label>
-                                <select name="product_id" class="form-select">
+                                <select name="product_id" class="form-select" id="output-product-select">
                                     <option value="">Select product (optional)...</option>
                                     {% for product in products %}
-                                    <option value="{{ product.id }}">{{ product.code }} - {{ product.name }}</option>
+                                    <option value="{{ product.id }}"
+                                            data-code="{{ product.code }}"
+                                            data-stock="{{ product.quantity }}">
+                                        {{ product.code }} - {{ product.name }} (Stock: {{ product.quantity }})
+                                    </option>
                                     {% endfor %}
                                 </select>
                                 <small class="text-muted">Link to finished product for inventory</small>
+                                <div id="selected-product-info" class="mt-2 d-none">
+                                    <div class="alert alert-success py-2 mb-0">
+                                        <i class="fas fa-check-circle me-2"></i>
+                                        <span id="selected-product-text"></span>
+                                    </div>
+                                </div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Can Produce At</label>
@@ -308,5 +318,21 @@ document.addEventListener('input', function(e) {
 
 // Add first ingredient on load
 addIngredient();
+
+// Handle output product selection - show check indicator
+document.getElementById('output-product-select').addEventListener('change', function() {
+    const infoDiv = document.getElementById('selected-product-info');
+    const textSpan = document.getElementById('selected-product-text');
+
+    if (this.value) {
+        const selectedOption = this.options[this.selectedIndex];
+        const code = selectedOption.getAttribute('data-code');
+        const stock = selectedOption.getAttribute('data-stock');
+        textSpan.textContent = `Selected: ${code} (Current Stock: ${stock})`;
+        infoDiv.classList.remove('d-none');
+    } else {
+        infoDiv.classList.add('d-none');
+    }
+});
 </script>
 {% endblock %}
