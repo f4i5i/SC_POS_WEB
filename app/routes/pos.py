@@ -304,6 +304,58 @@ def create_reorder():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@bp.route('/check-raw-materials', methods=['POST'])
+@login_required
+def check_raw_materials():
+    """Check raw material availability for made-to-order products before sale"""
+    try:
+        data = request.get_json()
+        items = data.get('items', [])
+
+        warnings = []
+        for item in items:
+            product = Product.query.get(item.get('product_id'))
+            if not product:
+                continue
+
+            quantity = int(item.get('quantity', 1))
+
+            # Check if product is made-to-order
+            if product.is_made_to_order:
+                recipe = product.get_recipe()
+                if not recipe:
+                    warnings.append({
+                        'product_id': product.id,
+                        'product_name': product.name,
+                        'type': 'no_recipe',
+                        'message': f'{product.name}: No recipe linked. Raw materials cannot be deducted.'
+                    })
+                    continue
+
+                availability = product.check_raw_material_availability(quantity)
+                if not availability['available']:
+                    for shortage in availability['shortages']:
+                        warnings.append({
+                            'product_id': product.id,
+                            'product_name': product.name,
+                            'type': 'insufficient_material',
+                            'material_name': shortage['material'].name,
+                            'required': shortage['required'],
+                            'available': shortage['available'],
+                            'unit': shortage['unit'],
+                            'message': f"{product.name}: Need {shortage['required']:.2f} {shortage['unit']} of {shortage['material'].name}, only {shortage['available']:.2f} available"
+                        })
+
+        return jsonify({
+            'success': True,
+            'has_warnings': len(warnings) > 0,
+            'warnings': warnings
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @bp.route('/complete-sale', methods=['POST'])
 @login_required
 @permission_required(Permissions.POS_CREATE_SALE)
@@ -430,6 +482,36 @@ def complete_sale():
                 location_id=location.id if location else None
             )
             db.session.add(stock_movement)
+
+            # Auto-deduct raw materials for made-to-order products
+            if product.is_made_to_order:
+                recipe = product.get_recipe()
+                if recipe:
+                    deduction_result = product.deduct_raw_materials(
+                        quantity=quantity,
+                        location_id=location.id if location else None,
+                        sale_id=sale.id
+                    )
+                    if not deduction_result['success']:
+                        db.session.rollback()
+                        return jsonify({
+                            'success': False,
+                            'error': deduction_result['message']
+                        }), 400
+
+                    # Log raw material consumption for this sale
+                    for deduction in deduction_result['deductions']:
+                        from app.models import RawMaterialMovement
+                        rm_movement = RawMaterialMovement(
+                            raw_material_id=deduction['material_id'],
+                            user_id=current_user.id,
+                            movement_type='pos_consumption',
+                            quantity=-deduction['quantity'],
+                            reference=sale.sale_number,
+                            notes=f'Auto-deducted for POS sale: {product.name} x{quantity}',
+                            location_id=location.id if location else None
+                        )
+                        db.session.add(rm_movement)
 
         # Handle split payments
         payments_data = data.get('payments', [])

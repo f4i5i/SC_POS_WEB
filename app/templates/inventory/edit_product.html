@@ -730,6 +730,46 @@
                                 <small class="d-block text-muted">Inactive products won't appear in POS</small>
                             </label>
                         </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   id="is_made_to_order"
+                                   name="is_made_to_order"
+                                   {% if product.is_made_to_order %}checked{% endif %}>
+                            <label class="form-check-label" for="is_made_to_order">
+                                <strong><i class="fas fa-flask text-primary"></i> Made to Order (Fill on Demand)</strong>
+                                <small class="d-block text-muted">
+                                    When sold, automatically deduct raw materials (oil + bottle) based on linked recipe.
+                                    <br>Use this for attars that are filled from bulk oil stock when customer orders.
+                                </small>
+                            </label>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   id="is_manufactured"
+                                   name="is_manufactured"
+                                   {% if product.is_manufactured %}checked{% endif %}>
+                            <label class="form-check-label" for="is_manufactured">
+                                <strong>Manufactured In-House</strong>
+                                <small class="d-block text-muted">This product is made/blended in your facility</small>
+                            </label>
+                        </div>
+                        {% if product.recipes %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>
+                            <strong>Linked Recipe:</strong> {{ product.recipes[0].name }} ({{ product.recipes[0].code }})
+                            <br><small>Raw materials will be auto-deducted when this product is sold with "Made to Order" enabled.</small>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-warning" id="no-recipe-warning" {% if not product.is_made_to_order %}style="display:none;"{% endif %}>
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>No Recipe Linked!</strong> Create a recipe and link it to this product for auto-deduction to work.
+                            <a href="{{ url_for('production.add_recipe') }}" class="btn btn-sm btn-outline-warning ms-2">
+                                <i class="fas fa-plus"></i> Create Recipe
+                            </a>
+                        </div>
+                        {% endif %}
                     </div>
 
                     <!-- Action Buttons -->

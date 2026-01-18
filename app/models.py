@@ -276,6 +276,7 @@ class Product(db.Model):
     product_type = db.Column(db.String(32), default='retail')  # 'retail', 'manufactured'
     is_manufactured = db.Column(db.Boolean, default=False)  # True for attars/perfumes made in-house
     can_be_reordered = db.Column(db.Boolean, default=True)  # False for manufactured products
+    is_made_to_order = db.Column(db.Boolean, default=False)  # Auto-deduct raw materials on sale
 
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -423,6 +424,115 @@ class Product(db.Model):
         if self.needs_reorder or self.is_expiring_soon:
             return 'medium'
         return 'low'
+
+    def get_recipe(self):
+        """Get the linked recipe for this product"""
+        if self.recipes:
+            return self.recipes[0] if isinstance(self.recipes, list) else self.recipes
+        return None
+
+    def get_raw_material_usage(self, quantity=1):
+        """
+        Calculate raw material usage for producing given quantity of this product.
+        Returns list of dicts: [{'raw_material': obj, 'quantity': float, 'unit': str}, ...]
+        """
+        recipe = self.get_recipe()
+        if not recipe:
+            return []
+
+        usage = []
+        output_ml = float(recipe.output_size_ml or 0)
+        oil_percentage = float(recipe.oil_percentage or 100) / 100
+
+        for ingredient in recipe.ingredients:
+            raw_material = ingredient.raw_material
+            if not raw_material:
+                continue
+
+            if ingredient.is_packaging:
+                # Bottle: 1 per unit produced
+                usage.append({
+                    'raw_material': raw_material,
+                    'quantity': quantity,
+                    'unit': 'pcs'
+                })
+            else:
+                # Oil: calculate based on percentage and output size
+                # For blended attars: each oil's percentage of the total
+                # For perfumes: oil_percentage determines how much is oil vs ethanol
+                percentage = float(ingredient.percentage or 100) / 100
+                oil_ml = output_ml * oil_percentage * percentage * quantity
+                usage.append({
+                    'raw_material': raw_material,
+                    'quantity': oil_ml,
+                    'unit': 'ml'
+                })
+
+        return usage
+
+    def check_raw_material_availability(self, quantity=1):
+        """
+        Check if raw materials are available to produce given quantity.
+        Returns: {'available': bool, 'shortages': [{'material': obj, 'required': float, 'available': float}]}
+        """
+        usage = self.get_raw_material_usage(quantity)
+        shortages = []
+
+        for item in usage:
+            rm = item['raw_material']
+            required = item['quantity']
+            available = float(rm.quantity_in_stock or 0)
+
+            if available < required:
+                shortages.append({
+                    'material': rm,
+                    'required': required,
+                    'available': available,
+                    'unit': item['unit']
+                })
+
+        return {
+            'available': len(shortages) == 0,
+            'shortages': shortages,
+            'usage': usage
+        }
+
+    def deduct_raw_materials(self, quantity=1, location_id=None, sale_id=None):
+        """
+        Deduct raw materials from stock for producing given quantity.
+        Returns: {'success': bool, 'message': str, 'deductions': list}
+        """
+        availability = self.check_raw_material_availability(quantity)
+
+        if not availability['available']:
+            shortage_msgs = []
+            for s in availability['shortages']:
+                shortage_msgs.append(f"{s['material'].name}: need {s['required']:.2f} {s['unit']}, have {s['available']:.2f}")
+            return {
+                'success': False,
+                'message': f"Insufficient raw materials: {'; '.join(shortage_msgs)}",
+                'deductions': []
+            }
+
+        deductions = []
+        for item in availability['usage']:
+            rm = item['raw_material']
+            qty = item['quantity']
+
+            # Deduct from raw material stock
+            rm.quantity_in_stock = float(rm.quantity_in_stock or 0) - qty
+            deductions.append({
+                'material_id': rm.id,
+                'material_name': rm.name,
+                'quantity': qty,
+                'unit': item['unit']
+            })
+
+        return {
+            'success': True,
+            'message': f"Deducted raw materials for {quantity} unit(s)",
+            'deductions': deductions
+        }
 
     def __repr__(self):
         return f'<Product {self.code} - {self.name}>'

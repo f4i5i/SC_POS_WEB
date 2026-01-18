@@ -168,7 +168,9 @@ def add_product():
                 reorder_quantity=int(request.form.get('reorder_quantity', 50)),
                 batch_number=request.form.get('batch_number'),
                 expiry_date=expiry_date,
-                image_url=image_url
+                image_url=image_url,
+                is_made_to_order='is_made_to_order' in request.form,
+                is_manufactured='is_manufactured' in request.form
             )
 
             db.session.add(product)
@@ -314,6 +316,8 @@ def edit_product(product_id):
             product.reorder_level = int(request.form.get('reorder_level', 10))
             product.reorder_quantity = int(request.form.get('reorder_quantity', 50))
             product.batch_number = request.form.get('batch_number')
+            product.is_made_to_order = 'is_made_to_order' in request.form
+            product.is_manufactured = 'is_manufactured' in request.form
 
             # Queue for sync
             sync_item = SyncQueue(
