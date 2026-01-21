@@ -258,6 +258,7 @@ class Permissions:
     RECIPE_VIEW = 'recipe.view'
     RECIPE_CREATE = 'recipe.create'
     RECIPE_EDIT = 'recipe.edit'
+    RECIPE_DELETE = 'recipe.delete'
 
 
 def get_all_permissions():

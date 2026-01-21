@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Recipe - {{ recipe.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-edit text-primary me-2"></i>Edit Recipe</h2>
+            <p class="text-muted mb-0">{{ recipe.code }} - {{ recipe.name }}</p>
+        </div>
+        <a href="{{ url_for('production.view_recipe', id=recipe.id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <!-- Basic Info -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Basic Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Recipe Code</label>
+                                <input type="text" class="form-control bg-light" value="{{ recipe.code }}" readonly>
+                                <small class="text-muted">Code cannot be changed</small>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label">Recipe Name <span class="text-danger">*</span></label>
+                                <input type="text" name="name" class="form-control" required
+                                       value="{{ recipe.name }}">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Recipe Type <span class="text-danger">*</span></label>
+                                <select name="recipe_type" class="form-select" required id="recipe-type">
+                                    <option value="single_oil" {% if recipe.recipe_type == 'single_oil' %}selected{% endif %}>Single Oil Attar</option>
+                                    <option value="blended" {% if recipe.recipe_type == 'blended' %}selected{% endif %}>Blended Attar</option>
+                                    <option value="perfume" {% if recipe.recipe_type == 'perfume' %}selected{% endif %}>Perfume</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Output Size (ml) <span class="text-danger">*</span></label>
+                                <select name="output_size_ml" class="form-select" required>
+                                    <option value="3" {% if recipe.output_size_ml == 3 %}selected{% endif %}>3ml (Attar)</option>
+                                    <option value="6" {% if recipe.output_size_ml == 6 %}selected{% endif %}>6ml (Attar)</option>
+                                    <option value="12" {% if recipe.output_size_ml == 12 %}selected{% endif %}>12ml (Attar)</option>
+                                    <option value="30" {% if recipe.output_size_ml == 30 %}selected{% endif %}>30ml (Perfume)</option>
+                                    <option value="50" {% if recipe.output_size_ml == 50 %}selected{% endif %}>50ml (Perfume)</option>
+                                    <option value="100" {% if recipe.output_size_ml == 100 %}selected{% endif %}>100ml (Perfume)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4" id="oil-percentage-field" {% if recipe.recipe_type != 'perfume' %}style="display: none;"{% endif %}>
+                                <label class="form-label">Oil Percentage</label>
+                                <div class="input-group">
+                                    <input type="number" name="oil_percentage" class="form-control"
+                                           value="{{ recipe.oil_percentage or 35 }}" min="1" max="100">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                                <small class="text-muted">Rest will be ethanol</small>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Output Product</label>
+                                <select name="product_id" class="form-select" id="output-product-select">
+                                    <option value="">Select product (optional)...</option>
+                                    {% for product in products %}
+                                    <option value="{{ product.id }}" {% if recipe.product_id == product.id %}selected{% endif %}>
+                                        {{ product.code }} - {{ product.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Can Produce At</label>
+                                <div class="form-check">
+                                    <input type="checkbox" name="can_produce_at_kiosk" class="form-check-input" id="kiosk-check"
+                                           {% if recipe.can_produce_at_kiosk %}checked{% endif %}
+                                           {% if recipe.recipe_type == 'perfume' %}disabled{% endif %}>
+                                    <label class="form-check-label" for="kiosk-check">
+                                        Kiosk locations
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label">Description</label>
+                                <textarea name="description" class="form-control" rows="2">{{ recipe.description or '' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ingredients -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Ingredients</h5>
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="addIngredient()">
+                            <i class="fas fa-plus"></i> Add Ingredient
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Important:</strong> Make sure oil ingredients have correct percentages and are NOT marked as "Bottle".
+                            Only actual bottles/packaging should be marked as "Bottle".
+                        </div>
+
+                        <div id="ingredients-container">
+                            <!-- Existing ingredients will be loaded here -->
+                        </div>
+
+                        <div class="alert alert-info mt-3 mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Single Oil:</strong> Add one oil (100%) + bottle<br>
+                            <strong>Blended:</strong> Add multiple oils (percentages must sum to 100%) + bottle<br>
+                            <strong>Perfume:</strong> Add oils + ethanol (auto-calculated) + bottle
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <!-- Summary -->
+                <div class="card shadow-sm mb-4 position-sticky" style="top: 80px;">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Recipe Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="percentage-warning" class="alert alert-warning d-none">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Oil percentages should sum to 100%
+                        </div>
+
+                        <div id="ingredients-summary">
+                            <p class="text-muted mb-0">Loading...</p>
+                        </div>
+
+                        <hr>
+
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-save me-2"></i>Update Recipe
+                        </button>
+                        <a href="{{ url_for('production.view_recipe', id=recipe.id) }}" class="btn btn-outline-secondary w-100 mt-2">
+                            Cancel
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Ingredient Template -->
+<template id="ingredient-template">
+    <div class="ingredient-row card mb-2">
+        <div class="card-body py-2">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-6">
+                    <select name="ingredient_id[]" class="form-select form-select-sm ingredient-select" required>
+                        <option value="">Select material...</option>
+                        <optgroup label="Oils">
+                            {% for oil in oils %}
+                            <option value="{{ oil.id }}" data-type="oil">{{ oil.code }} - {{ oil.name }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="Bottles">
+                            {% for bottle in bottles %}
+                            <option value="{{ bottle.id }}" data-type="bottle">{{ bottle.name }} ({{ bottle.bottle_size_ml }}ml)</option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <div class="input-group input-group-sm">
+                        <input type="number" name="percentage[]" class="form-control percentage-input"
+                               step="0.01" min="0" max="100" placeholder="%">
+                        <span class="input-group-text">%</span>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-check">
+                        <input type="checkbox" name="is_packaging[]" class="form-check-input packaging-check">
+                        <label class="form-check-label small">Bottle</label>
+                    </div>
+                </div>
+                <div class="col-md-1 text-end">
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeIngredient(this)">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+let ingredientCount = 0;
+
+// Existing ingredients data
+const existingIngredients = [
+    {% for ing in recipe.ingredients %}
+    {
+        id: {{ ing.raw_material_id }},
+        percentage: {{ ing.percentage or 'null' }},
+        isPackaging: {{ 'true' if ing.is_packaging else 'false' }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+function addIngredient(materialId = null, percentage = null, isPackaging = false) {
+    const container = document.getElementById('ingredients-container');
+    const template = document.getElementById('ingredient-template');
+    const clone = template.content.cloneNode(true);
+
+    // Update names with index
+    clone.querySelectorAll('[name]').forEach(el => {
+        if (el.name === 'is_packaging[]') {
+            el.value = ingredientCount;
+        }
+    });
+
+    container.appendChild(clone);
+
+    // Get the newly added row
+    const rows = container.querySelectorAll('.ingredient-row');
+    const newRow = rows[rows.length - 1];
+
+    // Set values if provided
+    if (materialId) {
+        const select = newRow.querySelector('.ingredient-select');
+        select.value = materialId;
+    }
+
+    const packagingCheck = newRow.querySelector('.packaging-check');
+    const percentInput = newRow.querySelector('.percentage-input');
+
+    if (isPackaging) {
+        packagingCheck.checked = true;
+        percentInput.disabled = true;
+        percentInput.value = '';
+    } else if (percentage !== null) {
+        percentInput.value = percentage;
+    }
+
+    ingredientCount++;
+    updateSummary();
+}
+
+function removeIngredient(btn) {
+    btn.closest('.ingredient-row').remove();
+    updateSummary();
+}
+
+function updateSummary() {
+    const percentages = document.querySelectorAll('.percentage-input');
+    let totalPercent = 0;
+    let ingredientList = [];
+
+    const recipeType = document.getElementById('recipe-type').value;
+    const outputSize = parseFloat(document.querySelector('[name="output_size_ml"]').value) || 0;
+    const oilPercentage = recipeType === 'perfume'
+        ? (parseFloat(document.querySelector('[name="oil_percentage"]').value) || 35) / 100
+        : 1;
+
+    percentages.forEach(input => {
+        const row = input.closest('.ingredient-row');
+        const select = row.querySelector('.ingredient-select');
+        const isPackaging = row.querySelector('.packaging-check').checked;
+
+        if (select.value) {
+            if (isPackaging) {
+                ingredientList.push({
+                    name: select.options[select.selectedIndex].text,
+                    percentage: 0,
+                    isPackaging: true,
+                    quantity: 1,
+                    unit: 'pcs'
+                });
+            } else {
+                const val = parseFloat(input.value) || 0;
+                totalPercent += val;
+                const mlNeeded = outputSize * oilPercentage * (val / 100);
+                ingredientList.push({
+                    name: select.options[select.selectedIndex].text,
+                    percentage: val,
+                    isPackaging: false,
+                    quantity: mlNeeded,
+                    unit: 'ml'
+                });
+            }
+        }
+    });
+
+    // Update warning
+    const warning = document.getElementById('percentage-warning');
+    if (totalPercent > 0 && Math.abs(totalPercent - 100) > 0.01) {
+        warning.classList.remove('d-none');
+        warning.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i>Oil percentages sum to ${totalPercent.toFixed(1)}% (should be 100%)`;
+    } else {
+        warning.classList.add('d-none');
+    }
+
+    // Update summary
+    const summary = document.getElementById('ingredients-summary');
+    if (ingredientList.length > 0 && outputSize > 0) {
+        let html = '<div class="mb-2"><strong>Per Unit Calculation:</strong></div>';
+        html += '<ul class="list-unstyled mb-2">';
+
+        ingredientList.filter(i => !i.isPackaging).forEach(ing => {
+            html += `<li class="mb-1">
+                <i class="fas fa-tint text-primary me-2"></i>
+                <strong>${ing.name.split(' - ')[0]}</strong>: ${ing.percentage}%
+                <span class="badge bg-info">${ing.quantity.toFixed(2)} ml</span>
+            </li>`;
+        });
+
+        if (recipeType === 'perfume') {
+            const ethanolMl = outputSize * (1 - oilPercentage);
+            html += `<li class="mb-1">
+                <i class="fas fa-flask text-secondary me-2"></i>
+                <strong>Ethanol</strong>: ${((1 - oilPercentage) * 100).toFixed(0)}%
+                <span class="badge bg-secondary">${ethanolMl.toFixed(2)} ml</span>
+            </li>`;
+        }
+
+        ingredientList.filter(i => i.isPackaging).forEach(ing => {
+            html += `<li class="mb-1">
+                <i class="fas fa-wine-bottle text-success me-2"></i>
+                <strong>${ing.name.split(' (')[0]}</strong>
+                <span class="badge bg-success">1 pcs</span>
+            </li>`;
+        });
+
+        html += '</ul>';
+        summary.innerHTML = html;
+    } else {
+        summary.innerHTML = '<p class="text-muted mb-0">Add ingredients to see summary</p>';
+    }
+}
+
+// Handle recipe type change
+document.getElementById('recipe-type').addEventListener('change', function() {
+    const type = this.value;
+    const oilField = document.getElementById('oil-percentage-field');
+    const kioskCheck = document.getElementById('kiosk-check');
+
+    if (type === 'perfume') {
+        oilField.style.display = 'block';
+        kioskCheck.checked = false;
+        kioskCheck.disabled = true;
+    } else {
+        oilField.style.display = 'none';
+        kioskCheck.disabled = false;
+    }
+    updateSummary();
+});
+
+// Handle packaging checkbox
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('packaging-check')) {
+        const row = e.target.closest('.ingredient-row');
+        const percentInput = row.querySelector('.percentage-input');
+
+        if (e.target.checked) {
+            percentInput.value = '';
+            percentInput.disabled = true;
+        } else {
+            percentInput.disabled = false;
+        }
+        updateSummary();
+    }
+    if (e.target.classList.contains('ingredient-select')) {
+        updateSummary();
+    }
+});
+
+document.addEventListener('input', function(e) {
+    if (e.target.classList.contains('percentage-input')) {
+        updateSummary();
+    }
+});
+
+document.querySelector('[name="output_size_ml"]').addEventListener('change', updateSummary);
+document.querySelector('[name="oil_percentage"]').addEventListener('input', updateSummary);
+
+// Load existing ingredients on page load
+document.addEventListener('DOMContentLoaded', function() {
+    if (existingIngredients.length > 0) {
+        existingIngredients.forEach(ing => {
+            addIngredient(ing.id, ing.percentage, ing.isPackaging);
+        });
+    } else {
+        addIngredient();
+    }
+});
+</script>
+{% endblock %}

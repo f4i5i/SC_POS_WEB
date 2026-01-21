@@ -160,38 +160,99 @@
     }
 
     /* Action Buttons */
+    .action-btn-group {
+        display: flex;
+        gap: 6px;
+        flex-wrap: nowrap;
+    }
+
     .action-btn {
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        border: none;
-        padding: 0.35rem 0.75rem;
-        border-radius: 8px;
-        font-weight: 600;
-        font-size: 0.80rem;
-        position: relative;
-        overflow: hidden;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        border: 1px solid transparent;
+        transition: all 0.2s ease;
     }
 
-    .action-btn::before {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 0;
-        height: 0;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.4);
-        transform: translate(-50%, -50%);
-        transition: width 0.5s, height 0.5s;
+    .action-btn i {
+        margin: 0;
     }
 
-    .action-btn:hover::before {
-        width: 200px;
-        height: 200px;
+    .action-btn-view {
+        background: #E0F2FE;
+        color: #0369A1;
+        border-color: #BAE6FD;
+    }
+
+    .action-btn-view:hover {
+        background: #0EA5E9;
+        color: white;
+        border-color: #0EA5E9;
+    }
+
+    .action-btn-edit {
+        background: #FEF3C7;
+        color: #B45309;
+        border-color: #FDE68A;
+    }
+
+    .action-btn-edit:hover {
+        background: #F59E0B;
+        color: white;
+        border-color: #F59E0B;
+    }
+
+    .action-btn-stock {
+        background: #DBEAFE;
+        color: #1D4ED8;
+        border-color: #BFDBFE;
+    }
+
+    .action-btn-stock:hover {
+        background: #3B82F6;
+        color: white;
+        border-color: #3B82F6;
+    }
+
+    .action-btn-delete {
+        background: #FEE2E2;
+        color: #B91C1C;
+        border-color: #FECACA;
+    }
+
+    .action-btn-delete:hover {
+        background: #EF4444;
+        color: white;
+        border-color: #EF4444;
+    }
+
+    .action-btn-allocate {
+        background: #FEF3C7;
+        color: #B45309;
+        border-color: #FDE68A;
+        animation: pulse-allocate 2s infinite;
+    }
+
+    .action-btn-allocate:hover {
+        background: #F59E0B;
+        color: white;
+        border-color: #F59E0B;
+        animation: none;
+    }
+
+    @keyframes pulse-allocate {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+        50% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.2); }
     }
 
     .action-btn:hover {
-        transform: translateY(-2px) scale(1.05);
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     }
 
     /* Product Image Styling */
@@ -348,12 +409,9 @@
         color: #1E293B !important;
     }
 
-    [data-theme="clean"] .action-btn::before {
-        display: none !important;
-    }
-
     [data-theme="clean"] .action-btn:hover {
         transform: none !important;
+        box-shadow: none !important;
     }
 
     [data-theme="clean"] .page-link {
@@ -387,6 +445,11 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="fas fa-boxes"></i> Inventory Management</h2>
     <div>
+        {% if current_user.is_global_admin %}
+        <a href="{{ url_for('inventory.allocate_stock') }}" class="btn btn-warning me-2">
+            <i class="fas fa-exchange-alt"></i> Allocate Stock
+        </a>
+        {% endif %}
         {% if current_user.has_permission('inventory.create') %}
         <a href="{{ url_for('inventory.add_product') }}" class="btn btn-primary">
             <i class="fas fa-plus-circle"></i> Add New Product
@@ -400,8 +463,49 @@
 {% set in_stock_count = products.items|selectattr('_loc_quantity', 'gt', 0)|rejectattr('_loc_is_low_stock')|list|length if products.items else 0 %}
 {% set low_stock_count = products.items|selectattr('_loc_is_low_stock')|list|length if products.items else 0 %}
 {% set out_of_stock_count = products.items|selectattr('_loc_quantity', 'equalto', 0)|list|length if products.items else 0 %}
+{% if current_user.is_global_admin and not location %}
+{% set unallocated_count = products.items|selectattr('_loc_unallocated', 'defined')|selectattr('_loc_unallocated', 'gt', 0)|list|length if products.items else 0 %}
+{% endif %}
 
 <div class="row mb-4">
+    {% if current_user.is_global_admin and not location %}
+    <div class="col">
+        <div class="stat-card" style="animation-delay: 0.1s;">
+            <div class="stat-value">{{ total_count }}</div>
+            <div class="stat-label">Total Products</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="stat-card" style="animation-delay: 0.2s;">
+            <div class="stat-value text-success">{{ in_stock_count }}</div>
+            <div class="stat-label">In Stock</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="stat-card" style="animation-delay: 0.3s;">
+            <div class="stat-value text-warning">{{ low_stock_count }}</div>
+            <div class="stat-label">Low Stock</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="stat-card" style="animation-delay: 0.4s;">
+            <div class="stat-value text-danger">{{ out_of_stock_count }}</div>
+            <div class="stat-label">Out of Stock</div>
+        </div>
+    </div>
+    <div class="col">
+        <a href="{{ url_for('inventory.allocate_stock') }}" class="text-decoration-none">
+            <div class="stat-card" style="animation-delay: 0.5s; border: 2px solid {% if unallocated_count > 0 %}#f59e0b{% else %}#10b981{% endif %};">
+                <div class="stat-value" style="color: {% if unallocated_count > 0 %}#f59e0b{% else %}#10b981{% endif %};">
+                    {{ unallocated_count }}
+                </div>
+                <div class="stat-label">
+                    <i class="fas fa-exclamation-circle"></i> Unallocated
+                </div>
+            </div>
+        </a>
+    </div>
+    {% else %}
     <div class="col-md-3">
         <div class="stat-card" style="animation-delay: 0.1s;">
             <div class="stat-value">{{ total_count }}</div>
@@ -426,6 +530,7 @@
             <div class="stat-label">Out of Stock</div>
         </div>
     </div>
+    {% endif %}
 </div>
 
 <!-- Filters and Search -->
@@ -541,6 +646,18 @@
                                 <strong class="{% if product._loc_quantity == 0 %}text-danger{% elif product._loc_is_low_stock %}text-warning{% else %}text-success{% endif %}">
                                     {{ product._loc_quantity }}
                                 </strong>
+                                {% if current_user.is_global_admin and not location %}
+                                <div class="small">
+                                    {% if product._loc_allocated is defined %}
+                                    <span class="text-success" title="In Locations"><i class="fas fa-map-marker-alt"></i> {{ product._loc_allocated }}</span>
+                                    {% if product._loc_unallocated > 0 %}
+                                    <a href="{{ url_for('inventory.allocate_stock') }}" class="text-warning ms-1 text-decoration-none" title="Click to allocate">
+                                        <i class="fas fa-exclamation-circle"></i> {{ product._loc_unallocated }}
+                                    </a>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
+                                {% endif %}
                             </td>
                             <td>
                                 {% if product.expiry_date %}
@@ -581,32 +698,27 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <button class="action-btn btn-sm btn-info text-white"
-                                        onclick="viewProduct({{ product.id }})"
-                                        title="View Details">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                {% if current_user.has_permission('inventory.edit') %}
-                                <a href="{{ url_for('inventory.edit_product', product_id=product.id) }}"
-                                   class="action-btn btn-sm btn-warning text-white"
-                                   title="Edit">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                {% endif %}
-                                {% if current_user.has_permission('inventory.adjust_stock') %}
-                                <a href="{{ url_for('inventory.adjust_stock_page', product_id=product.id) }}"
-                                   class="action-btn btn-sm btn-primary"
-                                   title="Adjust Stock">
-                                    <i class="fas fa-boxes"></i>
-                                </a>
-                                {% endif %}
-                                {% if current_user.has_permission('inventory.delete') %}
-                                <button class="action-btn btn-sm btn-danger"
-                                        onclick="deleteProduct({{ product.id }}, '{{ product.name }}')"
-                                        title="Delete">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                                {% endif %}
+                                <div class="action-btn-group">
+                                    <button class="action-btn action-btn-view"
+                                            onclick="viewProduct({{ product.id }})"
+                                            title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    {% if current_user.has_permission('inventory.edit') %}
+                                    <a href="{{ url_for('inventory.edit_product', product_id=product.id) }}"
+                                       class="action-btn action-btn-edit"
+                                       title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if current_user.has_permission('inventory.delete') %}
+                                    <button class="action-btn action-btn-delete"
+                                            onclick="deleteProduct({{ product.id }}, '{{ product.name }}')"
+                                            title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}

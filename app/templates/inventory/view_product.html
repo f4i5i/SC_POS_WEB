@@ -103,6 +103,16 @@
             <a href="{{ url_for('inventory.index') }}" class="btn btn-outline-secondary me-2">
                 <i class="fas fa-arrow-left"></i> Back
             </a>
+            {% if current_user.has_permission('inventory.adjust_stock') %}
+            <a href="{{ url_for('inventory.adjust_stock_page', product_id=product.id) }}" class="btn btn-info me-2">
+                <i class="fas fa-sliders-h"></i> Adjust Stock
+            </a>
+            {% endif %}
+            {% if current_user.is_global_admin %}
+            <a href="{{ url_for('inventory.allocate_stock', product_id=product.id) }}" class="btn btn-warning me-2">
+                <i class="fas fa-map-marker-alt"></i> Allocate Stock
+            </a>
+            {% endif %}
             <a href="{{ url_for('inventory.edit_product', product_id=product.id) }}" class="btn btn-primary">
                 <i class="fas fa-edit"></i> Edit Product
             </a>
@@ -225,6 +235,68 @@
                 </div>
                 {% endif %}
 
+                <!-- Stock by Store (Global Admin Only) -->
+                {% if current_user.is_global_admin and location_stocks %}
+                <div class="col-12 mb-4">
+                    <div class="info-card">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0"><i class="fas fa-store text-primary me-2"></i>Stock by Store</h5>
+                            <span class="badge bg-primary">{{ location_stocks|length }} stores</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Location</th>
+                                        <th>Type</th>
+                                        <th class="text-center">Stock</th>
+                                        <th class="text-center">Reorder Level</th>
+                                        <th class="text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in location_stocks %}
+                                    <tr>
+                                        <td>
+                                            <i class="fas fa-store text-muted me-2"></i>
+                                            <strong>{{ item.location.name }}</strong>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">
+                                                {{ item.location.location_type|title }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            <strong class="{% if item.quantity == 0 %}text-danger{% elif item.quantity <= item.reorder_level %}text-warning{% else %}text-success{% endif %}">
+                                                {{ item.quantity }}
+                                            </strong>
+                                        </td>
+                                        <td class="text-center text-muted">{{ item.reorder_level }}</td>
+                                        <td class="text-center">
+                                            {% if item.quantity == 0 %}
+                                            <span class="badge bg-danger">Out of Stock</span>
+                                            {% elif item.quantity <= item.reorder_level %}
+                                            <span class="badge bg-warning text-dark">Low Stock</span>
+                                            {% else %}
+                                            <span class="badge bg-success">In Stock</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot class="table-light">
+                                    <tr>
+                                        <td colspan="2"><strong>Total in Stores</strong></td>
+                                        <td class="text-center"><strong>{{ location_stocks|sum(attribute='quantity') }}</strong></td>
+                                        <td colspan="2"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 <!-- Recent Stock Movements -->
                 <div class="col-md-6 mb-4">
                     <div class="info-card">
@@ -293,5 +365,6 @@ if (diffDays < 0) {
     console.log('Product expires in ' + diffDays + ' days');
 }
 {% endif %}
+
 </script>
 {% endblock %}

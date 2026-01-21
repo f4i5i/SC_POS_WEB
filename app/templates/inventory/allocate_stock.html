@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Allocate Stock to Locations - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-exchange-alt text-primary me-2"></i>Allocate Stock to Locations</h2>
+            <p class="text-muted mb-0">Move existing product stock to specific locations</p>
+        </div>
+        {% if selected_product %}
+        <a href="{{ url_for('inventory.view_product', product_id=selected_product.product.id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Product
+        </a>
+        {% else %}
+        <a href="{{ url_for('inventory.index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Inventory
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="row g-4">
+        <!-- Allocation Form -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Allocate Stock</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('inventory.allocate_stock') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                        {% if selected_product %}
+                        <div class="alert alert-info mb-3">
+                            <strong><i class="fas fa-box me-2"></i>{{ selected_product.product.name }}</strong><br>
+                            <small>{{ selected_product.unallocated }} units available to allocate</small>
+                            <input type="hidden" name="product_id" value="{{ selected_product.product.id }}">
+                        </div>
+                        {% else %}
+                        <div class="mb-3">
+                            <label class="form-label">Product <span class="text-danger">*</span></label>
+                            <select name="product_id" class="form-select" required id="product-select">
+                                <option value="">Select Product...</option>
+                                {% for item in unallocated_products %}
+                                <option value="{{ item.product.id }}"
+                                        data-unallocated="{{ item.unallocated }}">
+                                    {{ item.product.code }} - {{ item.product.name }}
+                                    ({{ item.unallocated }} unallocated)
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label class="form-label">Destination Location <span class="text-danger">*</span></label>
+                            <select name="location_id" class="form-select" required>
+                                <option value="">Select Location...</option>
+                                {% for location in locations %}
+                                <option value="{{ location.id }}">
+                                    {{ location.name }} ({{ location.location_type|title }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Quantity to Allocate <span class="text-danger">*</span></label>
+                            <input type="number" name="quantity" class="form-control" required
+                                   min="1" id="quantity-input" placeholder="Enter quantity"
+                                   {% if selected_product %}max="{{ selected_product.unallocated }}" value="{{ selected_product.unallocated }}"{% endif %}>
+                            <small class="text-muted" id="max-qty-hint">
+                                {% if selected_product %}
+                                Maximum: {{ selected_product.unallocated }} units available
+                                {% else %}
+                                Select a product to see available quantity
+                                {% endif %}
+                            </small>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-check me-2"></i>Allocate Stock
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unallocated Products List -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle text-warning me-2"></i>Products with Unallocated Stock</h5>
+                    <span class="badge bg-warning text-dark">{{ unallocated_products|length }} products</span>
+                </div>
+                <div class="card-body p-0">
+                    {% if unallocated_products %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Product</th>
+                                    <th class="text-center">Total Stock</th>
+                                    <th class="text-center">Allocated</th>
+                                    <th class="text-center">Unallocated</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in unallocated_products %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ item.product.code }}</strong>
+                                        <div class="small text-muted">{{ item.product.name }}</div>
+                                    </td>
+                                    <td class="text-center">{{ item.total_stock }}</td>
+                                    <td class="text-center">
+                                        <span class="badge bg-success">{{ item.allocated }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-warning text-dark">{{ item.unallocated }}</span>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                                onclick="selectProduct({{ item.product.id }}, {{ item.unallocated }})">
+                                            <i class="fas fa-arrow-right"></i> Allocate
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
+                        <h5>All Stock Allocated!</h5>
+                        <p class="text-muted">All products have their stock properly allocated to locations.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Location Stock Summary -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Stock by Location</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        {% for location in locations %}
+                        <div class="col-md-4">
+                            <div class="card bg-light border-0">
+                                <div class="card-body py-3">
+                                    <h6 class="mb-1">
+                                        <i class="fas fa-{% if location.location_type == 'warehouse' %}warehouse{% else %}store{% endif %} me-2"></i>
+                                        {{ location.name }}
+                                    </h6>
+                                    <small class="text-muted">{{ location.location_type|title }}</small>
+                                    <div class="mt-2">
+                                        <span class="badge bg-primary">
+                                            {{ location.stock.count() }} products
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function selectProduct(productId, maxQty) {
+    document.getElementById('product-select').value = productId;
+    document.getElementById('quantity-input').max = maxQty;
+    document.getElementById('quantity-input').value = maxQty;
+    document.getElementById('max-qty-hint').textContent = `Maximum: ${maxQty} units available`;
+    document.getElementById('quantity-input').focus();
+}
+
+document.getElementById('product-select').addEventListener('change', function() {
+    const option = this.options[this.selectedIndex];
+    const maxQty = option.dataset.unallocated || 0;
+    document.getElementById('quantity-input').max = maxQty;
+    document.getElementById('max-qty-hint').textContent = maxQty > 0
+        ? `Maximum: ${maxQty} units available`
+        : 'Select a product to see available quantity';
+});
+</script>
+{% endblock %}

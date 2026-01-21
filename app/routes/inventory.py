@@ -10,7 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 import os
 import pandas as pd
-from app.models import db, Product, Category, Supplier, StockMovement, SyncQueue
+from app.models import db, Product, Category, Supplier, StockMovement, SyncQueue, Location, LocationStock
 from app.utils.helpers import has_permission, allowed_file
 from app.utils.permissions import permission_required, Permissions
 import json
@@ -87,21 +87,155 @@ def index():
             product._loc_reorder_level = ls.reorder_level if ls else product.reorder_level
             product._loc_is_low_stock = product._loc_quantity <= product._loc_reorder_level
     else:
-        # No location - use product's own values
+        # Global admin - calculate total stock across all locations
+        # Get total stock per product from LocationStock
+        from sqlalchemy import func
+        total_stocks = db.session.query(
+            LocationStock.product_id,
+            func.sum(LocationStock.quantity).label('total_qty')
+        ).group_by(LocationStock.product_id).all()
+        total_stock_map = {ts.product_id: int(ts.total_qty or 0) for ts in total_stocks}
+
         for product in products.items:
-            product._loc_quantity = product.quantity
+            allocated_qty = total_stock_map.get(product.id, 0)
+            unallocated_qty = max(0, product.quantity - allocated_qty)
+
+            # Total = allocated (in locations) + unallocated (not yet assigned)
+            product._loc_quantity = allocated_qty + unallocated_qty
+            product._loc_allocated = allocated_qty  # Stock in locations
+            product._loc_unallocated = unallocated_qty  # Stock not yet assigned to locations
             product._loc_reorder_level = product.reorder_level
-            product._loc_is_low_stock = product.quantity <= product.reorder_level
+            product._loc_is_low_stock = product._loc_quantity <= product._loc_reorder_level
 
     # Get categories and suppliers for filters
     categories = Category.query.all()
     suppliers = Supplier.query.filter_by(is_active=True).all()
 
+    # Get all locations for global admin
+    locations = []
+    if current_user.is_global_admin:
+        locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+
     return render_template('inventory/index.html',
                          products=products,
                          categories=categories,
                          suppliers=suppliers,
-                         location=location)
+                         location=location,
+                         locations=locations)
+
+
+@bp.route('/allocate-stock', methods=['GET', 'POST'])
+@login_required
+@permission_required(Permissions.INVENTORY_ADJUST)
+def allocate_stock():
+    """Allocate existing product stock to locations (Global Admin only)"""
+    if not current_user.is_global_admin:
+        flash('Only global admins can allocate stock to locations', 'danger')
+        return redirect(url_for('inventory.index'))
+
+    # Check if specific product is requested
+    selected_product_id = request.args.get('product_id', type=int)
+    selected_product = None
+
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+
+    # Get products with unallocated stock (product.quantity > 0 but no LocationStock entries)
+    products_with_stock = Product.query.filter(
+        Product.quantity > 0,
+        Product.is_active == True
+    ).all()
+
+    unallocated_products = []
+    for product in products_with_stock:
+        # Check if total LocationStock quantity matches product.quantity
+        total_allocated = db.session.query(
+            db.func.coalesce(db.func.sum(LocationStock.quantity), 0)
+        ).filter(LocationStock.product_id == product.id).scalar()
+
+        unallocated_qty = product.quantity - int(total_allocated or 0)
+        if unallocated_qty > 0:
+            product_data = {
+                'product': product,
+                'total_stock': product.quantity,
+                'allocated': int(total_allocated or 0),
+                'unallocated': unallocated_qty
+            }
+            unallocated_products.append(product_data)
+
+            # If this is the selected product, save it
+            if selected_product_id and product.id == selected_product_id:
+                selected_product = product_data
+
+    if request.method == 'POST':
+        try:
+            product_id = request.form.get('product_id', type=int)
+            location_id = request.form.get('location_id', type=int)
+            quantity = request.form.get('quantity', type=int)
+
+            if not all([product_id, location_id, quantity]):
+                flash('Please fill all fields', 'danger')
+                return redirect(url_for('inventory.allocate_stock'))
+
+            product = Product.query.get_or_404(product_id)
+            location = Location.query.get_or_404(location_id)
+
+            # Check if quantity is valid
+            total_allocated = db.session.query(
+                db.func.coalesce(db.func.sum(LocationStock.quantity), 0)
+            ).filter(LocationStock.product_id == product_id).scalar()
+            unallocated = product.quantity - int(total_allocated or 0)
+
+            if quantity > unallocated:
+                flash(f'Cannot allocate {quantity} units. Only {unallocated} unallocated.', 'danger')
+                return redirect(url_for('inventory.allocate_stock'))
+
+            # Check if LocationStock exists for this product+location
+            location_stock = LocationStock.query.filter_by(
+                product_id=product_id,
+                location_id=location_id
+            ).first()
+
+            if location_stock:
+                location_stock.quantity += quantity
+                location_stock.last_movement_at = datetime.utcnow()
+            else:
+                location_stock = LocationStock(
+                    product_id=product_id,
+                    location_id=location_id,
+                    quantity=quantity,
+                    reorder_level=product.reorder_level,
+                    last_movement_at=datetime.utcnow()
+                )
+                db.session.add(location_stock)
+
+            # Create stock movement record
+            stock_movement = StockMovement(
+                product_id=product_id,
+                user_id=current_user.id,
+                movement_type='allocation',
+                quantity=quantity,
+                reference='STOCK_ALLOCATION',
+                notes=f'Stock allocated to {location.name}',
+                location_id=location_id
+            )
+            db.session.add(stock_movement)
+
+            db.session.commit()
+            flash(f'Successfully allocated {quantity} units of {product.name} to {location.name}', 'success')
+
+            # Redirect back to product page if came from there
+            if selected_product_id:
+                return redirect(url_for('inventory.view_product', product_id=product_id))
+            return redirect(url_for('inventory.allocate_stock'))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error allocating stock: {str(e)}', 'danger')
+
+    return render_template('inventory/allocate_stock.html',
+                           locations=locations,
+                           unallocated_products=unallocated_products,
+                           selected_product=selected_product)
 
 
 @bp.route('/add', methods=['GET', 'POST'])
@@ -176,15 +310,54 @@ def add_product():
             db.session.add(product)
             db.session.flush()
 
-            # Create initial stock movement
-            if product.quantity > 0:
+            # Get location_id if provided (for global admin)
+            location_id = request.form.get('location_id', type=int)
+
+            # If location specified, create LocationStock entry
+            if location_id and product.quantity > 0:
+                location_stock = LocationStock(
+                    location_id=location_id,
+                    product_id=product.id,
+                    quantity=product.quantity,
+                    reorder_level=product.reorder_level,
+                    last_movement_at=datetime.utcnow()
+                )
+                db.session.add(location_stock)
+
+                # Create stock movement with location
                 stock_movement = StockMovement(
                     product_id=product.id,
                     user_id=current_user.id,
                     movement_type='adjustment',
                     quantity=product.quantity,
                     reference='INITIAL_STOCK',
-                    notes='Initial stock entry'
+                    notes='Initial stock entry',
+                    location_id=location_id
+                )
+                db.session.add(stock_movement)
+            elif product.quantity > 0:
+                # No location specified - create movement without location
+                # For non-global admins, use their assigned location
+                user_location_id = current_user.location_id if current_user.location_id else None
+
+                if user_location_id:
+                    location_stock = LocationStock(
+                        location_id=user_location_id,
+                        product_id=product.id,
+                        quantity=product.quantity,
+                        reorder_level=product.reorder_level,
+                        last_movement_at=datetime.utcnow()
+                    )
+                    db.session.add(location_stock)
+
+                stock_movement = StockMovement(
+                    product_id=product.id,
+                    user_id=current_user.id,
+                    movement_type='adjustment',
+                    quantity=product.quantity,
+                    reference='INITIAL_STOCK',
+                    notes='Initial stock entry',
+                    location_id=user_location_id
                 )
                 db.session.add(stock_movement)
 
@@ -198,7 +371,8 @@ def add_product():
             db.session.add(sync_item)
 
             db.session.commit()
-            flash(f'Product {product.name} added successfully', 'success')
+            location_name = Location.query.get(location_id).name if location_id else 'default'
+            flash(f'Product {product.name} added successfully at {location_name}', 'success')
             return redirect(url_for('inventory.index'))
 
         except Exception as e:
@@ -207,7 +381,11 @@ def add_product():
 
     categories = Category.query.all()
     suppliers = Supplier.query.filter_by(is_active=True).all()
-    return render_template('inventory/add_product.html', categories=categories, suppliers=suppliers)
+    locations = Location.query.filter_by(is_active=True).all() if current_user.is_global_admin else []
+    return render_template('inventory/add_product.html',
+                           categories=categories,
+                           suppliers=suppliers,
+                           locations=locations)
 
 
 @bp.route('/product/<int:product_id>')
@@ -225,8 +403,31 @@ def view_product(product_id):
     # Get location-specific stock
     location_stock = None
     store_quantity = product.quantity  # Fallback to global quantity
+    location_stocks = []  # For global admin: stock per location
+    total_allocated = 0
 
-    if location:
+    if current_user.is_global_admin:
+        # Get only store/kiosk locations (exclude warehouses) with their stock for this product
+        locations = Location.query.filter(
+            Location.is_active == True,
+            Location.location_type != 'warehouse'
+        ).order_by(Location.name).all()
+        all_location_stocks = {ls.location_id: ls for ls in LocationStock.query.filter_by(product_id=product_id).all()}
+
+        for loc in locations:
+            ls = all_location_stocks.get(loc.id)
+            qty = ls.quantity if ls else 0
+            total_allocated += qty
+            location_stocks.append({
+                'location': loc,
+                'location_stock': ls,
+                'quantity': qty,
+                'reorder_level': ls.reorder_level if ls else product.reorder_level
+            })
+
+        # Total stock for global admin
+        store_quantity = total_allocated if total_allocated > 0 else product.quantity
+    elif location:
         location_stock = LocationStock.query.filter_by(
             location_id=location.id,
             product_id=product_id
@@ -248,6 +449,7 @@ def view_product(product_id):
                           product=product,
                           location=location,
                           location_stock=location_stock,
+                          location_stocks=location_stocks,
                           store_quantity=store_quantity,
                           stock_movements=stock_movements,
                           recent_sales=recent_sales,
@@ -467,6 +669,110 @@ def adjust_stock(product_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/adjust-stock-location/<int:product_id>', methods=['POST'])
+@login_required
+@permission_required(Permissions.INVENTORY_ADJUST)
+def adjust_stock_location(product_id):
+    """Adjust product stock for a specific location (Global Admin only)"""
+    if not current_user.is_global_admin:
+        flash('Only global admins can adjust stock by location', 'danger')
+        return redirect(url_for('inventory.view_product', product_id=product_id))
+
+    try:
+        product = Product.query.get_or_404(product_id)
+
+        # Accept both form data and JSON
+        if request.is_json:
+            data = request.get_json()
+            location_id = data.get('location_id')
+            adjustment_type = data.get('adjustment_type', 'add')
+            quantity = int(data.get('quantity', 0))
+            reason = data.get('reason', 'Manual adjustment')
+            is_ajax = True
+        else:
+            location_id = request.form.get('location_id')
+            adjustment_type = request.form.get('adjustment_type', 'add')
+            quantity = int(request.form.get('quantity', 0))
+            reason = request.form.get('reason', 'Manual adjustment')
+            is_ajax = False
+
+        if not location_id:
+            if is_ajax:
+                return jsonify({'success': False, 'error': 'Location ID required'}), 400
+            flash('Location ID required', 'danger')
+            return redirect(url_for('inventory.view_product', product_id=product_id))
+
+        location = Location.query.get_or_404(location_id)
+
+        # Get or create LocationStock
+        location_stock = LocationStock.query.filter_by(
+            location_id=location_id, product_id=product_id
+        ).first()
+
+        if not location_stock:
+            location_stock = LocationStock(
+                location_id=location_id,
+                product_id=product_id,
+                quantity=0,
+                reorder_level=product.reorder_level
+            )
+            db.session.add(location_stock)
+
+        old_quantity = location_stock.quantity
+
+        # Calculate adjustment based on type
+        if adjustment_type == 'add':
+            adjustment = quantity
+        elif adjustment_type == 'remove':
+            adjustment = -quantity
+        elif adjustment_type == 'set':
+            adjustment = quantity - old_quantity
+        else:
+            adjustment = quantity
+
+        location_stock.quantity += adjustment
+        location_stock.last_movement_at = datetime.utcnow()
+
+        if location_stock.quantity < 0:
+            if is_ajax:
+                return jsonify({'success': False, 'error': 'Stock cannot be negative'}), 400
+            flash('Stock cannot be negative', 'danger')
+            return redirect(url_for('inventory.view_product', product_id=product_id))
+
+        new_quantity = location_stock.quantity
+
+        # Create stock movement
+        stock_movement = StockMovement(
+            product_id=product_id,
+            user_id=current_user.id,
+            location_id=location_id,
+            movement_type='adjustment',
+            quantity=adjustment,
+            reference='ADMIN_ADJUSTMENT',
+            notes=f'{reason} at {location.name} (Old: {old_quantity}, New: {new_quantity})'
+        )
+        db.session.add(stock_movement)
+
+        db.session.commit()
+
+        if is_ajax:
+            return jsonify({
+                'success': True,
+                'new_quantity': new_quantity,
+                'message': f'Stock adjusted successfully at {location.name}'
+            })
+
+        flash(f'Stock adjusted successfully at {location.name}', 'success')
+        return redirect(url_for('inventory.view_product', product_id=product_id))
+
+    except Exception as e:
+        db.session.rollback()
+        if request.is_json:
+            return jsonify({'success': False, 'error': str(e)}), 500
+        flash(f'Error adjusting stock: {str(e)}', 'danger')
+        return redirect(url_for('inventory.view_product', product_id=product_id))
 
 
 @bp.route('/adjust-stock-page/<int:product_id>', methods=['GET', 'POST'])

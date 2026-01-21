@@ -509,7 +509,58 @@
                     <!-- Inventory -->
                     <div class="form-section" style="animation-delay: 0.3s;">
                         <h5><i class="fas fa-warehouse"></i> Inventory</h5>
+                        {% if current_user.is_global_admin and locations %}
+                        <div class="alert alert-info mb-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Global Admin:</strong> Select a location where this stock will be stored.
+                        </div>
+                        {% endif %}
                         <div class="row">
+                            {% if current_user.is_global_admin and locations %}
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="location_id" class="form-label required-field">
+                                        <i class="fas fa-map-marker-alt text-primary"></i> Stock Location
+                                    </label>
+                                    <select class="form-select" id="location_id" name="location_id" required>
+                                        <option value="">Select Location...</option>
+                                        {% for location in locations %}
+                                        <option value="{{ location.id }}">
+                                            {{ location.name }} ({{ location.location_type|title }})
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                    <small class="help-text">Where will this stock be stored?</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="mb-3">
+                                    <label for="quantity" class="form-label required-field">Initial Qty</label>
+                                    <input type="number"
+                                           class="form-control"
+                                           id="quantity"
+                                           name="quantity"
+                                           min="0"
+                                           required
+                                           value="0"
+                                           placeholder="0">
+                                    <small class="help-text">Stock quantity</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="mb-3">
+                                    <label for="reorder_level" class="form-label">Reorder Level</label>
+                                    <input type="number"
+                                           class="form-control"
+                                           id="reorder_level"
+                                           name="reorder_level"
+                                           min="0"
+                                           value="10"
+                                           placeholder="10">
+                                    <small class="help-text">Low stock alert</small>
+                                </div>
+                            </div>
+                            {% else %}
                             <div class="col-md-3">
                                 <div class="mb-3">
                                     <label for="quantity" class="form-label required-field">Initial Quantity</label>
@@ -537,6 +588,7 @@
                                     <small class="help-text">Alert when stock reaches this level</small>
                                 </div>
                             </div>
+                            {% endif %}
                             <div class="col-md-3">
                                 <div class="mb-3">
                                     <label for="expiry_date" class="form-label">
@@ -547,10 +599,10 @@
                                            id="expiry_date"
                                            name="expiry_date"
                                            placeholder="YYYY-MM-DD">
-                                    <small class="help-text">Optional - for perishable products</small>
+                                    <small class="help-text">Optional - for perishable</small>
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-{% if current_user.is_global_admin and locations %}2{% else %}3{% endif %}">
                                 <div class="mb-3">
                                     <label for="supplier_id" class="form-label">Supplier</label>
                                     <select class="form-select" id="supplier_id" name="supplier_id">

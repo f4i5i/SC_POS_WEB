@@ -389,6 +389,97 @@ def view_recipe(id):
                            current_location=location)
 
 
+@bp.route('/recipes/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+@permission_required(Permissions.RECIPE_EDIT)
+def edit_recipe(id):
+    """Edit existing recipe"""
+    recipe = Recipe.query.get_or_404(id)
+
+    if request.method == 'POST':
+        try:
+            recipe.name = request.form.get('name', '').strip()
+            recipe.recipe_type = request.form.get('recipe_type')
+            recipe.product_id = request.form.get('product_id', type=int) or None
+            recipe.output_size_ml = request.form.get('output_size_ml', type=float)
+            recipe.oil_percentage = request.form.get('oil_percentage', type=float, default=100)
+            recipe.can_produce_at_kiosk = request.form.get('can_produce_at_kiosk') == 'on'
+            recipe.description = request.form.get('description', '').strip()
+
+            # Delete old ingredients
+            RecipeIngredient.query.filter_by(recipe_id=recipe.id).delete()
+
+            # Add new ingredients
+            ingredient_ids = request.form.getlist('ingredient_id[]')
+            percentages = request.form.getlist('percentage[]')
+            is_packaging_list = request.form.getlist('is_packaging[]')
+
+            for i, mat_id in enumerate(ingredient_ids):
+                if mat_id:
+                    is_pack = str(i) in is_packaging_list
+                    pct = float(percentages[i]) if i < len(percentages) and percentages[i] else None
+
+                    ingredient = RecipeIngredient(
+                        recipe_id=recipe.id,
+                        raw_material_id=int(mat_id),
+                        percentage=pct if not is_pack else None,
+                        is_packaging=is_pack
+                    )
+                    db.session.add(ingredient)
+
+            db.session.commit()
+            flash(f'Recipe "{recipe.name}" updated successfully.', 'success')
+            return redirect(url_for('production.view_recipe', id=recipe.id))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating recipe: {str(e)}', 'danger')
+
+    # Get data for form
+    products = Product.query.filter_by(is_active=True, is_manufactured=True).all()
+    oils = RawMaterial.query.join(RawMaterialCategory).filter(
+        RawMaterialCategory.code == 'OIL'
+    ).order_by(RawMaterial.name).all()
+    bottles = RawMaterial.query.join(RawMaterialCategory).filter(
+        RawMaterialCategory.code == 'BOTTLE'
+    ).order_by(RawMaterial.bottle_size_ml).all()
+
+    return render_template('production/recipes/edit.html',
+                           recipe=recipe,
+                           products=products,
+                           oils=oils,
+                           bottles=bottles)
+
+
+@bp.route('/recipes/<int:id>/delete', methods=['POST'])
+@login_required
+@permission_required(Permissions.RECIPE_DELETE)
+def delete_recipe(id):
+    """Delete a recipe"""
+    try:
+        recipe = Recipe.query.get_or_404(id)
+
+        # Check if recipe has production orders
+        if recipe.production_orders.count() > 0:
+            flash('Cannot delete recipe with existing production orders.', 'danger')
+            return redirect(url_for('production.view_recipe', id=id))
+
+        # Delete ingredients first
+        RecipeIngredient.query.filter_by(recipe_id=id).delete()
+
+        # Delete recipe
+        db.session.delete(recipe)
+        db.session.commit()
+
+        flash(f'Recipe "{recipe.name}" deleted successfully.', 'success')
+        return redirect(url_for('production.recipes'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting recipe: {str(e)}', 'danger')
+        return redirect(url_for('production.view_recipe', id=id))
+
+
 # ============================================================
 # Production Orders
 # ============================================================

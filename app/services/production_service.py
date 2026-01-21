@@ -83,6 +83,14 @@ class ProductionService:
         if recipe.recipe_type == 'perfume':
             ethanol_amount_ml = total_ml * (1 - oil_percentage)
 
+        # Count oil ingredients (non-packaging, non-ethanol)
+        oil_ingredients = [
+            ing for ing in recipe.ingredients
+            if not ing.is_packaging and ing.raw_material and
+               not (ing.raw_material.category and ing.raw_material.category.code == 'ETHANOL')
+        ]
+        is_single_oil = len(oil_ingredients) == 1
+
         # Process each ingredient
         for ingredient in recipe.ingredients:
             material = ingredient.raw_material
@@ -92,25 +100,36 @@ class ProductionService:
             if ingredient.is_packaging:
                 # Bottles - one per unit produced
                 required_qty = quantity
+                unit = 'pcs'
             elif material.category and material.category.code == 'ETHANOL':
                 # Ethanol for perfumes
                 required_qty = ethanol_amount_ml
+                unit = 'ml'
             else:
                 # Oil ingredients
-                if recipe.recipe_type == 'single_oil':
-                    # Single oil attar - all oil is this ingredient
+                if recipe.recipe_type == 'single_oil' or is_single_oil:
+                    # Single oil attar OR perfume with single oil - all oil is this ingredient
                     required_qty = oil_amount_ml
                 else:
                     # Blended - calculate based on percentage
                     ing_percentage = float(ingredient.percentage or 0) / 100
                     required_qty = oil_amount_ml * ing_percentage
+                unit = 'ml'
+
+            # Determine unit: packaging = pcs, liquids = ml
+            if ingredient.is_packaging:
+                display_unit = 'pcs'
+            elif material.category and material.category.code in ['OIL', 'ETHANOL']:
+                display_unit = 'ml'
+            else:
+                display_unit = material.unit or 'ml'
 
             materials.append({
                 'raw_material_id': material.id,
                 'raw_material': material,
                 'code': material.code,
                 'name': material.name,
-                'unit': material.unit,
+                'unit': display_unit,
                 'quantity_required': round(required_qty, 4),
                 'is_packaging': ingredient.is_packaging,
                 'percentage': float(ingredient.percentage or 0) if not ingredient.is_packaging else None
