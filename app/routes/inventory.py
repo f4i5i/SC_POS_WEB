@@ -9,7 +9,8 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 from decimal import Decimal
 import os
-import pandas as pd
+import csv
+import io
 from app.models import db, Product, Category, Supplier, StockMovement, SyncQueue, Location, LocationStock
 from app.utils.helpers import has_permission, allowed_file
 from app.utils.permissions import permission_required, Permissions
@@ -886,36 +887,37 @@ def import_csv():
         return redirect(url_for('inventory.index'))
 
     try:
-        # Read CSV
-        df = pd.read_csv(file)
+        # Read CSV using built-in csv module
+        stream = io.StringIO(file.stream.read().decode('utf-8'))
+        reader = csv.DictReader(stream)
 
         # Expected columns: code, barcode, name, brand, category, supplier, cost_price, selling_price, quantity
         imported = 0
         errors = []
 
-        for index, row in df.iterrows():
+        for index, row in enumerate(reader):
             try:
                 # Check if product already exists
                 existing = Product.query.filter_by(code=row['code']).first()
                 if existing:
-                    errors.append(f"Row {index + 1}: Product code {row['code']} already exists")
+                    errors.append(f"Row {index + 2}: Product code {row['code']} already exists")
                     continue
 
                 product = Product(
                     code=row['code'],
-                    barcode=row.get('barcode'),
+                    barcode=row.get('barcode') or None,
                     name=row['name'],
-                    brand=row.get('brand'),
-                    cost_price=Decimal(str(row.get('cost_price', 0))),
-                    selling_price=Decimal(str(row.get('selling_price', 0))),
-                    quantity=int(row.get('quantity', 0))
+                    brand=row.get('brand') or None,
+                    cost_price=Decimal(str(row.get('cost_price') or 0)),
+                    selling_price=Decimal(str(row.get('selling_price') or 0)),
+                    quantity=int(row.get('quantity') or 0)
                 )
 
                 db.session.add(product)
                 imported += 1
 
             except Exception as e:
-                errors.append(f"Row {index + 1}: {str(e)}")
+                errors.append(f"Row {index + 2}: {str(e)}")
 
         db.session.commit()
 
