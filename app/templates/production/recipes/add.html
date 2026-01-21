@@ -233,41 +233,117 @@ function updateSummary() {
     const percentages = document.querySelectorAll('.percentage-input');
     let totalPercent = 0;
     let ingredientList = [];
+    let hasBottle = false;
+
+    // Get recipe parameters
+    const recipeType = document.getElementById('recipe-type').value;
+    const outputSize = parseFloat(document.querySelector('[name="output_size_ml"]').value) || 0;
+    const oilPercentage = recipeType === 'perfume'
+        ? (parseFloat(document.querySelector('[name="oil_percentage"]').value) || 35) / 100
+        : 1; // 100% for attars
 
     percentages.forEach(input => {
         const row = input.closest('.ingredient-row');
         const select = row.querySelector('.ingredient-select');
         const isPackaging = row.querySelector('.packaging-check').checked;
 
-        if (select.value && !isPackaging) {
-            const val = parseFloat(input.value) || 0;
-            totalPercent += val;
-            ingredientList.push({
-                name: select.options[select.selectedIndex].text,
-                percentage: val
-            });
+        if (select.value) {
+            if (isPackaging) {
+                hasBottle = true;
+                ingredientList.push({
+                    name: select.options[select.selectedIndex].text,
+                    percentage: 0,
+                    isPackaging: true,
+                    quantity: 1,
+                    unit: 'pcs'
+                });
+            } else {
+                const val = parseFloat(input.value) || 0;
+                totalPercent += val;
+                // Calculate actual ml needed
+                const mlNeeded = outputSize * oilPercentage * (val / 100);
+                ingredientList.push({
+                    name: select.options[select.selectedIndex].text,
+                    percentage: val,
+                    isPackaging: false,
+                    quantity: mlNeeded,
+                    unit: 'ml'
+                });
+            }
         }
     });
 
     // Update warning
     const warning = document.getElementById('percentage-warning');
-    const recipeType = document.getElementById('recipe-type').value;
 
     if (recipeType !== 'perfume' && totalPercent > 0 && Math.abs(totalPercent - 100) > 0.01) {
         warning.classList.remove('d-none');
-        warning.textContent = `Oil percentages sum to ${totalPercent}% (should be 100%)`;
+        warning.textContent = `Oil percentages sum to ${totalPercent.toFixed(1)}% (should be 100%)`;
+    } else if (recipeType === 'perfume' && totalPercent > 0 && Math.abs(totalPercent - 100) > 0.01) {
+        warning.classList.remove('d-none');
+        warning.classList.remove('alert-warning');
+        warning.classList.add('alert-info');
+        warning.textContent = `Oil blend percentages sum to ${totalPercent.toFixed(1)}% (should be 100% of oil portion)`;
     } else {
         warning.classList.add('d-none');
     }
 
-    // Update summary
+    // Update summary with actual calculations
     const summary = document.getElementById('ingredients-summary');
-    if (ingredientList.length > 0) {
+    if (ingredientList.length > 0 && outputSize > 0) {
+        let html = '<div class="mb-2"><strong>Per Unit Calculation:</strong></div>';
+        html += '<ul class="list-unstyled mb-2">';
+
+        // Show oils
+        let totalOilMl = 0;
+        ingredientList.filter(i => !i.isPackaging).forEach(ing => {
+            totalOilMl += ing.quantity;
+            html += `<li class="mb-1">
+                <i class="fas fa-tint text-primary me-2"></i>
+                <strong>${ing.name.split(' - ')[0]}</strong>: ${ing.percentage}%
+                <span class="badge bg-info">${ing.quantity.toFixed(2)} ml</span>
+            </li>`;
+        });
+
+        // Show ethanol for perfumes
+        if (recipeType === 'perfume') {
+            const ethanolMl = outputSize * (1 - oilPercentage);
+            html += `<li class="mb-1">
+                <i class="fas fa-flask text-secondary me-2"></i>
+                <strong>Ethanol</strong>: ${((1 - oilPercentage) * 100).toFixed(0)}%
+                <span class="badge bg-secondary">${ethanolMl.toFixed(2)} ml</span>
+            </li>`;
+        }
+
+        // Show bottle
+        ingredientList.filter(i => i.isPackaging).forEach(ing => {
+            html += `<li class="mb-1">
+                <i class="fas fa-wine-bottle text-success me-2"></i>
+                <strong>${ing.name.split(' (')[0]}</strong>
+                <span class="badge bg-success">1 pcs</span>
+            </li>`;
+        });
+
+        html += '</ul>';
+
+        // Total summary
+        html += '<hr class="my-2">';
+        html += `<div class="small">
+            <strong>Total Output:</strong> ${outputSize} ml<br>
+            <strong>Total Oil:</strong> ${totalOilMl.toFixed(2)} ml (${(oilPercentage * 100).toFixed(0)}%)`;
+        if (recipeType === 'perfume') {
+            html += `<br><strong>Total Ethanol:</strong> ${(outputSize - totalOilMl).toFixed(2)} ml (${((1 - oilPercentage) * 100).toFixed(0)}%)`;
+        }
+        html += '</div>';
+
+        summary.innerHTML = html;
+    } else if (ingredientList.length > 0) {
         let html = '<ul class="list-unstyled mb-0">';
         ingredientList.forEach(ing => {
             html += `<li><i class="fas fa-check text-success me-2"></i>${ing.name}: ${ing.percentage}%</li>`;
         });
         html += '</ul>';
+        html += '<p class="text-warning small mt-2"><i class="fas fa-exclamation-triangle"></i> Select output size to see ml calculations</p>';
         summary.innerHTML = html;
     } else {
         summary.innerHTML = '<p class="text-muted mb-0">Add ingredients to see summary</p>';
@@ -291,6 +367,17 @@ document.getElementById('recipe-type').addEventListener('change', function() {
             kioskCheck.checked = true;
         }
     }
+    updateSummary();
+});
+
+// Handle output size change
+document.querySelector('[name="output_size_ml"]').addEventListener('change', function() {
+    updateSummary();
+});
+
+// Handle oil percentage change (for perfumes)
+document.querySelector('[name="oil_percentage"]').addEventListener('input', function() {
+    updateSummary();
 });
 
 // Handle packaging checkbox
