@@ -122,7 +122,7 @@
                 <h1 class="mb-1"><i class="fas fa-bell me-2"></i>Payment Reminders</h1>
                 <p class="mb-0 opacity-75">Track overdue and upcoming vendor payments</p>
             </div>
-            <a href="{{ url_for('vendor_payments.index') }}" class="btn btn-light">
+            <a href="{{ url_for('supplier_payments.index') }}" class="btn btn-light">
                 <i class="fas fa-arrow-left me-1"></i> Back to Payments
             </a>
         </div>
@@ -198,7 +198,7 @@
                                 <br>
                                 <small class="text-muted">Oldest PO: {{ item.oldest_po.po_number }}</small>
                             </div>
-                            <a href="{{ url_for('vendor_payments.create') }}?supplier_id={{ item.supplier.id }}" class="btn btn-danger btn-sm">
+                            <a href="{{ url_for('supplier_payments.create') }}?supplier_id={{ item.supplier.id }}" class="btn btn-danger btn-sm">
                                 <i class="fas fa-plus me-1"></i> Pay Now
                             </a>
                         </div>
@@ -248,7 +248,7 @@
                                 <br>
                                 <small class="text-muted">PO: {{ item.oldest_po.po_number }}</small>
                             </div>
-                            <a href="{{ url_for('vendor_payments.create') }}?supplier_id={{ item.supplier.id }}" class="btn btn-warning btn-sm">
+                            <a href="{{ url_for('supplier_payments.create') }}?supplier_id={{ item.supplier.id }}" class="btn btn-warning btn-sm">
                                 <i class="fas fa-plus me-1"></i> Pay Now
                             </a>
                         </div>

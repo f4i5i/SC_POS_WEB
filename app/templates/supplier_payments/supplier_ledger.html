@@ -117,10 +117,10 @@
                 <p class="mb-0 opacity-75">Supplier Ledger</p>
             </div>
             <div>
-                <a href="{{ url_for('vendor_payments.supplier_statement', supplier_id=supplier.id) }}" class="btn btn-light me-2">
+                <a href="{{ url_for('supplier_payments.supplier_statement', supplier_id=supplier.id) }}" class="btn btn-light me-2">
                     <i class="fas fa-file-alt me-1"></i> Print Statement
                 </a>
-                <a href="{{ url_for('vendor_payments.create') }}?supplier_id={{ supplier.id }}" class="btn btn-success">
+                <a href="{{ url_for('supplier_payments.create') }}?supplier_id={{ supplier.id }}" class="btn btn-success">
                     <i class="fas fa-plus me-1"></i> Record Payment
                 </a>
             </div>
