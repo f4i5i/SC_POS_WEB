@@ -349,8 +349,8 @@ def add_recipe():
             db.session.rollback()
             flash(f'Error creating recipe: {str(e)}', 'danger')
 
-    # Get data for form
-    products = Product.query.filter_by(is_active=True, is_manufactured=True).all()
+    # Get data for form - show all active products as potential recipe outputs
+    products = Product.query.filter_by(is_active=True).order_by(Product.name).all()
     oils = RawMaterial.query.join(RawMaterialCategory).filter(
         RawMaterialCategory.code == 'OIL'
     ).order_by(RawMaterial.name).all()
@@ -435,8 +435,8 @@ def edit_recipe(id):
             db.session.rollback()
             flash(f'Error updating recipe: {str(e)}', 'danger')
 
-    # Get data for form
-    products = Product.query.filter_by(is_active=True, is_manufactured=True).all()
+    # Get data for form - show all active products as potential recipe outputs
+    products = Product.query.filter_by(is_active=True).order_by(Product.name).all()
     oils = RawMaterial.query.join(RawMaterialCategory).filter(
         RawMaterialCategory.code == 'OIL'
     ).order_by(RawMaterial.name).all()
