@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Draft Purchase Orders - Warehouse - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        color: white;
+    }
+    .stat-card.primary { background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%); }
+    .stat-card.success { background: linear-gradient(135deg, #10B981 0%, #059669 100%); }
+    .stat-card.warning { background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); }
+    .stat-value { font-size: 2rem; font-weight: bold; }
+
+    .supplier-card {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+    }
+
+    .supplier-header {
+        background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 12px 12px 0 0;
+    }
+
+    .status-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .status-badge.draft { background: #E5E7EB; color: #374151; }
+
+    .low-stock-item {
+        padding: 0.5rem 0.75rem;
+        background: #FEF3C7;
+        border-radius: 6px;
+        margin-bottom: 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .generate-btn {
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+        border: none;
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+    }
+    .generate-btn:hover { background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="mb-1">Draft Purchase Orders</h4>
+            <p class="text-muted mb-0">Review and submit POs to suppliers</p>
+        </div>
+        <div class="d-flex gap-2">
+            <form method="POST" action="{{ url_for('warehouse.generate_draft_pos') }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="generate-btn" onclick="return confirm('Generate draft POs from all low stock items?')">
+                    <i class="fas fa-magic me-2"></i>Generate from Low Stock
+                </button>
+            </form>
+            <a href="{{ url_for('warehouse.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="stat-card primary">
+                <div class="stat-value">{{ total_drafts }}</div>
+                <div class="opacity-75">Draft POs</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card success">
+                <div class="stat-value">{{ format_currency(total_value) }}</div>
+                <div class="opacity-75">Total Value</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card warning">
+                <div class="stat-value">{{ low_stock_data|length }}</div>
+                <div class="opacity-75">Suppliers with Low Stock</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Draft POs by Supplier -->
+    {% if grouped_drafts %}
+    <div class="row">
+        {% for supplier_id, data in grouped_drafts.items() %}
+        <div class="col-lg-6">
+            <div class="card supplier-card">
+                <div class="supplier-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">{{ data.supplier.name if data.supplier else 'Unknown' }}</h5>
+                            <small class="opacity-75">{{ data.orders|length }} draft order(s) | {{ data.total_items }} items | {{ format_currency(data.total_value) }}</small>
+                        </div>
+                        <i class="fas fa-truck fa-2x opacity-50"></i>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% for po in data.orders %}
+                    <div class="border rounded p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <strong>{{ po.po_number }}</strong>
+                                {% if po.is_auto_generated %}
+                                <span class="badge bg-info ms-1">Auto</span>
+                                {% endif %}
+                            </div>
+                            <span class="status-badge draft">Draft</span>
+                        </div>
+                        <div class="row mb-2 small">
+                            <div class="col-4">
+                                <span class="text-muted">Items:</span> <strong>{{ po.items.count() }}</strong>
+                            </div>
+                            <div class="col-4">
+                                <span class="text-muted">Created:</span> {{ po.created_at.strftime('%Y-%m-%d') if po.created_at else '-' }}
+                            </div>
+                            <div class="col-4 text-end">
+                                <strong>{{ format_currency(po.total or 0) }}</strong>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('warehouse.review_draft_po', po_id=po.id) }}" class="btn btn-sm btn-primary flex-grow-1">
+                                <i class="fas fa-eye me-1"></i>Review
+                            </a>
+                            <form method="POST" action="{{ url_for('warehouse.review_draft_po', po_id=po.id) }}" class="flex-grow-1">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="submit">
+                                <button type="submit" class="btn btn-sm btn-success w-100" onclick="return confirm('Submit this PO to supplier?')">
+                                    <i class="fas fa-paper-plane me-1"></i>Submit
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-file-alt fa-4x text-muted mb-3"></i>
+            <h5>No Draft Purchase Orders</h5>
+            <p class="text-muted mb-4">Click "Generate from Low Stock" to automatically create draft POs for items below reorder level.</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Low Stock Not in Drafts -->
+    {% if low_stock_data %}
+    <h5 class="mt-4 mb-3"><i class="fas fa-exclamation-triangle text-warning me-2"></i>Low Stock Items</h5>
+    <div class="row">
+        {% for supplier_id, data in low_stock_data.items() %}
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-warning bg-opacity-10">
+                    <strong>{{ data.supplier.name if data.supplier else 'Unknown' }}</strong>
+                    <span class="badge bg-warning text-dark float-end">{{ data.products|length }} items</span>
+                </div>
+                <div class="card-body">
+                    {% for product in data.products[:5] %}
+                    <div class="low-stock-item">
+                        <div class="d-flex justify-content-between">
+                            <span>{{ product.name[:25] }}{% if product.name|length > 25 %}...{% endif %}</span>
+                            <span class="text-danger fw-bold">{{ product.quantity }}/{{ product.reorder_level }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% if data.products|length > 5 %}
+                    <small class="text-muted">+{{ data.products|length - 5 }} more items</small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

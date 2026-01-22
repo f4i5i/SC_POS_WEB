@@ -159,8 +159,12 @@ def delete_supplier(supplier_id):
 @bp.route('/view/<int:supplier_id>')
 @login_required
 def view_supplier(supplier_id):
-    """View supplier details and products"""
+    """View supplier details with dashboard tabs"""
+    from app.models_extended import SupplierPayment, SupplierLedger
+    from sqlalchemy import func
+
     supplier = Supplier.query.get_or_404(supplier_id)
+    active_tab = request.args.get('tab', 'overview')
 
     # Pagination for products
     page = request.args.get('page', 1, type=int)
@@ -176,8 +180,56 @@ def view_supplier(supplier_id):
         Product.supplier_id == supplier_id
     ).scalar() or 0
 
+    # Low stock products from this supplier
+    low_stock_products = Product.query.filter(
+        Product.supplier_id == supplier_id,
+        Product.is_active == True,
+        Product.quantity <= Product.reorder_level
+    ).all()
+
+    # Purchase Orders history
+    purchase_orders = PurchaseOrder.query.filter_by(
+        supplier_id=supplier_id
+    ).order_by(PurchaseOrder.created_at.desc()).limit(20).all()
+
+    # PO statistics
+    total_orders = PurchaseOrder.query.filter_by(supplier_id=supplier_id).count()
+    pending_orders = PurchaseOrder.query.filter(
+        PurchaseOrder.supplier_id == supplier_id,
+        PurchaseOrder.status.in_(['draft', 'pending', 'ordered'])
+    ).count()
+
+    total_ordered_value = db.session.query(func.sum(PurchaseOrder.total)).filter(
+        PurchaseOrder.supplier_id == supplier_id,
+        PurchaseOrder.status == 'received'
+    ).scalar() or 0
+
+    # Payment history
+    payments = SupplierPayment.query.filter_by(
+        supplier_id=supplier_id
+    ).order_by(SupplierPayment.payment_date.desc()).limit(20).all()
+
+    total_paid = db.session.query(func.sum(SupplierPayment.amount)).filter(
+        SupplierPayment.supplier_id == supplier_id,
+        SupplierPayment.status == 'completed'
+    ).scalar() or 0
+
+    # Ledger entries (last 20)
+    ledger_entries = SupplierLedger.query.filter_by(
+        supplier_id=supplier_id
+    ).order_by(SupplierLedger.transaction_date.desc()).limit(20).all()
+
     return render_template('suppliers/view_supplier.html',
                          supplier=supplier,
                          products=products,
                          product_count=product_count,
-                         total_cost_value=total_cost_value)
+                         total_cost_value=total_cost_value,
+                         low_stock_products=low_stock_products,
+                         purchase_orders=purchase_orders,
+                         total_orders=total_orders,
+                         pending_orders=pending_orders,
+                         total_ordered_value=total_ordered_value,
+                         payments=payments,
+                         total_paid=total_paid,
+                         ledger_entries=ledger_entries,
+                         active_tab=active_tab)

@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Draft Purchase Orders - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .supplier-card {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+    }
+
+    .supplier-header {
+        background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 12px 12px 0 0;
+    }
+
+    .status-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .status-badge.draft { background: #E5E7EB; color: #374151; }
+
+    .low-stock-item {
+        padding: 0.75rem;
+        background: #FEF3C7;
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+    }
+
+    .generate-btn {
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        color: white;
+        font-weight: 600;
+    }
+
+    .generate-btn:hover {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="mb-1">Draft Purchase Orders</h4>
+            <p class="text-muted mb-0">Review and submit draft POs to suppliers</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button id="generatePosBtn" class="generate-btn">
+                <i class="fas fa-magic me-2"></i>Generate from Low Stock
+            </button>
+            <a href="{{ url_for('purchase_orders.create') }}" class="btn btn-outline-primary">
+                <i class="fas fa-plus me-2"></i>Create Manual PO
+            </a>
+            <a href="{{ url_for('purchase_orders.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-list me-2"></i>All POs
+            </a>
+        </div>
+    </div>
+
+    <!-- Draft POs by Supplier -->
+    {% if grouped_drafts %}
+    <div class="row">
+        {% for supplier_id, data in grouped_drafts.items() %}
+        <div class="col-lg-6">
+            <div class="card supplier-card">
+                <div class="supplier-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1">{{ data.supplier.name if data.supplier else 'Unknown Supplier' }}</h5>
+                            <small class="opacity-75">{{ data.orders|length }} draft order(s)</small>
+                        </div>
+                        <i class="fas fa-truck fa-2x opacity-50"></i>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% for po in data.orders %}
+                    <div class="border rounded p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <strong>{{ po.po_number }}</strong>
+                                {% if po.is_auto_generated %}
+                                <span class="badge bg-info ms-1">Auto-generated</span>
+                                {% endif %}
+                            </div>
+                            <span class="status-badge draft">Draft</span>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-6">
+                                <small class="text-muted">Items:</small>
+                                <strong>{{ po.items.count() }}</strong>
+                            </div>
+                            <div class="col-6 text-end">
+                                <small class="text-muted">Total:</small>
+                                <strong>{{ format_currency(po.total or 0) }}</strong>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('purchase_orders.edit', id=po.id) }}" class="btn btn-sm btn-outline-primary flex-grow-1">
+                                <i class="fas fa-edit me-1"></i>Edit
+                            </a>
+                            <form method="POST" action="{{ url_for('purchase_orders.submit', id=po.id) }}" class="flex-grow-1">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-success w-100" onclick="return confirm('Submit this PO to supplier?')">
+                                    <i class="fas fa-paper-plane me-1"></i>Submit
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ url_for('purchase_orders.delete', id=po.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this draft PO?')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-file-alt fa-4x text-muted mb-3"></i>
+            <h5>No Draft Purchase Orders</h5>
+            <p class="text-muted mb-4">Click "Generate from Low Stock" to automatically create draft POs for items below reorder level.</p>
+            <button id="generatePosBtnEmpty" class="generate-btn">
+                <i class="fas fa-magic me-2"></i>Generate from Low Stock
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Low Stock Summary -->
+    {% if low_stock_data %}
+    <h5 class="mt-4 mb-3">Low Stock Items Not Yet in Draft PO</h5>
+    <div class="row">
+        {% for supplier_id, data in low_stock_data.items() %}
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-warning bg-opacity-10">
+                    <strong>{{ data.supplier.name if data.supplier else 'Unknown' }}</strong>
+                    <span class="badge bg-warning text-dark float-end">{{ data.products|length }} items</span>
+                </div>
+                <div class="card-body">
+                    {% for product in data.products[:5] %}
+                    <div class="low-stock-item">
+                        <div class="d-flex justify-content-between">
+                            <small class="fw-medium">{{ product.name[:30] }}{% if product.name|length > 30 %}...{% endif %}</small>
+                            <small class="text-danger fw-bold">{{ product.quantity }}/{{ product.reorder_level }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% if data.products|length > 5 %}
+                    <small class="text-muted">+{{ data.products|length - 5 }} more items</small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const generateBtns = document.querySelectorAll('#generatePosBtn, #generatePosBtnEmpty');
+
+    generateBtns.forEach(btn => {
+        btn.addEventListener('click', async function() {
+            if (!confirm('Generate draft Purchase Orders from all low stock items?')) return;
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating...';
+
+            try {
+                const response = await fetch('{{ url_for("purchase_orders.api_generate_from_low_stock") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(`Success!\n${result.message}\nDraft POs created: ${result.draft_pos_created}\nDraft POs updated: ${result.draft_pos_updated}\nItems added: ${result.items_added}`);
+                    location.reload();
+                } else {
+                    alert('Error: ' + (result.errors.join(', ') || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-magic me-2"></i>Generate from Low Stock';
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

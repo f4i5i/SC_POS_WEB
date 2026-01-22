@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+
+{% block title %}{{ po.po_number }} - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .status-badge {
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .status-badge.draft { background: #E5E7EB; color: #374151; }
+    .status-badge.pending { background: #FEF3C7; color: #D97706; }
+    .status-badge.ordered { background: #DBEAFE; color: #2563EB; }
+    .status-badge.partial { background: #FDE68A; color: #B45309; }
+    .status-badge.received { background: #D1FAE5; color: #059669; }
+    .status-badge.cancelled { background: #FEE2E2; color: #DC2626; }
+
+    .info-card {
+        background: #F9FAFB;
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    .po-header {
+        background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 12px 12px 0 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header Card -->
+    <div class="card mb-4">
+        <div class="po-header">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h3 class="mb-1">{{ po.po_number }}</h3>
+                    <p class="mb-0 opacity-75">{{ po.supplier.name if po.supplier else 'N/A' }}</p>
+                </div>
+                <div class="text-end">
+                    <span class="status-badge {{ po.status }}">{{ po.status|title }}</span>
+                    {% if po.is_auto_generated %}
+                    <span class="badge bg-info ms-2">Auto-generated</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <small class="text-muted d-block">Order Date</small>
+                        <strong>{{ po.order_date.strftime('%Y-%m-%d') if po.order_date else '-' }}</strong>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <small class="text-muted d-block">Expected Date</small>
+                        <strong>{{ po.expected_date.strftime('%Y-%m-%d') if po.expected_date else '-' }}</strong>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <small class="text-muted d-block">Received Date</small>
+                        <strong>{{ po.received_date.strftime('%Y-%m-%d') if po.received_date else '-' }}</strong>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <small class="text-muted d-block">Payment Status</small>
+                        <span class="status-badge {{ po.payment_status }}">{{ po.payment_status|title }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Items -->
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-boxes me-2"></i>Order Items ({{ po.items.count() }})</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Product</th>
+                                    <th class="text-center">Ordered</th>
+                                    <th class="text-center">Received</th>
+                                    <th class="text-end">Unit Cost</th>
+                                    <th class="text-end">Landed Cost</th>
+                                    <th class="text-end">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in po.items %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ item.product.name if item.product else 'N/A' }}</strong>
+                                        <br><small class="text-muted">{{ item.product.code if item.product else '' }}</small>
+                                    </td>
+                                    <td class="text-center">{{ item.quantity_ordered }}</td>
+                                    <td class="text-center">
+                                        {{ item.quantity_received or 0 }}
+                                        {% if item.quantity_received and item.quantity_received >= item.quantity_ordered %}
+                                        <i class="fas fa-check-circle text-success ms-1"></i>
+                                        {% elif item.quantity_received and item.quantity_received > 0 %}
+                                        <i class="fas fa-exclamation-circle text-warning ms-1"></i>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">{{ format_currency(item.unit_cost or 0) }}</td>
+                                    <td class="text-end">{{ format_currency(item.landed_cost or 0) }}</td>
+                                    <td class="text-end fw-medium">{{ format_currency(item.subtotal or 0) }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">No items in this order</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            {% if po.notes %}
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Notes</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ po.notes }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Summary -->
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-calculator me-2"></i>Order Summary</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Subtotal (Base Cost)</span>
+                        <span>{{ format_currency(po.subtotal or 0) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Packaging Cost</span>
+                        <span>{{ format_currency(po.total_packaging_cost or 0) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Delivery Cost</span>
+                        <span>{{ format_currency(po.total_delivery_cost or 0) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Bottle Cost</span>
+                        <span>{{ format_currency(po.total_bottle_cost or 0) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Tax</span>
+                        <span>{{ format_currency(po.tax or 0) }}</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between mb-2">
+                        <strong>Grand Total</strong>
+                        <strong class="text-primary fs-5">{{ format_currency(po.total or 0) }}</strong>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Amount Paid</span>
+                        <span class="text-success">{{ format_currency(po.amount_paid or 0) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Amount Due</span>
+                        <span class="text-danger fw-bold">{{ format_currency(po.amount_due or 0) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-cogs me-2"></i>Actions</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        {% if po.status == 'draft' %}
+                        <a href="{{ url_for('purchase_orders.edit', id=po.id) }}" class="btn btn-primary">
+                            <i class="fas fa-edit me-2"></i>Edit Draft
+                        </a>
+                        <form method="POST" action="{{ url_for('purchase_orders.submit', id=po.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-success w-100" onclick="return confirm('Submit this PO to supplier?')">
+                                <i class="fas fa-paper-plane me-2"></i>Submit to Supplier
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('purchase_orders.delete', id=po.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Delete this draft PO?')">
+                                <i class="fas fa-trash me-2"></i>Delete Draft
+                            </button>
+                        </form>
+                        {% elif po.status in ['ordered', 'partial'] %}
+                        <a href="{{ url_for('purchase_orders.receive', id=po.id) }}" class="btn btn-success">
+                            <i class="fas fa-box me-2"></i>Receive Goods
+                        </a>
+                        <form method="POST" action="{{ url_for('purchase_orders.cancel', id=po.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Cancel this PO?')">
+                                <i class="fas fa-times me-2"></i>Cancel PO
+                            </button>
+                        </form>
+                        {% endif %}
+
+                        {% if po.amount_due and po.amount_due > 0 %}
+                        <a href="{{ url_for('supplier_payments.create') }}?supplier_id={{ po.supplier_id }}&po_id={{ po.id }}" class="btn btn-outline-primary">
+                            <i class="fas fa-money-bill me-2"></i>Record Payment
+                        </a>
+                        {% endif %}
+
+                        <a href="{{ url_for('purchase_orders.index') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to List
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

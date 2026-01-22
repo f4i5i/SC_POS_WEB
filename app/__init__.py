@@ -111,8 +111,8 @@ def create_app(config_name='default'):
     from app.routes.suppliers import bp as suppliers_bp
     app.register_blueprint(suppliers_bp, url_prefix='/suppliers')
 
-    from app.routes.vendor_payments import bp as vendor_payments_bp
-    app.register_blueprint(vendor_payments_bp)  # url_prefix is in blueprint
+    from app.routes.supplier_payments import bp as supplier_payments_bp
+    app.register_blueprint(supplier_payments_bp)  # url_prefix is in blueprint
 
     from app.routes.reports import bp as reports_bp
     app.register_blueprint(reports_bp, url_prefix='/reports')
@@ -160,6 +160,9 @@ def create_app(config_name='default'):
 
     from app.routes.marketing import bp as marketing_bp
     app.register_blueprint(marketing_bp, url_prefix='/marketing')
+
+    from app.routes.purchase_orders import bp as purchase_orders_bp
+    app.register_blueprint(purchase_orders_bp)  # url_prefix is in blueprint
 
     # Register main routes
     @app.route('/')

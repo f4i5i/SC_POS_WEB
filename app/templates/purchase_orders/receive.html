@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Receive {{ po.po_number }} - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .receive-header {
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+    }
+
+    .item-card {
+        border: 1px solid #E5E7EB;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: border-color 0.2s;
+    }
+
+    .item-card:focus-within {
+        border-color: #6366F1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .cost-breakdown {
+        background: #F9FAFB;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+
+    .qty-status {
+        font-size: 0.85rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+    }
+
+    .qty-status.pending { background: #FEF3C7; color: #D97706; }
+    .qty-status.partial { background: #DBEAFE; color: #2563EB; }
+    .qty-status.complete { background: #D1FAE5; color: #059669; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="receive-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h4 class="mb-1">Receive Goods</h4>
+                <p class="mb-0 opacity-75">{{ po.po_number }} from {{ po.supplier.name if po.supplier else 'Unknown' }}</p>
+            </div>
+            <a href="{{ url_for('purchase_orders.view', id=po.id) }}" class="btn btn-light">
+                <i class="fas fa-arrow-left me-2"></i>Back to PO
+            </a>
+        </div>
+    </div>
+
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- Receiving Location -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-end">
+                    <div class="col-md-6">
+                        <label class="form-label">Receiving Location (Warehouse)</label>
+                        <select name="receiving_location_id" class="form-select">
+                            {% for warehouse in warehouses %}
+                            <option value="{{ warehouse.id }}" {{ 'selected' if default_warehouse and warehouse.id == default_warehouse.id }}>
+                                {{ warehouse.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Stock will be added to this location</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Items to Receive -->
+        <h5 class="mb-3">Items to Receive</h5>
+
+        {% for item in po.items %}
+        {% set remaining = item.quantity_ordered - (item.quantity_received or 0) %}
+        <div class="item-card">
+            <div class="row align-items-start">
+                <div class="col-md-4">
+                    <h6 class="mb-1">{{ item.product.name if item.product else 'N/A' }}</h6>
+                    <small class="text-muted">{{ item.product.code if item.product else '' }}</small>
+                    <div class="mt-2">
+                        <span class="qty-status {% if remaining == item.quantity_ordered %}pending{% elif remaining > 0 %}partial{% else %}complete{% endif %}">
+                            Ordered: {{ item.quantity_ordered }} |
+                            Received: {{ item.quantity_received or 0 }} |
+                            Remaining: {{ remaining }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">Qty to Receive</label>
+                    <input type="number" name="qty_{{ item.id }}" class="form-control"
+                           min="0" max="{{ remaining }}" value="{{ remaining }}"
+                           {% if remaining <= 0 %}disabled{% endif %}>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="cost-breakdown">
+                        <small class="text-muted d-block mb-2">Cost Breakdown (per unit)</small>
+                        <div class="row g-2">
+                            <div class="col-3">
+                                <label class="form-label small">Base Cost</label>
+                                <input type="number" name="base_cost_{{ item.id }}" class="form-control form-control-sm"
+                                       step="0.01" value="{{ item.base_cost or item.product.base_cost or 0 }}">
+                            </div>
+                            <div class="col-3">
+                                <label class="form-label small">Packaging</label>
+                                <input type="number" name="packaging_cost_{{ item.id }}" class="form-control form-control-sm"
+                                       step="0.01" value="{{ item.packaging_cost or item.product.packaging_cost or 0 }}">
+                            </div>
+                            <div class="col-3">
+                                <label class="form-label small">Delivery</label>
+                                <input type="number" name="delivery_cost_{{ item.id }}" class="form-control form-control-sm"
+                                       step="0.01" value="{{ item.delivery_cost or item.product.delivery_cost or 0 }}">
+                            </div>
+                            <div class="col-3">
+                                <label class="form-label small">Bottle</label>
+                                <input type="number" name="bottle_cost_{{ item.id }}" class="form-control form-control-sm"
+                                       step="0.01" value="{{ item.bottle_cost or item.product.bottle_cost or 0 }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-info">No items to receive</div>
+        {% endfor %}
+
+        <!-- Submit -->
+        <div class="d-flex justify-content-end gap-2 mt-4">
+            <a href="{{ url_for('purchase_orders.view', id=po.id) }}" class="btn btn-outline-secondary">
+                Cancel
+            </a>
+            <button type="submit" class="btn btn-success btn-lg">
+                <i class="fas fa-box me-2"></i>Receive Goods
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

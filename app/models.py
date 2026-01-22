@@ -874,8 +874,12 @@ class PurchaseOrder(db.Model):
     payment_status = db.Column(db.String(32), default='unpaid')  # unpaid, partial, paid
 
     status = db.Column(db.String(32), default='pending')
-    # pending, ordered, partial, received, cancelled
+    # draft, pending, ordered, partial, received, cancelled
     notes = db.Column(db.Text)
+
+    # Auto-reorder support
+    is_auto_generated = db.Column(db.Boolean, default=False)
+    source_type = db.Column(db.String(32), default='manual')  # manual, auto_reorder
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

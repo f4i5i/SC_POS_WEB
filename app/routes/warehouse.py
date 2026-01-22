@@ -893,3 +893,186 @@ def reorders_by_store():
                            store_reorders=store_reorders,
                            total_pending=total_pending,
                            total_approved=total_approved)
+
+
+# =====================================
+# Draft Purchase Orders for Warehouse
+# =====================================
+
+@bp.route('/draft-pos')
+@login_required
+@permission_required(Permissions.WAREHOUSE_VIEW)
+def draft_pos():
+    """View draft purchase orders for warehouse review"""
+    from app.models import PurchaseOrder, Supplier
+    from app.services.reorder_service import get_low_stock_by_supplier
+
+    location = get_current_location()
+
+    if location and location.is_warehouse:
+        warehouse = location
+    elif current_user.is_global_admin:
+        warehouse = Location.query.filter_by(location_type='warehouse', is_active=True).first()
+    else:
+        flash('Warehouse access required.', 'warning')
+        return redirect(url_for('index'))
+
+    # Get all draft POs
+    draft_pos = PurchaseOrder.query.filter_by(status='draft').order_by(
+        PurchaseOrder.created_at.desc()
+    ).all()
+
+    # Group by supplier
+    grouped_drafts = {}
+    for po in draft_pos:
+        supplier_id = po.supplier_id
+        if supplier_id not in grouped_drafts:
+            grouped_drafts[supplier_id] = {
+                'supplier': po.supplier,
+                'orders': [],
+                'total_items': 0,
+                'total_value': 0
+            }
+        grouped_drafts[supplier_id]['orders'].append(po)
+        grouped_drafts[supplier_id]['total_items'] += po.items.count()
+        grouped_drafts[supplier_id]['total_value'] += float(po.total or 0)
+
+    # Get low stock summary
+    low_stock_data = get_low_stock_by_supplier()
+
+    # Stats
+    total_drafts = len(draft_pos)
+    total_value = sum(float(po.total or 0) for po in draft_pos)
+
+    return render_template('warehouse/draft_pos.html',
+                           warehouse=warehouse,
+                           grouped_drafts=grouped_drafts,
+                           low_stock_data=low_stock_data,
+                           total_drafts=total_drafts,
+                           total_value=total_value)
+
+
+@bp.route('/draft-pos/generate', methods=['POST'])
+@login_required
+@permission_required(Permissions.WAREHOUSE_MANAGE_STOCK)
+def generate_draft_pos():
+    """Generate draft POs from low stock items"""
+    from app.services.reorder_service import generate_draft_pos_from_low_stock
+
+    result = generate_draft_pos_from_low_stock(current_user.id)
+
+    if result['success']:
+        flash(f"Generated {result['draft_pos_created']} new draft POs, "
+              f"updated {result['draft_pos_updated']} existing drafts, "
+              f"added {result['items_added']} items", 'success')
+    else:
+        flash(f"Error: {', '.join(result['errors'])}", 'danger')
+
+    return redirect(url_for('warehouse.draft_pos'))
+
+
+@bp.route('/draft-pos/<int:po_id>/review', methods=['GET', 'POST'])
+@login_required
+@permission_required(Permissions.WAREHOUSE_MANAGE_STOCK)
+def review_draft_po(po_id):
+    """Review and edit a draft PO before submitting"""
+    from app.models import PurchaseOrder, PurchaseOrderItem
+    from decimal import Decimal
+
+    po = PurchaseOrder.query.get_or_404(po_id)
+
+    if po.status != 'draft':
+        flash('Only draft POs can be reviewed.', 'warning')
+        return redirect(url_for('warehouse.draft_pos'))
+
+    location = get_current_location()
+
+    if location and location.is_warehouse:
+        warehouse = location
+    elif current_user.is_global_admin:
+        warehouse = Location.query.filter_by(location_type='warehouse', is_active=True).first()
+    else:
+        flash('Warehouse access required.', 'warning')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        try:
+            if action == 'update_quantity':
+                item_id = request.form.get('item_id', type=int)
+                quantity = request.form.get('quantity', type=int)
+                item = PurchaseOrderItem.query.get(item_id)
+                if item and item.po_id == po.id and quantity > 0:
+                    item.quantity_ordered = quantity
+                    item.subtotal = item.unit_cost * quantity
+                    po.calculate_totals()
+                    db.session.commit()
+                    flash('Quantity updated.', 'success')
+
+            elif action == 'remove_item':
+                item_id = request.form.get('item_id', type=int)
+                item = PurchaseOrderItem.query.get(item_id)
+                if item and item.po_id == po.id:
+                    db.session.delete(item)
+                    po.calculate_totals()
+                    db.session.commit()
+                    flash('Item removed.', 'success')
+
+            elif action == 'submit':
+                from app.services.reorder_service import submit_draft_po
+                result = submit_draft_po(po.id, current_user.id)
+                if result['success']:
+                    flash(f'PO {result["po_number"]} submitted to supplier!', 'success')
+                    return redirect(url_for('warehouse.draft_pos'))
+                else:
+                    flash(f'Error: {result["error"]}', 'danger')
+
+            elif action == 'delete':
+                from app.services.reorder_service import delete_draft_po
+                result = delete_draft_po(po.id)
+                if result['success']:
+                    flash(result['message'], 'success')
+                    return redirect(url_for('warehouse.draft_pos'))
+                else:
+                    flash(f'Error: {result["error"]}', 'danger')
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error: {str(e)}', 'danger')
+
+        return redirect(url_for('warehouse.review_draft_po', po_id=po_id))
+
+    # Get supplier's products for adding more items
+    products = Product.query.filter_by(
+        supplier_id=po.supplier_id,
+        is_active=True
+    ).order_by(Product.name).all()
+
+    return render_template('warehouse/review_draft_po.html',
+                           warehouse=warehouse,
+                           po=po,
+                           products=products)
+
+
+@bp.route('/api/draft-pos/stats')
+@login_required
+@permission_required(Permissions.WAREHOUSE_VIEW)
+def api_draft_pos_stats():
+    """API: Get draft PO statistics for dashboard"""
+    from app.models import PurchaseOrder
+    from app.services.reorder_service import get_low_stock_by_supplier
+
+    draft_count = PurchaseOrder.query.filter_by(status='draft').count()
+    ordered_count = PurchaseOrder.query.filter_by(status='ordered').count()
+
+    # Low stock items not in any draft
+    low_stock_data = get_low_stock_by_supplier()
+    low_stock_count = sum(len(data['products']) for data in low_stock_data.values())
+
+    return jsonify({
+        'draft_pos': draft_count,
+        'ordered_pos': ordered_count,
+        'low_stock_items': low_stock_count,
+        'suppliers_with_low_stock': len(low_stock_data)
+    })

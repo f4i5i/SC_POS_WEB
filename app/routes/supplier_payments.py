@@ -1,5 +1,5 @@
 """
-Vendor Payment Routes
+Supplier Payment Routes
 Handles supplier payments, ledger, and payment reminders
 """
 
@@ -11,7 +11,7 @@ from app.models import db, Supplier, PurchaseOrder
 from app.models_extended import SupplierPayment, SupplierLedger
 from app.utils.permissions import permission_required, Permissions
 
-bp = Blueprint('vendor_payments', __name__, url_prefix='/vendor-payments')
+bp = Blueprint('supplier_payments', __name__, url_prefix='/supplier-payments')
 
 
 def generate_payment_number():
@@ -39,7 +39,7 @@ def generate_payment_number():
 @login_required
 @permission_required(Permissions.SUPPLIER_VIEW)
 def index():
-    """List all vendor payments"""
+    """List all supplier payments"""
     page = request.args.get('page', 1, type=int)
     per_page = current_app.config.get('ITEMS_PER_PAGE', 20)
     supplier_id = request.args.get('supplier_id', type=int)
@@ -78,7 +78,7 @@ def index():
     # Calculate totals for displayed payments
     total_amount = sum(float(p.amount or 0) for p in payments.items)
 
-    return render_template('vendor_payments/index.html',
+    return render_template('supplier_payments/index.html',
                           payments=payments,
                           suppliers=suppliers,
                           total_amount=total_amount)
@@ -88,7 +88,7 @@ def index():
 @login_required
 @permission_required(Permissions.SUPPLIER_EDIT)
 def create():
-    """Create new vendor payment"""
+    """Create new supplier payment"""
     if request.method == 'POST':
         try:
             supplier_id = request.form.get('supplier_id', type=int)
@@ -101,7 +101,7 @@ def create():
 
             if not supplier_id or amount <= 0:
                 flash('Invalid supplier or amount', 'danger')
-                return redirect(url_for('vendor_payments.create'))
+                return redirect(url_for('supplier_payments.create'))
 
             payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date()
 
@@ -155,7 +155,7 @@ def create():
 
             db.session.commit()
             flash(f'Payment {payment_number} recorded successfully', 'success')
-            return redirect(url_for('vendor_payments.view', id=payment.id))
+            return redirect(url_for('supplier_payments.view', id=payment.id))
 
         except Exception as e:
             db.session.rollback()
@@ -169,7 +169,7 @@ def create():
         if s.current_balance and s.current_balance > 0:
             suppliers_with_dues.append(s)
 
-    return render_template('vendor_payments/create.html',
+    return render_template('supplier_payments/create.html',
                           suppliers=suppliers,
                           suppliers_with_dues=suppliers_with_dues)
 
@@ -180,7 +180,7 @@ def create():
 def view(id):
     """View payment details"""
     payment = SupplierPayment.query.get_or_404(id)
-    return render_template('vendor_payments/view.html', payment=payment)
+    return render_template('supplier_payments/view.html', payment=payment)
 
 
 @bp.route('/<int:id>/void', methods=['POST'])
@@ -192,7 +192,7 @@ def void_payment(id):
 
     if payment.status == 'cancelled':
         flash('Payment is already voided', 'warning')
-        return redirect(url_for('vendor_payments.view', id=id))
+        return redirect(url_for('supplier_payments.view', id=id))
 
     try:
         # Reverse the balance changes
@@ -232,7 +232,7 @@ def void_payment(id):
         db.session.rollback()
         flash(f'Error voiding payment: {str(e)}', 'danger')
 
-    return redirect(url_for('vendor_payments.view', id=id))
+    return redirect(url_for('supplier_payments.view', id=id))
 
 
 @bp.route('/supplier/<int:supplier_id>/ledger')
@@ -273,7 +273,7 @@ def supplier_ledger(supplier_id):
         PurchaseOrder.status.in_(['ordered', 'partial', 'received'])
     ).order_by(PurchaseOrder.order_date).all()
 
-    return render_template('vendor_payments/supplier_ledger.html',
+    return render_template('supplier_payments/supplier_ledger.html',
                           supplier=supplier,
                           entries=entries,
                           total_debit=total_debit,
@@ -308,7 +308,7 @@ def supplier_statement(supplier_id):
 
     entries = query.order_by(SupplierLedger.transaction_date).all()
 
-    return render_template('vendor_payments/statement.html',
+    return render_template('supplier_payments/statement.html',
                           supplier=supplier,
                           entries=entries,
                           date_from=date_from,
@@ -363,7 +363,7 @@ def reminders():
     total_overdue = sum(s['amount_due'] for s in overdue_suppliers)
     total_upcoming = sum(s['amount_due'] for s in upcoming_suppliers)
 
-    return render_template('vendor_payments/reminders.html',
+    return render_template('supplier_payments/reminders.html',
                           overdue_suppliers=overdue_suppliers,
                           upcoming_suppliers=upcoming_suppliers,
                           total_overdue=total_overdue,

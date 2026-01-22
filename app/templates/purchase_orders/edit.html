@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ po.po_number }} - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .product-select-card {
+        border: 2px dashed #E5E7EB;
+        border-radius: 12px;
+        padding: 1.5rem;
+        background: #F9FAFB;
+    }
+
+    .item-row { transition: background 0.2s; }
+    .item-row:hover { background: #F9FAFB; }
+
+    .low-stock-badge {
+        background: #FEE2E2;
+        color: #DC2626;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="mb-1">Edit {{ po.po_number }}</h4>
+            <p class="text-muted mb-0">{{ po.supplier.name if po.supplier else 'Unknown Supplier' }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <form method="POST" action="{{ url_for('purchase_orders.submit', id=po.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-success" onclick="return confirm('Submit this PO to supplier?')" {% if po.items.count() == 0 %}disabled{% endif %}>
+                    <i class="fas fa-paper-plane me-2"></i>Submit to Supplier
+                </button>
+            </form>
+            <a href="{{ url_for('purchase_orders.view', id=po.id) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-eye me-2"></i>View
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Items List -->
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="fas fa-boxes me-2"></i>Order Items ({{ po.items.count() }})</h6>
+                    <strong class="text-primary">{{ format_currency(po.total or 0) }}</strong>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Product</th>
+                                    <th class="text-center" style="width: 120px;">Quantity</th>
+                                    <th class="text-end">Unit Cost</th>
+                                    <th class="text-end">Subtotal</th>
+                                    <th class="text-center" style="width: 80px;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in po.items %}
+                                <tr class="item-row">
+                                    <td>
+                                        <strong>{{ item.product.name if item.product else 'N/A' }}</strong>
+                                        <br><small class="text-muted">{{ item.product.code if item.product else '' }}</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <form method="POST" class="d-flex align-items-center gap-1">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="action" value="update_quantity">
+                                            <input type="hidden" name="item_id" value="{{ item.id }}">
+                                            <input type="number" name="quantity" value="{{ item.quantity_ordered }}" class="form-control form-control-sm text-center" style="width: 70px;" min="1">
+                                            <button type="submit" class="btn btn-sm btn-outline-primary" title="Update">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                    <td class="text-end">{{ format_currency(item.unit_cost or 0) }}</td>
+                                    <td class="text-end fw-medium">{{ format_currency(item.subtotal or 0) }}</td>
+                                    <td class="text-center">
+                                        <form method="POST" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="action" value="remove_item">
+                                            <input type="hidden" name="item_id" value="{{ item.id }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this item?')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-5 text-muted">
+                                        <i class="fas fa-box-open fa-3x mb-3 d-block opacity-25"></i>
+                                        No items added yet. Add products from the panel on the right.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PO Notes -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Order Details</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="action" value="update_notes">
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Expected Delivery Date</label>
+                                <input type="date" name="expected_date" class="form-control" value="{{ po.expected_date.strftime('%Y-%m-%d') if po.expected_date else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea name="notes" class="form-control" rows="3">{{ po.notes or '' }}</textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save Details
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Item -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-plus me-2"></i>Add Product</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="action" value="add_item">
+
+                        <div class="mb-3">
+                            <label class="form-label">Select Product</label>
+                            <select name="product_id" class="form-select" id="productSelect" required>
+                                <option value="">Choose product...</option>
+                                {% for product in products %}
+                                <option value="{{ product.id }}"
+                                        data-cost="{{ product.base_cost or 0 }}"
+                                        data-reorder-qty="{{ product.reorder_quantity or 50 }}"
+                                        data-stock="{{ product.quantity }}"
+                                        data-reorder-level="{{ product.reorder_level }}">
+                                    {{ product.name }} ({{ product.code }})
+                                    {% if product.quantity <= product.reorder_level %} - LOW STOCK{% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div id="productInfo" class="mb-3 d-none">
+                            <div class="alert alert-info py-2">
+                                <small>
+                                    <strong>Stock:</strong> <span id="currentStock">-</span> |
+                                    <strong>Reorder Level:</strong> <span id="reorderLevel">-</span> |
+                                    <strong>Cost:</strong> <span id="unitCost">-</span>
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Quantity to Order</label>
+                            <input type="number" name="quantity" id="quantityInput" class="form-control" min="1" value="50" required>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-plus me-2"></i>Add to Order
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Quick Add Low Stock -->
+            {% set low_stock_products = products | selectattr('quantity', 'le', 10) | list %}
+            {% if low_stock_products %}
+            <div class="card mt-4">
+                <div class="card-header bg-warning bg-opacity-10">
+                    <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Low Stock Items</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% for product in low_stock_products[:10] %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong class="d-block">{{ product.name[:25] }}{% if product.name|length > 25 %}...{% endif %}</strong>
+                                <small class="text-muted">Stock: {{ product.quantity }} / {{ product.reorder_level }}</small>
+                            </div>
+                            <form method="POST" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="add_item">
+                                <input type="hidden" name="product_id" value="{{ product.id }}">
+                                <input type="hidden" name="quantity" value="{{ product.reorder_quantity or 50 }}">
+                                <button type="submit" class="btn btn-sm btn-outline-primary" title="Add {{ product.reorder_quantity or 50 }} units">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </form>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const productSelect = document.getElementById('productSelect');
+    const productInfo = document.getElementById('productInfo');
+    const currentStock = document.getElementById('currentStock');
+    const reorderLevel = document.getElementById('reorderLevel');
+    const unitCost = document.getElementById('unitCost');
+    const quantityInput = document.getElementById('quantityInput');
+
+    productSelect.addEventListener('change', function() {
+        const option = this.options[this.selectedIndex];
+
+        if (option.value) {
+            productInfo.classList.remove('d-none');
+            currentStock.textContent = option.dataset.stock;
+            reorderLevel.textContent = option.dataset.reorderLevel;
+            unitCost.textContent = parseFloat(option.dataset.cost).toFixed(2);
+            quantityInput.value = option.dataset.reorderQty || 50;
+        } else {
+            productInfo.classList.add('d-none');
+        }
+    });
+});
+</script>
+{% endblock %}
