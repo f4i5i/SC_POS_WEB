@@ -24,6 +24,81 @@ except ImportError:
 bp = Blueprint('pos', __name__)
 
 
+def deduct_raw_materials_for_sale(product, quantity, location_id, sale_id, sale_number, user_id):
+    """
+    Deduct raw materials from location-specific stock for a made-to-order sale.
+    Returns: {'success': bool, 'message': str, 'deductions': list}
+    """
+    from app.models import RawMaterialMovement
+    from decimal import Decimal
+
+    recipe = Recipe.query.filter_by(product_id=product.id, is_active=True).first()
+    if not recipe:
+        return {'success': False, 'message': f'No recipe found for {product.name}', 'deductions': []}
+
+    output_ml = float(recipe.output_size_ml or 0)
+    deductions = []
+
+    for ingredient in recipe.ingredients:
+        raw_material = ingredient.raw_material
+        if not raw_material:
+            continue
+
+        if ingredient.is_packaging:
+            # Bottle: 1 per unit produced
+            required_qty = quantity
+        else:
+            # Oil: calculate based on percentage and output size
+            percentage = float(ingredient.percentage or 100) / 100
+            required_qty = output_ml * percentage * quantity
+
+        # Get location-specific stock
+        stock = RawMaterialStock.query.filter_by(
+            raw_material_id=raw_material.id,
+            location_id=location_id
+        ).first()
+
+        if not stock:
+            return {
+                'success': False,
+                'message': f'No stock record for {raw_material.name} at this location',
+                'deductions': []
+            }
+
+        available = float(stock.available_quantity)
+        if available < required_qty:
+            return {
+                'success': False,
+                'message': f'Insufficient {raw_material.name}: need {required_qty:.2f}, have {available:.2f}',
+                'deductions': []
+            }
+
+        # Deduct from location stock
+        stock.quantity = Decimal(str(stock.quantity)) - Decimal(str(required_qty))
+        stock.last_movement_at = datetime.utcnow()
+
+        # Create movement record
+        movement = RawMaterialMovement(
+            raw_material_id=raw_material.id,
+            location_id=location_id,
+            user_id=user_id,
+            movement_type='pos_consumption',
+            quantity=-required_qty,
+            reference=sale_number,
+            notes=f'Made-to-order sale: {product.name} x{quantity}'
+        )
+        db.session.add(movement)
+
+        deductions.append({
+            'material_id': raw_material.id,
+            'material_name': raw_material.name,
+            'quantity': required_qty,
+            'unit': 'pcs' if ingredient.is_packaging else 'ml'
+        })
+
+    return {'success': True, 'message': 'Raw materials deducted', 'deductions': deductions}
+
+
 def get_attar_oil_availability(product, location_id):
     """
     Check oil availability for made-to-order attar products.
@@ -532,9 +607,33 @@ def complete_sale():
 
             quantity = int(item_data['quantity'])
 
-            # Check stock availability - location-aware
-            if location:
-                # Use LocationStock for multi-kiosk
+            # For made-to-order products, check oil availability instead of product stock
+            if product.is_made_to_order and location:
+                oil_info = get_attar_oil_availability(product, location.id)
+                if oil_info:
+                    if oil_info['max_can_produce'] < quantity:
+                        db.session.rollback()
+                        return jsonify({
+                            'success': False,
+                            'error': f'Insufficient oil for {product.name}. Can only make {oil_info["max_can_produce"]} units (need {oil_info["oil_required_per_unit"]}ml per unit, have {oil_info["oil_available_ml"]}ml of {oil_info["oil_name"]})'
+                        }), 400
+                    # Skip regular stock check for made-to-order products
+                    location_stock = None
+                else:
+                    # No recipe found - treat as regular product
+                    location_stock = LocationStock.query.filter_by(
+                        location_id=location.id,
+                        product_id=product.id
+                    ).first()
+                    available_qty = location_stock.available_quantity if location_stock else 0
+                    if available_qty < quantity:
+                        db.session.rollback()
+                        return jsonify({
+                            'success': False,
+                            'error': f'Insufficient stock for {product.name} at this location. Available: {available_qty}'
+                        }), 400
+            elif location:
+                # Regular product - check LocationStock for multi-kiosk
                 location_stock = LocationStock.query.filter_by(
                     location_id=location.id,
                     product_id=product.id
@@ -549,6 +648,7 @@ def complete_sale():
                     }), 400
             else:
                 # Fallback: use product.quantity
+                location_stock = None
                 if product.quantity < quantity:
                     db.session.rollback()
                     return jsonify({
@@ -568,35 +668,14 @@ def complete_sale():
             db.session.add(sale_item)
 
             # Update stock - location-aware
-            if location:
-                # Update LocationStock
-                if location_stock:
-                    location_stock.quantity -= quantity
-                    location_stock.last_movement_at = datetime.utcnow()
-            else:
-                # Fallback: update product.quantity
-                product.quantity -= quantity
-
-            # Create stock movement record with location
-            stock_movement = StockMovement(
-                product_id=product.id,
-                user_id=current_user.id,
-                movement_type='sale',
-                quantity=-quantity,
-                reference=sale.sale_number,
-                notes=f'Sale {sale.sale_number}',
-                location_id=location.id if location else None
-            )
-            db.session.add(stock_movement)
-
-            # Auto-deduct raw materials for made-to-order products
+            # For made-to-order products, don't deduct from product stock (raw materials are deducted instead)
             if product.is_made_to_order:
-                recipe = product.get_recipe()
+                # Auto-deduct raw materials for made-to-order products
+                recipe = Recipe.query.filter_by(product_id=product.id, is_active=True).first()
                 if recipe:
-                    deduction_result = product.deduct_raw_materials(
-                        quantity=quantity,
-                        location_id=location.id if location else None,
-                        sale_id=sale.id
+                    # Deduct from location-specific raw material stock
+                    deduction_result = deduct_raw_materials_for_sale(
+                        product, quantity, location.id if location else None, sale.id, sale.sale_number, current_user.id
                     )
                     if not deduction_result['success']:
                         db.session.rollback()
@@ -605,19 +684,38 @@ def complete_sale():
                             'error': deduction_result['message']
                         }), 400
 
-                    # Log raw material consumption for this sale
-                    for deduction in deduction_result['deductions']:
-                        from app.models import RawMaterialMovement
-                        rm_movement = RawMaterialMovement(
-                            raw_material_id=deduction['material_id'],
-                            user_id=current_user.id,
-                            movement_type='pos_consumption',
-                            quantity=-deduction['quantity'],
-                            reference=sale.sale_number,
-                            notes=f'Auto-deducted for POS sale: {product.name} x{quantity}',
-                            location_id=location.id if location else None
-                        )
-                        db.session.add(rm_movement)
+                # Create stock movement record (for tracking, even though no physical stock deducted)
+                stock_movement = StockMovement(
+                    product_id=product.id,
+                    user_id=current_user.id,
+                    movement_type='sale',
+                    quantity=-quantity,
+                    reference=sale.sale_number,
+                    notes=f'Made-to-order sale {sale.sale_number}',
+                    location_id=location.id if location else None
+                )
+                db.session.add(stock_movement)
+            else:
+                # Regular product - deduct from stock
+                if location and location_stock:
+                    # Update LocationStock
+                    location_stock.quantity -= quantity
+                    location_stock.last_movement_at = datetime.utcnow()
+                elif not location:
+                    # Fallback: update product.quantity
+                    product.quantity -= quantity
+
+                # Create stock movement record with location
+                stock_movement = StockMovement(
+                    product_id=product.id,
+                    user_id=current_user.id,
+                    movement_type='sale',
+                    quantity=-quantity,
+                    reference=sale.sale_number,
+                    notes=f'Sale {sale.sale_number}',
+                    location_id=location.id if location else None
+                )
+                db.session.add(stock_movement)
 
         # Handle split payments
         payments_data = data.get('payments', [])
