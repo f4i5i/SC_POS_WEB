@@ -256,6 +256,7 @@ class Product(db.Model):
     packaging_cost = db.Column(db.Numeric(10, 2), default=0.00)  # Box, wrapper, etc.
     delivery_cost = db.Column(db.Numeric(10, 2), default=0.00)  # Freight per unit
     bottle_cost = db.Column(db.Numeric(10, 2), default=0.00)  # Optional bottle cost
+    kiosk_cost = db.Column(db.Numeric(10, 2), default=0.00)  # Kiosk/store margin
 
     # Computed/cached landed cost (for backward compatibility)
     cost_price = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
@@ -294,7 +295,8 @@ class Product(db.Model):
             (self.base_cost or Decimal('0')) +
             (self.packaging_cost or Decimal('0')) +
             (self.delivery_cost or Decimal('0')) +
-            (self.bottle_cost or Decimal('0'))
+            (self.bottle_cost or Decimal('0')) +
+            (self.kiosk_cost or Decimal('0'))
         )
 
     def update_cost_price(self):
