@@ -73,7 +73,13 @@ class ProductionService:
 
         materials = []
         total_ml = float(recipe.output_size_ml or 0) * quantity
-        oil_percentage = float(recipe.oil_percentage or 100) / 100
+
+        # For single_oil and blended attars, oil percentage is always 100%
+        # Only perfumes have partial oil percentage (rest is ethanol)
+        if recipe.recipe_type in ('single_oil', 'blended'):
+            oil_percentage = 1.0  # 100% oil for attars
+        else:
+            oil_percentage = float(recipe.oil_percentage or 100) / 100
 
         # Calculate oil amount needed
         oil_amount_ml = total_ml * oil_percentage

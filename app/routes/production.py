@@ -304,8 +304,11 @@ def add_recipe():
                 flash('A recipe with this code already exists.', 'danger')
                 return redirect(url_for('production.add_recipe'))
 
-            # For perfumes, ensure oil percentage is set
-            if recipe_type == 'perfume' and not oil_percentage:
+            # For attars (single_oil, blended), oil percentage is always 100%
+            # Only perfumes have partial oil percentage
+            if recipe_type in ('single_oil', 'blended'):
+                oil_percentage = 100.0
+            elif recipe_type == 'perfume' and not oil_percentage:
                 oil_percentage = 35.0
 
             recipe = Recipe(
@@ -402,9 +405,15 @@ def edit_recipe(id):
             recipe.recipe_type = request.form.get('recipe_type')
             recipe.product_id = request.form.get('product_id', type=int) or None
             recipe.output_size_ml = request.form.get('output_size_ml', type=float)
-            recipe.oil_percentage = request.form.get('oil_percentage', type=float, default=100)
             recipe.can_produce_at_kiosk = request.form.get('can_produce_at_kiosk') == 'on'
             recipe.description = request.form.get('description', '').strip()
+
+            # For attars (single_oil, blended), oil percentage is always 100%
+            # Only perfumes have partial oil percentage
+            if recipe.recipe_type in ('single_oil', 'blended'):
+                recipe.oil_percentage = 100.0
+            else:
+                recipe.oil_percentage = request.form.get('oil_percentage', type=float, default=35)
 
             # Delete old ingredients
             RecipeIngredient.query.filter_by(recipe_id=recipe.id).delete()
