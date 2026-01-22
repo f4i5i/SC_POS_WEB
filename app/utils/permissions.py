@@ -252,6 +252,8 @@ class Permissions:
     # Raw Material Permissions
     RAW_MATERIAL_VIEW = 'raw_material.view'
     RAW_MATERIAL_CREATE = 'raw_material.create'
+    RAW_MATERIAL_EDIT = 'raw_material.edit'
+    RAW_MATERIAL_DELETE = 'raw_material.delete'
     RAW_MATERIAL_ADJUST = 'raw_material.adjust_stock'
 
     # Recipe Permissions
@@ -346,6 +348,8 @@ def get_all_permissions():
         # Raw Materials
         ('raw_material.view', 'View Raw Materials', 'production'),
         ('raw_material.create', 'Create Raw Materials', 'production'),
+        ('raw_material.edit', 'Edit Raw Materials', 'production'),
+        ('raw_material.delete', 'Delete Raw Materials', 'production'),
         ('raw_material.adjust_stock', 'Adjust Raw Material Stock', 'production'),
 
         # Recipes
@@ -448,7 +452,7 @@ def get_default_roles():
                 'report.view_inventory', 'report.view_all_locations',
                 # Production - full access
                 'production.view', 'production.create_order', 'production.approve_order', 'production.execute',
-                'raw_material.view', 'raw_material.create', 'raw_material.adjust_stock',
+                'raw_material.view', 'raw_material.create', 'raw_material.edit', 'raw_material.delete', 'raw_material.adjust_stock',
                 'recipe.view', 'recipe.create', 'recipe.edit'
             ],
             'is_system': True

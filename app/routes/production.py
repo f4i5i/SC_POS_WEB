@@ -257,6 +257,69 @@ def adjust_raw_material(id):
     return redirect(url_for('production.view_raw_material', id=id))
 
 
+@bp.route('/raw-materials/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+@permission_required(Permissions.RAW_MATERIAL_EDIT)
+def edit_raw_material(id):
+    """Edit raw material"""
+    material = RawMaterial.query.get_or_404(id)
+
+    if request.method == 'POST':
+        try:
+            material.name = request.form.get('name', '').strip()
+            material.category_id = request.form.get('category_id', type=int)
+            material.cost_per_unit = request.form.get('cost_per_unit', type=float, default=0)
+            material.reorder_level = request.form.get('reorder_level', type=float, default=100)
+            material.bottle_size_ml = request.form.get('bottle_size_ml', type=float) or None
+
+            if not material.name or not material.category_id:
+                flash('Please fill all required fields.', 'danger')
+                return redirect(url_for('production.edit_raw_material', id=id))
+
+            db.session.commit()
+            flash(f'Raw material "{material.name}" updated successfully.', 'success')
+            return redirect(url_for('production.view_raw_material', id=id))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating material: {str(e)}', 'danger')
+
+    categories = RawMaterialCategory.query.filter_by(is_active=True).all()
+    return render_template('production/raw_materials/edit.html',
+                           material=material,
+                           categories=categories)
+
+
+@bp.route('/raw-materials/<int:id>/delete', methods=['POST'])
+@login_required
+@permission_required(Permissions.RAW_MATERIAL_DELETE)
+def delete_raw_material(id):
+    """Delete raw material"""
+    material = RawMaterial.query.get_or_404(id)
+
+    try:
+        # Check if material is used in any recipes
+        if material.recipe_ingredients:
+            flash('Cannot delete material that is used in recipes.', 'danger')
+            return redirect(url_for('production.view_raw_material', id=id))
+
+        # Check if there is stock
+        total_stock = sum(s.quantity for s in material.stock_levels)
+        if total_stock > 0:
+            flash('Cannot delete material with existing stock. Please adjust stock to 0 first.', 'danger')
+            return redirect(url_for('production.view_raw_material', id=id))
+
+        db.session.delete(material)
+        db.session.commit()
+        flash(f'Raw material "{material.name}" deleted successfully.', 'success')
+        return redirect(url_for('production.raw_materials'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting material: {str(e)}', 'danger')
+        return redirect(url_for('production.view_raw_material', id=id))
+
+
 # ============================================================
 # Recipes
 # ============================================================

@@ -1366,25 +1366,43 @@ function displaySearchResults(products) {
     let html = '';
     products.forEach(product => {
         const reorderLevel = product.reorder_level || 10;
-        const stockClass = product.quantity > reorderLevel ? 'stock-ok' : product.quantity > 0 ? 'stock-low' : 'stock-out';
-        const showReorderBtn = product.is_low_stock && product.can_reorder;
+        const isMadeToOrder = product.is_made_to_order && product.oil_info;
+        const showReorderBtn = product.is_low_stock && product.can_reorder && !isMadeToOrder;
         const suggestedQty = product.suggested_reorder_qty || 10;
         const isOutOfStock = product.quantity <= 0;
 
+        // For made-to-order attars, show oil info
+        let stockDisplay = '';
+        let stockClass = '';
+        if (isMadeToOrder) {
+            const oilInfo = product.oil_info;
+            stockClass = oilInfo.max_can_produce > 5 ? 'stock-ok' : oilInfo.max_can_produce > 0 ? 'stock-low' : 'stock-out';
+            stockDisplay = `
+                <div class="text-info" style="font-size: 0.75rem;">
+                    <i class="fas fa-tint"></i> ${oilInfo.oil_code}: ${oilInfo.oil_available_ml} ml
+                </div>
+                <span class="product-stock ${stockClass}">Can make: ${oilInfo.max_can_produce} units</span>
+            `;
+        } else {
+            stockClass = product.quantity > reorderLevel ? 'stock-ok' : product.quantity > 0 ? 'stock-low' : 'stock-out';
+            stockDisplay = `<span class="product-stock ${stockClass}">${product.quantity} in stock</span>`;
+        }
+
         html += `
             <div class="search-result-item ${isOutOfStock ? 'opacity-50' : ''}"
-                 ${isOutOfStock ? 'onclick="showToast(\'Out of stock!\', \'error\')"' : `onclick='addToCart(${JSON.stringify(product)})'`}
+                 ${isOutOfStock ? `onclick="showToast('${isMadeToOrder ? 'Not enough oil to produce!' : 'Out of stock!'}', 'error')"` : `onclick='addToCart(${JSON.stringify(product)})'`}
                  style="${isOutOfStock ? 'cursor: not-allowed;' : ''}">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <strong>${product.name}</strong>
-                        ${isOutOfStock ? '<span class="badge bg-danger ms-2">OUT OF STOCK</span>' : ''}
+                        ${isMadeToOrder ? '<span class="badge bg-info ms-2" style="font-size: 0.65rem;"><i class="fas fa-magic"></i> Made-to-Order</span>' : ''}
+                        ${isOutOfStock ? '<span class="badge bg-danger ms-2">' + (isMadeToOrder ? 'NO OIL' : 'OUT OF STOCK') + '</span>' : ''}
                         <br><small class="text-muted">${product.code} - ${product.brand || ''}</small>
                     </div>
                     <div class="text-end">
                         <div class="fw-bold ${isOutOfStock ? 'text-muted' : 'text-primary'}">Rs. ${product.selling_price.toFixed(2)}</div>
-                        <span class="product-stock ${stockClass}">${product.quantity} in stock</span>
-                        ${product.is_low_stock ? `
+                        ${stockDisplay}
+                        ${product.is_low_stock && !isMadeToOrder ? `
                             <div class="mt-1">
                                 <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">
                                     <i class="fas fa-exclamation-triangle"></i> Low Stock
@@ -1396,6 +1414,13 @@ function displaySearchResults(products) {
                                         <i class="fas fa-truck-loading"></i> Reorder
                                     </button>
                                 ` : ''}
+                            </div>
+                        ` : ''}
+                        ${isMadeToOrder && product.is_low_stock ? `
+                            <div class="mt-1">
+                                <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">
+                                    <i class="fas fa-exclamation-triangle"></i> Low Oil
+                                </span>
                             </div>
                         ` : ''}
                     </div>
@@ -1411,9 +1436,15 @@ function addToCart(product) {
     $('#searchResults').addClass('d-none');
     $('#productSearch').val('');
 
-    // Prevent adding out-of-stock items
+    const isMadeToOrder = product.is_made_to_order && product.oil_info;
+
+    // Prevent adding if no stock/oil available
     if (product.quantity <= 0) {
-        showToast('This product is out of stock!', 'error');
+        if (isMadeToOrder) {
+            showToast('Not enough oil to produce this attar!', 'error');
+        } else {
+            showToast('This product is out of stock!', 'error');
+        }
         return;
     }
 
@@ -1423,7 +1454,11 @@ function addToCart(product) {
             existingItem.quantity++;
             showToast(`${product.name} quantity updated`, 'success');
         } else {
-            showToast('Not enough stock!', 'warning');
+            if (isMadeToOrder) {
+                showToast('Not enough oil to make more!', 'warning');
+            } else {
+                showToast('Not enough stock!', 'warning');
+            }
             return;
         }
     } else {
@@ -1432,7 +1467,9 @@ function addToCart(product) {
             name: product.name,
             price: product.selling_price,
             quantity: 1,
-            max_quantity: product.quantity
+            max_quantity: product.quantity,
+            is_made_to_order: isMadeToOrder,
+            oil_info: product.oil_info || null
         });
         showToast(`${product.name} added to cart`, 'success');
     }
@@ -1460,10 +1497,13 @@ function updateCartDisplay() {
 
     let html = '';
     cart.forEach((item, index) => {
+        const madeToOrderBadge = item.is_made_to_order
+            ? '<span class="badge bg-info ms-1" style="font-size: 0.6rem;"><i class="fas fa-magic"></i></span>'
+            : '';
         html += `
             <div class="cart-item">
                 <div class="d-flex justify-content-between align-items-center">
-                    <span class="item-name" title="${item.name}">${item.name}</span>
+                    <span class="item-name" title="${item.name}">${item.name}${madeToOrderBadge}</span>
                     <button class="btn btn-danger btn-remove" onclick="removeFromCart(${index})">
                         <i class="fas fa-times"></i>
                     </button>
@@ -1497,7 +1537,11 @@ function updateQuantity(index, change) {
     }
 
     if (newQty > item.max_quantity) {
-        showToast('Not enough stock!', 'warning');
+        if (item.is_made_to_order) {
+            showToast('Not enough oil to make more!', 'warning');
+        } else {
+            showToast('Not enough stock!', 'warning');
+        }
         return;
     }
 
@@ -1507,16 +1551,21 @@ function updateQuantity(index, change) {
 
 function setQuantity(index, value) {
     const qty = parseInt(value);
+    const item = cart[index];
     if (qty <= 0) {
         removeFromCart(index);
         return;
     }
 
-    if (qty > cart[index].max_quantity) {
-        showToast('Not enough stock!', 'warning');
-        cart[index].quantity = cart[index].max_quantity;
+    if (qty > item.max_quantity) {
+        if (item.is_made_to_order) {
+            showToast('Not enough oil to make that many!', 'warning');
+        } else {
+            showToast('Not enough stock!', 'warning');
+        }
+        item.quantity = item.max_quantity;
     } else {
-        cart[index].quantity = qty;
+        item.quantity = qty;
     }
 
     updateCartDisplay();

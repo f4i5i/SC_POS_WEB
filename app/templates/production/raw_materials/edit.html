@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ material.name }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-edit text-primary me-2"></i>Edit Raw Material</h2>
+            <p class="text-muted mb-0">{{ material.code }}</p>
+        </div>
+        <a href="{{ url_for('production.view_raw_material', id=material.id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Code</label>
+                                <input type="text" class="form-control" value="{{ material.code }}" disabled>
+                                <small class="text-muted">Code cannot be changed</small>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <input type="text" name="name" class="form-control" required
+                                       value="{{ material.name }}">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Category <span class="text-danger">*</span></label>
+                                <select name="category_id" class="form-select" required id="category-select">
+                                    <option value="">Select category...</option>
+                                    {% for cat in categories %}
+                                    <option value="{{ cat.id }}" data-code="{{ cat.code }}"
+                                            {{ 'selected' if material.category_id == cat.id }}>
+                                        {{ cat.name }} ({{ cat.unit }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Cost per Unit (PKR)</label>
+                                <input type="number" name="cost_per_unit" class="form-control"
+                                       step="0.01" min="0" value="{{ material.cost_per_unit or 0 }}">
+                            </div>
+
+                            <!-- Bottle size field - shown only for BOTTLE category -->
+                            <div class="col-md-6" id="bottle-size-field"
+                                 style="{{ '' if material.category and material.category.code == 'BOTTLE' else 'display: none;' }}">
+                                <label class="form-label">Bottle Size (ml)</label>
+                                <select name="bottle_size_ml" class="form-select">
+                                    <option value="">Select size...</option>
+                                    <option value="3" {{ 'selected' if material.bottle_size_ml == 3 }}>3ml (Attar)</option>
+                                    <option value="6" {{ 'selected' if material.bottle_size_ml == 6 }}>6ml (Attar)</option>
+                                    <option value="12" {{ 'selected' if material.bottle_size_ml == 12 }}>12ml (Attar)</option>
+                                    <option value="30" {{ 'selected' if material.bottle_size_ml == 30 }}>30ml (Perfume)</option>
+                                    <option value="50" {{ 'selected' if material.bottle_size_ml == 50 }}>50ml (Perfume)</option>
+                                    <option value="100" {{ 'selected' if material.bottle_size_ml == 100 }}>100ml (Perfume)</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Reorder Level</label>
+                                <input type="number" name="reorder_level" class="form-control"
+                                       step="0.01" min="0" value="{{ material.reorder_level or 100 }}">
+                                <small class="text-muted">Alert when stock falls below this</small>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Update Material
+                            </button>
+                            <a href="{{ url_for('production.view_raw_material', id=material.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Delete Card -->
+            <div class="card shadow-sm border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h6 class="mb-0"><i class="fas fa-trash me-2"></i>Delete Material</h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small">Deleting this material will remove it permanently. This action cannot be undone.</p>
+                    <form method="POST" action="{{ url_for('production.delete_raw_material', id=material.id) }}"
+                          onsubmit="return confirm('Are you sure you want to delete this material? This cannot be undone.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-danger w-100">
+                            <i class="fas fa-trash me-2"></i>Delete Material
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('category-select').addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    const categoryCode = selectedOption.dataset.code;
+    const bottleField = document.getElementById('bottle-size-field');
+
+    if (categoryCode === 'BOTTLE') {
+        bottleField.style.display = 'block';
+    } else {
+        bottleField.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}

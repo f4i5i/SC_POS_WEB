@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, flash, redirect,
 from flask_login import login_required, current_user
 from datetime import datetime, date
 from decimal import Decimal
-from app.models import db, Product, Sale, SaleItem, Customer, StockMovement, Payment, SyncQueue, Setting, DayClose, LocationStock, StockTransfer, StockTransferItem, Location
+from app.models import db, Product, Sale, SaleItem, Customer, StockMovement, Payment, SyncQueue, Setting, DayClose, LocationStock, StockTransfer, StockTransferItem, Location, Recipe, RawMaterialStock
 from app.utils.helpers import generate_sale_number, has_permission
 from app.utils.pdf_utils import generate_receipt_pdf
 from app.utils.permissions import permission_required, Permissions
@@ -22,6 +22,87 @@ except ImportError:
     RETURNS_ENABLED = False
 
 bp = Blueprint('pos', __name__)
+
+
+def get_attar_oil_availability(product, location_id):
+    """
+    Check oil availability for made-to-order attar products.
+    Returns dict with oil availability info or None if not made-to-order.
+    """
+    if not product.is_made_to_order:
+        return None
+
+    # Get the recipe for this product
+    recipe = Recipe.query.filter_by(product_id=product.id, is_active=True).first()
+    if not recipe:
+        return None
+
+    # Only handle single_oil and blended attars (not perfumes at kiosks)
+    if recipe.recipe_type not in ('single_oil', 'blended'):
+        return None
+
+    # Get oil ingredients (non-packaging)
+    oil_ingredients = [ing for ing in recipe.ingredients if not ing.is_packaging]
+    if not oil_ingredients:
+        return None
+
+    # Calculate oil requirement per unit
+    output_ml = float(recipe.output_size_ml or 0)
+    # For attars, oil_percentage is 100%
+    oil_required_per_unit = output_ml
+
+    # Check oil availability at location
+    oil_info = []
+    min_can_produce = float('inf')
+
+    for ingredient in oil_ingredients:
+        raw_material = ingredient.raw_material
+        if not raw_material:
+            continue
+
+        # Get stock at this location
+        stock = RawMaterialStock.query.filter_by(
+            raw_material_id=raw_material.id,
+            location_id=location_id
+        ).first()
+
+        available_ml = float(stock.available_quantity) if stock else 0
+
+        # For single oil: full output_ml per unit
+        # For blended: percentage of output_ml
+        percentage = float(ingredient.percentage or 100) / 100
+        required_per_unit = output_ml * percentage
+
+        # How many units can be made with this oil
+        can_produce = int(available_ml / required_per_unit) if required_per_unit > 0 else 0
+        min_can_produce = min(min_can_produce, can_produce)
+
+        oil_info.append({
+            'oil_id': raw_material.id,
+            'oil_code': raw_material.code,
+            'oil_name': raw_material.name,
+            'available_ml': round(available_ml, 2),
+            'required_per_unit': round(required_per_unit, 2),
+            'can_produce': can_produce
+        })
+
+    if min_can_produce == float('inf'):
+        min_can_produce = 0
+
+    # Return primary oil info (first oil for display)
+    primary_oil = oil_info[0] if oil_info else None
+
+    return {
+        'is_made_to_order': True,
+        'recipe_type': recipe.recipe_type,
+        'output_size_ml': output_ml,
+        'oil_name': primary_oil['oil_name'] if primary_oil else 'Unknown',
+        'oil_code': primary_oil['oil_code'] if primary_oil else '',
+        'oil_available_ml': primary_oil['available_ml'] if primary_oil else 0,
+        'oil_required_per_unit': oil_required_per_unit,
+        'max_can_produce': min_can_produce,
+        'oils': oil_info
+    }
 
 
 @bp.route('/')
@@ -114,7 +195,8 @@ def search_products():
             qty = stock.available_quantity if stock else 0
             reorder_level = stock.reorder_level if stock else product.reorder_level
             is_low = stock.is_low_stock if stock else (qty <= reorder_level)
-            results.append({
+
+            result = {
                 'id': product.id,
                 'code': product.code,
                 'barcode': product.barcode,
@@ -127,8 +209,20 @@ def search_products():
                 'reorder_level': reorder_level,
                 'suggested_reorder_qty': product.suggested_reorder_quantity if hasattr(product, 'suggested_reorder_quantity') else 10,
                 'can_reorder': can_reorder,
-                'image_url': product.image_url
-            })
+                'image_url': product.image_url,
+                'is_made_to_order': product.is_made_to_order
+            }
+
+            # For made-to-order attars, check oil availability instead of product stock
+            if product.is_made_to_order:
+                oil_info = get_attar_oil_availability(product, location.id)
+                if oil_info:
+                    result['oil_info'] = oil_info
+                    # Override quantity with max producible units for stock check
+                    result['quantity'] = oil_info['max_can_produce']
+                    result['is_low_stock'] = oil_info['max_can_produce'] <= 5
+
+            results.append(result)
     else:
         # Fallback: use product.quantity for backward compatibility
         products = Product.query.filter(filter_condition).limit(50).all()
@@ -175,7 +269,7 @@ def get_product(product_id):
         qty = product.quantity
         is_low_stock = product.is_low_stock
 
-    return jsonify({
+    result = {
         'id': product.id,
         'code': product.code,
         'barcode': product.barcode,
@@ -186,8 +280,20 @@ def get_product(product_id):
         'tax_rate': float(product.tax_rate),
         'quantity': qty,
         'is_low_stock': is_low_stock,
-        'image_url': product.image_url
-    })
+        'image_url': product.image_url,
+        'is_made_to_order': product.is_made_to_order
+    }
+
+    # For made-to-order attars, check oil availability instead of product stock
+    if product.is_made_to_order and location:
+        oil_info = get_attar_oil_availability(product, location.id)
+        if oil_info:
+            result['oil_info'] = oil_info
+            # Override quantity with max producible units for stock check
+            result['quantity'] = oil_info['max_can_produce']
+            result['is_low_stock'] = oil_info['max_can_produce'] <= 5
+
+    return jsonify(result)
 
 
 def generate_transfer_number():

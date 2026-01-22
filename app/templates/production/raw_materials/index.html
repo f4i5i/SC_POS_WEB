@@ -94,10 +94,18 @@
                             {% endif %}
                             <td class="text-end">PKR {{ "%.2f"|format(material.cost_per_unit) }}</td>
                             <td>
-                                <a href="{{ url_for('production.view_raw_material', id=material.id) }}"
-                                   class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-eye"></i>
-                                </a>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('production.view_raw_material', id=material.id) }}"
+                                       class="btn btn-outline-primary" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if current_user.has_permission('raw_material.edit') %}
+                                    <a href="{{ url_for('production.edit_raw_material', id=material.id) }}"
+                                       class="btn btn-outline-warning" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
