@@ -12,98 +12,108 @@
         }
 
         @page {
-            size: 80mm auto;
+            size: 72mm auto;
             margin: 0;
         }
 
         @media print {
             .no-print { display: none !important; }
             html, body {
-                width: 80mm;
+                width: 72mm;
                 margin: 0;
                 padding: 0;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
             body {
-                padding: 3mm;
+                padding: 2mm;
             }
             /* Force darker prints on thermal */
             * {
                 color: #000 !important;
-                -webkit-text-stroke: 0.3px #000;
+                -webkit-text-stroke: 0.4px #000;
             }
         }
 
         body {
-            font-family: 'Arial', 'Helvetica', sans-serif;
-            max-width: 80mm;
+            font-family: 'Courier New', 'Lucida Console', monospace;
+            width: 72mm;
+            max-width: 72mm;
             margin: 0 auto;
-            padding: 8px;
+            padding: 4px;
             background: #fff;
             color: #000;
-            font-size: 13px;
-            line-height: 1.5;
-            font-weight: 500;
+            font-size: 11px;
+            line-height: 1.4;
+            font-weight: 600;
+            text-align: center;
         }
 
         /* Header */
         .receipt-header {
             text-align: center;
-            padding-bottom: 10px;
-            border-bottom: 3px double #000;
-            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 2px double #000;
+            margin-bottom: 8px;
         }
 
         .receipt-logo {
-            max-width: 120px;
+            max-width: 100px;
             height: auto;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             filter: contrast(1.5) brightness(0.9);
         }
 
         .business-name {
-            font-size: 20px;
+            font-size: 16px;
             font-weight: 900;
-            letter-spacing: 1px;
-            margin: 6px 0;
+            letter-spacing: 0.5px;
+            margin: 4px 0;
             text-transform: uppercase;
         }
 
         .business-tagline {
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-bottom: 4px;
         }
 
         .business-contact {
-            font-size: 11px;
-            line-height: 1.6;
-            font-weight: 600;
+            font-size: 9px;
+            line-height: 1.4;
+            font-weight: 700;
         }
 
         /* Receipt Info */
         .receipt-info {
-            border-bottom: 2px solid #000;
-            padding-bottom: 8px;
-            margin-bottom: 8px;
-            font-size: 12px;
-            font-weight: 600;
+            border-bottom: 1px solid #000;
+            padding-bottom: 6px;
+            margin-bottom: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            text-align: left;
         }
 
         .receipt-info-row {
             display: flex;
             justify-content: space-between;
-            margin: 4px 0;
+            margin: 2px 0;
+            padding: 0 2px;
+        }
+
+        .receipt-info-row span:last-child {
+            text-align: right;
+            max-width: 55%;
+            word-wrap: break-word;
         }
 
         .receipt-number {
-            font-size: 14px;
+            font-size: 11px;
             font-weight: 900;
             text-align: center;
-            padding: 6px;
-            margin-bottom: 8px;
-            border: 2px solid #000;
+            padding: 4px;
+            margin-bottom: 6px;
+            border: 1px solid #000;
             background: transparent;
         }
 
@@ -111,64 +121,72 @@
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 8px 0;
-            font-size: 12px;
+            margin: 6px 0;
+            font-size: 9px;
+            table-layout: fixed;
         }
 
         .items-table th {
-            border-bottom: 2px solid #000;
-            border-top: 2px solid #000;
-            padding: 6px 3px;
+            border-bottom: 1px solid #000;
+            border-top: 1px solid #000;
+            padding: 3px 1px;
             text-align: left;
             font-weight: 900;
-            font-size: 12px;
+            font-size: 9px;
         }
 
         .items-table td {
-            padding: 5px 3px;
-            border-bottom: 1px solid #000;
+            padding: 3px 1px;
+            border-bottom: 1px dashed #000;
             vertical-align: top;
-            font-weight: 600;
+            font-weight: 700;
         }
 
         .items-table th:first-child,
         .items-table td:first-child {
-            width: 48%;
+            width: 40%;
+            text-align: left;
         }
 
         .items-table th:nth-child(2),
         .items-table td:nth-child(2) {
-            width: 12%;
+            width: 15%;
             text-align: center;
         }
 
         .items-table th:nth-child(3),
-        .items-table td:nth-child(3),
+        .items-table td:nth-child(3) {
+            width: 22%;
+            text-align: right;
+        }
+
         .items-table th:nth-child(4),
         .items-table td:nth-child(4) {
-            width: 20%;
+            width: 23%;
             text-align: right;
         }
 
         .item-name {
             word-wrap: break-word;
-            max-width: 110px;
+            overflow-wrap: break-word;
             font-weight: 700;
         }
 
         /* Totals */
         .totals {
-            border-top: 2px solid #000;
-            padding-top: 8px;
-            margin-top: 5px;
-            font-size: 13px;
+            border-top: 1px solid #000;
+            padding-top: 6px;
+            margin-top: 4px;
+            font-size: 10px;
             font-weight: 700;
+            text-align: left;
         }
 
         .totals-row {
             display: flex;
             justify-content: space-between;
-            margin: 5px 0;
+            margin: 3px 0;
+            padding: 0 2px;
         }
 
         .totals-row.discount {
@@ -176,19 +194,19 @@
         }
 
         .grand-total {
-            border-top: 3px solid #000;
-            border-bottom: 3px solid #000;
-            margin: 10px 0;
-            padding: 10px 0;
-            font-size: 18px;
+            border-top: 2px solid #000;
+            border-bottom: 2px solid #000;
+            margin: 6px 0;
+            padding: 6px 2px;
+            font-size: 14px;
             font-weight: 900;
         }
 
         .payment-info {
-            border-top: 2px solid #000;
-            padding-top: 8px;
-            margin-top: 8px;
-            font-size: 13px;
+            border-top: 1px solid #000;
+            padding-top: 6px;
+            margin-top: 6px;
+            font-size: 10px;
             font-weight: 700;
         }
 
@@ -196,62 +214,84 @@
             text-align: center;
             font-weight: 900;
             background: transparent;
-            padding: 6px;
-            margin-bottom: 8px;
+            padding: 4px;
+            margin-bottom: 6px;
             text-transform: uppercase;
-            border: 2px solid #000;
-            font-size: 14px;
+            border: 1px solid #000;
+            font-size: 10px;
         }
 
         /* Customer Loyalty */
         .loyalty-info {
             text-align: center;
-            border: 2px solid #000;
-            padding: 8px;
-            margin: 10px 0;
-            font-size: 12px;
+            border: 1px solid #000;
+            padding: 4px;
+            margin: 6px 0;
+            font-size: 9px;
             background: transparent;
             font-weight: 700;
         }
 
         .loyalty-points {
-            font-size: 14px;
+            font-size: 10px;
             font-weight: 900;
         }
 
         /* Footer */
         .receipt-footer {
             text-align: center;
-            border-top: 3px double #000;
-            margin-top: 10px;
-            padding-top: 10px;
-            font-size: 12px;
-            font-weight: 600;
+            border-top: 2px double #000;
+            margin-top: 8px;
+            padding-top: 8px;
+            font-size: 10px;
+            font-weight: 700;
         }
 
         .thank-you {
-            font-size: 16px;
+            font-size: 12px;
             font-weight: 900;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
             text-transform: uppercase;
         }
 
         .footer-tagline {
             font-weight: 700;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
+            font-size: 9px;
         }
 
         .footer-contact {
-            font-size: 11px;
-            margin-top: 8px;
+            font-size: 8px;
+            margin-top: 6px;
             font-weight: 700;
         }
 
         .barcode-area {
             text-align: center;
-            margin: 10px 0;
+            margin: 8px 0;
             font-family: 'Libre Barcode 39', cursive;
-            font-size: 32px;
+            font-size: 28px;
+        }
+
+        /* Terms and Conditions */
+        .terms-conditions {
+            text-align: center;
+            border-top: 1px dashed #000;
+            margin-top: 8px;
+            padding-top: 6px;
+            font-size: 7px;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .terms-conditions .terms-title {
+            font-weight: 900;
+            font-size: 8px;
+            margin-bottom: 3px;
+        }
+
+        .terms-conditions p {
+            margin: 2px 0;
         }
 
         /* Print Button */
@@ -296,24 +336,24 @@
 
         /* Divider - solid for better thermal print */
         .divider {
-            border-bottom: 2px solid #000;
-            margin: 8px 0;
+            border-bottom: 1px solid #000;
+            margin: 6px 0;
         }
 
         /* Items count */
         .items-count {
             text-align: center;
-            font-size: 11px;
+            font-size: 9px;
             color: #000;
-            margin: 6px 0;
+            margin: 4px 0;
             font-weight: 700;
         }
 
         /* Timestamp at bottom */
         .timestamp {
-            margin-top: 10px;
-            font-size: 10px;
-            font-weight: 600;
+            margin-top: 6px;
+            font-size: 8px;
+            font-weight: 700;
             color: #000 !important;
         }
     </style>
@@ -478,6 +518,15 @@
         <div class="timestamp">
             {{ sale.sale_date.strftime('%Y-%m-%d %H:%M:%S') }}
         </div>
+    </div>
+
+    <!-- Terms and Conditions -->
+    <div class="terms-conditions">
+        <div class="terms-title">TERMS & CONDITIONS</div>
+        <p>* No exchange or refund after 7 days</p>
+        <p>* Original receipt required for exchange</p>
+        <p>* Opened perfumes cannot be returned</p>
+        <p>* Keep receipt for warranty claims</p>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
