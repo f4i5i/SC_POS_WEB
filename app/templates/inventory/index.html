@@ -743,10 +743,12 @@
 
 <!-- Pagination -->
 {% if products.pages > 1 %}
+{% set args_without_page = request.args.to_dict() %}
+{% if 'page' in args_without_page %}{% set _ = args_without_page.pop('page') %}{% endif %}
 <nav aria-label="Page navigation">
     <ul class="pagination justify-content-center">
         <li class="page-item {% if not products.has_prev %}disabled{% endif %}">
-            <a class="page-link" href="{{ url_for('inventory.index', page=products.prev_num, **request.args) }}">
+            <a class="page-link" href="{{ url_for('inventory.index', page=products.prev_num, **args_without_page) }}">
                 <i class="fas fa-chevron-left"></i> Previous
             </a>
         </li>
@@ -754,7 +756,7 @@
         {% for page_num in products.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
             {% if page_num %}
                 <li class="page-item {% if page_num == products.page %}active{% endif %}">
-                    <a class="page-link" href="{{ url_for('inventory.index', page=page_num, **request.args) }}">
+                    <a class="page-link" href="{{ url_for('inventory.index', page=page_num, **args_without_page) }}">
                         {{ page_num }}
                     </a>
                 </li>
@@ -766,7 +768,7 @@
         {% endfor %}
 
         <li class="page-item {% if not products.has_next %}disabled{% endif %}">
-            <a class="page-link" href="{{ url_for('inventory.index', page=products.next_num, **request.args) }}">
+            <a class="page-link" href="{{ url_for('inventory.index', page=products.next_num, **args_without_page) }}">
                 Next <i class="fas fa-chevron-right"></i>
             </a>
         </li>

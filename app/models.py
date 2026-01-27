@@ -1075,6 +1075,23 @@ class DayClose(db.Model):
     expected_cash = db.Column(db.Numeric(12, 2), default=0.00)
     cash_variance = db.Column(db.Numeric(12, 2), default=0.00)  # Difference between actual and expected
 
+    # Detailed payment breakdown for Z-Report
+    total_easypaisa = db.Column(db.Numeric(12, 2), default=0.00)
+    total_jazzcash = db.Column(db.Numeric(12, 2), default=0.00)
+    total_bank_transfer = db.Column(db.Numeric(12, 2), default=0.00)
+    total_credit = db.Column(db.Numeric(12, 2), default=0.00)
+
+    # Sales reconciliation for Z-Report
+    gross_sales = db.Column(db.Numeric(12, 2), default=0.00)  # Before discounts
+    total_discounts = db.Column(db.Numeric(12, 2), default=0.00)
+    total_tax = db.Column(db.Numeric(12, 2), default=0.00)
+    net_sales = db.Column(db.Numeric(12, 2), default=0.00)  # After discounts + tax
+    total_refunds = db.Column(db.Numeric(12, 2), default=0.00)
+
+    # Z-Report tracking
+    z_report_number = db.Column(db.String(32))  # Z-001, Z-002, etc.
+    shift_count = db.Column(db.Integer, default=1)  # Number of shifts that day
+
     # Report
     report_generated = db.Column(db.Boolean, default=False)
     report_path = db.Column(db.String(512))

@@ -2391,6 +2391,46 @@
     </script>
     {% endif %}
 
+    <!-- Sidebar Active Menu State -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get current path
+        const currentPath = window.location.pathname;
+
+        // Find all nav links in sidebar
+        const sidebarLinks = document.querySelectorAll('.sidebar-menu .nav-link');
+
+        sidebarLinks.forEach(function(link) {
+            const href = link.getAttribute('href');
+            if (href && href !== '#' && currentPath.startsWith(href) && href !== '/') {
+                // Mark link as active
+                link.classList.add('active');
+
+                // Find parent collapse and expand it
+                const parentCollapse = link.closest('.collapse');
+                if (parentCollapse) {
+                    parentCollapse.classList.add('show');
+
+                    // Also update the toggle button
+                    const toggleBtn = document.querySelector('[href="#' + parentCollapse.id + '"]');
+                    if (toggleBtn) {
+                        toggleBtn.classList.remove('collapsed');
+                        toggleBtn.setAttribute('aria-expanded', 'true');
+                    }
+                }
+            }
+        });
+
+        // Special handling for exact match on Dashboard
+        if (currentPath === '/') {
+            const dashboardLink = document.querySelector('.sidebar-menu a[href="/"]');
+            if (dashboardLink) {
+                dashboardLink.classList.add('active');
+            }
+        }
+    });
+    </script>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

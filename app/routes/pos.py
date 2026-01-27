@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, flash, redirect,
 from flask_login import login_required, current_user
 from datetime import datetime, date
 from decimal import Decimal
-from app.models import db, Product, Sale, SaleItem, Customer, StockMovement, Payment, SyncQueue, Setting, DayClose, LocationStock, StockTransfer, StockTransferItem, Location, Recipe, RawMaterialStock
+from app.models import db, Product, Sale, SaleItem, Customer, StockMovement, Payment, SyncQueue, Setting, DayClose, LocationStock, StockTransfer, StockTransferItem, Location, Recipe, RawMaterialStock, User
 from app.utils.helpers import generate_sale_number, has_permission
 from app.utils.pdf_utils import generate_receipt_pdf
 from app.utils.permissions import permission_required, Permissions
@@ -1697,3 +1697,5 @@ def process_return():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
