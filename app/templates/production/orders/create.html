@@ -21,11 +21,28 @@
         {% if current_location.location_type == 'kiosk' %}
         <br><small>Note: Only attar recipes can be produced at kiosks</small>
         {% endif %}
+        {% if is_global_admin and available_locations %}
+        <div class="mt-2">
+            <form method="GET" class="d-inline-flex align-items-center gap-2">
+                <label class="mb-0"><small>Change location:</small></label>
+                <select name="location_id" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                    {% for loc in available_locations %}
+                    <option value="{{ loc.id }}" {% if loc.id == current_location.id %}selected{% endif %}>
+                        {{ loc.name }} ({{ loc.location_type }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
     <form method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            {% if is_global_admin and current_location %}
+            <input type="hidden" name="location_id" value="{{ current_location.id }}"/>
+            {% endif %}
         <div class="row g-4">
             <div class="col-lg-8">
                 <div class="card shadow-sm">

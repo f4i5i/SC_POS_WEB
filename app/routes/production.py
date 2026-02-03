@@ -180,6 +180,14 @@ def view_raw_material(id):
     material = RawMaterial.query.get_or_404(id)
     location = get_current_location()
 
+    # For global admin, get all locations for stock adjustment
+    available_locations = None
+    if current_user.is_global_admin:
+        available_locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+        # Default to warehouse if no location assigned
+        if not location:
+            location = Location.query.filter_by(location_type='warehouse', is_active=True).first()
+
     # Get stock at all locations
     stock_by_location = RawMaterialStock.query.filter_by(
         raw_material_id=id
@@ -194,7 +202,9 @@ def view_raw_material(id):
                            material=material,
                            stock_by_location=stock_by_location,
                            movements=movements,
-                           current_location=location)
+                           current_location=location,
+                           available_locations=available_locations,
+                           is_global_admin=current_user.is_global_admin)
 
 
 @bp.route('/raw-materials/<int:id>/adjust', methods=['POST'])
@@ -204,6 +214,14 @@ def adjust_raw_material(id):
     """Adjust raw material stock"""
     material = RawMaterial.query.get_or_404(id)
     location = get_current_location()
+
+    # For global admin, allow selecting location or default to warehouse
+    if not location and current_user.is_global_admin:
+        location_id = request.form.get('location_id', type=int)
+        if location_id:
+            location = Location.query.get(location_id)
+        else:
+            location = Location.query.filter_by(location_type='warehouse', is_active=True).first()
 
     if not location:
         flash('You must be assigned to a location.', 'danger')
@@ -587,6 +605,16 @@ def create_order():
     """Create new production order"""
     location = get_current_location()
 
+    # For global admin without assigned location, allow selecting location or default to warehouse
+    if not location and current_user.is_global_admin:
+        # Check if admin selected a specific location
+        selected_location_id = request.args.get('location_id', type=int) or request.form.get('location_id', type=int)
+        if selected_location_id:
+            location = Location.query.get(selected_location_id)
+        else:
+            # Default to warehouse for global admin
+            location = Location.query.filter_by(location_type='warehouse', is_active=True).first()
+
     if not location:
         flash('You must be assigned to a location to create production orders.', 'warning')
         return redirect(url_for('production.orders'))
@@ -652,9 +680,16 @@ def create_order():
         recipes_query = recipes_query.filter_by(can_produce_at_kiosk=True)
     recipes = recipes_query.order_by(Recipe.name).all()
 
+    # For global admin, get all locations they can produce at
+    available_locations = None
+    if current_user.is_global_admin:
+        available_locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+
     return render_template('production/orders/create.html',
                            recipes=recipes,
-                           current_location=location)
+                           current_location=location,
+                           available_locations=available_locations,
+                           is_global_admin=current_user.is_global_admin)
 
 
 @bp.route('/orders/<int:id>')
