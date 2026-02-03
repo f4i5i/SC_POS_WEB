@@ -675,8 +675,10 @@ def create_order():
             flash(f'Error: {str(e)}', 'danger')
 
     # Get recipes available at this location
+    # Global admin at warehouse can see all recipes
+    # Kiosk can only produce recipes marked as can_produce_at_kiosk
     recipes_query = Recipe.query.filter_by(is_active=True)
-    if location.location_type == 'kiosk':
+    if location.location_type == 'kiosk' and not current_user.is_global_admin:
         recipes_query = recipes_query.filter_by(can_produce_at_kiosk=True)
     recipes = recipes_query.order_by(Recipe.name).all()
 
