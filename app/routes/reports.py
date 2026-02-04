@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, send_file, curre
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_, or_, extract, case
-from app.models import db, Sale, SaleItem, Product, Customer, StockMovement
+from app.models import db, Sale, SaleItem, Product, Customer, StockMovement, Location, LocationStock, ProductionOrder, RawMaterialStock, RawMaterial
 from app.utils.helpers import has_permission
 from app.utils.permissions import permission_required, Permissions
 from app.utils.pdf_utils import generate_daily_report, generate_sales_report
@@ -1120,3 +1120,110 @@ def export_report(report_type):
     except Exception as e:
         current_app.logger.error(f"Export error: {str(e)}")
         return jsonify({'error': 'Export failed', 'message': str(e)}), 500
+
+
+@bp.route('/stock-valuation')
+@login_required
+@permission_required(Permissions.REPORT_VIEW_INVENTORY)
+def stock_valuation():
+    """Stock valuation report by location - shows cost and selling value"""
+
+    # Get selected location from request
+    selected_location_id = request.args.get('location_id', type=int)
+
+    # Get all locations
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+
+    # Calculate stock values per location
+    location_summaries = []
+    grand_total_cost = 0
+    grand_total_selling = 0
+    grand_total_items = 0
+    grand_total_quantity = 0
+
+    for loc in locations:
+        stocks = LocationStock.query.filter_by(location_id=loc.id).filter(LocationStock.quantity > 0).all()
+
+        loc_cost_value = 0
+        loc_selling_value = 0
+        loc_item_count = len(stocks)
+        loc_total_quantity = 0
+
+        for stock in stocks:
+            if stock.product:
+                loc_cost_value += float(stock.quantity) * float(stock.product.cost_price or 0)
+                loc_selling_value += float(stock.quantity) * float(stock.product.selling_price or 0)
+                loc_total_quantity += stock.quantity
+
+        location_summaries.append({
+            'location': loc,
+            'cost_value': loc_cost_value,
+            'selling_value': loc_selling_value,
+            'potential_profit': loc_selling_value - loc_cost_value,
+            'item_count': loc_item_count,
+            'total_quantity': loc_total_quantity
+        })
+
+        grand_total_cost += loc_cost_value
+        grand_total_selling += loc_selling_value
+        grand_total_items += loc_item_count
+        grand_total_quantity += loc_total_quantity
+
+    # Get detailed stock for selected location
+    selected_location = None
+    location_stock_details = []
+
+    if selected_location_id:
+        selected_location = Location.query.get(selected_location_id)
+        if selected_location:
+            stocks = LocationStock.query.filter_by(location_id=selected_location_id)\
+                .filter(LocationStock.quantity > 0)\
+                .join(Product)\
+                .order_by(Product.name).all()
+
+            for stock in stocks:
+                if stock.product:
+                    cost_val = float(stock.quantity) * float(stock.product.cost_price or 0)
+                    sell_val = float(stock.quantity) * float(stock.product.selling_price or 0)
+                    location_stock_details.append({
+                        'product': stock.product,
+                        'quantity': stock.quantity,
+                        'cost_price': float(stock.product.cost_price or 0),
+                        'selling_price': float(stock.product.selling_price or 0),
+                        'cost_value': cost_val,
+                        'selling_value': sell_val,
+                        'profit': sell_val - cost_val
+                    })
+
+    # Get production order summary
+    production_stats = {
+        'total_orders': ProductionOrder.query.count(),
+        'completed_orders': ProductionOrder.query.filter_by(status='completed').count(),
+        'pending_orders': ProductionOrder.query.filter(ProductionOrder.status.in_(['draft', 'pending', 'approved', 'in_progress'])).count(),
+        'total_produced': db.session.query(func.sum(ProductionOrder.quantity_produced)).filter_by(status='completed').scalar() or 0
+    }
+
+    # Get raw material stock value
+    raw_material_value = 0
+    raw_materials_query = db.session.query(
+        func.sum(RawMaterialStock.quantity * RawMaterial.cost_per_unit)
+    ).join(RawMaterial).filter(RawMaterialStock.quantity > 0)
+
+    if selected_location_id:
+        raw_materials_query = raw_materials_query.filter(RawMaterialStock.location_id == selected_location_id)
+
+    raw_material_value = raw_materials_query.scalar() or 0
+
+    return render_template('reports/stock_valuation.html',
+                         locations=locations,
+                         location_summaries=location_summaries,
+                         selected_location=selected_location,
+                         selected_location_id=selected_location_id,
+                         location_stock_details=location_stock_details,
+                         grand_total_cost=grand_total_cost,
+                         grand_total_selling=grand_total_selling,
+                         grand_total_profit=grand_total_selling - grand_total_cost,
+                         grand_total_items=grand_total_items,
+                         grand_total_quantity=grand_total_quantity,
+                         production_stats=production_stats,
+                         raw_material_value=float(raw_material_value))
