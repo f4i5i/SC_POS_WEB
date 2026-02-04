@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Transfer Discrepancy Report - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-exclamation-triangle text-warning me-2"></i>Transfer Discrepancy Report</h2>
+            <p class="text-muted mb-0">Track variances between dispatched and received quantities</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="window.print()" class="btn btn-outline-secondary">
+                <i class="fas fa-print me-2"></i>Print
+            </button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check mt-4">
+                        <input type="checkbox" class="form-check-input" name="discrepancies_only" value="true"
+                               id="discrepancies_only" {% if show_only_discrepancies %}checked{% endif %}>
+                        <label class="form-check-label" for="discrepancies_only">
+                            Show only transfers with discrepancies
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-2"></i>Apply Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="text-white-50">Total Transfers</h6>
+                    <h3 class="mb-0">{{ transfer_data|length }}</h3>
+                    <small>in selected period</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 bg-warning text-dark">
+                <div class="card-body">
+                    <h6 class="text-dark-50">Total Discrepancies</h6>
+                    <h3 class="mb-0">{{ total_discrepancies }}</h3>
+                    <small>items with variance</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 bg-danger text-white">
+                <div class="card-body">
+                    <h6 class="text-white-50">Discrepancy Value</h6>
+                    <h3 class="mb-0">{{ format_currency(total_discrepancy_value) }}</h3>
+                    <small>at cost price</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transfer List -->
+    {% if transfer_data %}
+    {% for data in transfer_data %}
+    <div class="card shadow-sm mb-3 {% if data.has_discrepancy %}border-warning{% endif %}">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <div>
+                <h6 class="mb-0">
+                    <i class="fas fa-truck me-2"></i>
+                    {{ data.transfer.transfer_number }}
+                    {% if data.has_discrepancy %}
+                    <span class="badge bg-warning ms-2"><i class="fas fa-exclamation-triangle"></i> Discrepancy</span>
+                    {% endif %}
+                </h6>
+                <small class="text-muted">
+                    {{ data.transfer.source_location.name if data.transfer.source_location else 'Unknown' }}
+                    <i class="fas fa-arrow-right mx-2"></i>
+                    {{ data.transfer.destination_location.name if data.transfer.destination_location else 'Unknown' }}
+                </small>
+            </div>
+            <div class="text-end">
+                <div>{{ data.transfer.created_at.strftime('%d %b %Y') }}</div>
+                <small class="text-muted">
+                    Received: {{ data.transfer.received_at.strftime('%d %b %Y') if data.transfer.received_at else 'N/A' }}
+                </small>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Product</th>
+                            <th class="text-center">Dispatched</th>
+                            <th class="text-center">Received</th>
+                            <th class="text-center">Variance</th>
+                            <th class="text-end">Variance Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in data.items %}
+                        <tr class="{% if item.variance != 0 %}table-warning{% endif %}">
+                            <td>
+                                {% if item.product %}
+                                <strong>{{ item.product.name }}</strong>
+                                <div class="small text-muted">{{ item.product.sku }}</div>
+                                {% else %}
+                                <span class="text-muted">Unknown Product</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ item.dispatched }}</td>
+                            <td class="text-center">{{ item.received }}</td>
+                            <td class="text-center">
+                                {% if item.variance > 0 %}
+                                <span class="text-success fw-bold">+{{ item.variance }}</span>
+                                <small class="text-muted">(excess)</small>
+                                {% elif item.variance < 0 %}
+                                <span class="text-danger fw-bold">{{ item.variance }}</span>
+                                <small class="text-muted">(short)</small>
+                                {% else %}
+                                <span class="text-success"><i class="fas fa-check"></i></span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if item.variance != 0 %}
+                                <span class="{% if item.variance < 0 %}text-danger{% else %}text-warning{% endif %}">
+                                    {{ format_currency(item.variance_value) }}
+                                </span>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5 text-muted">
+            <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
+            <h5>No Discrepancies Found</h5>
+            <p>All transfers in the selected period have matching quantities</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+@media print {
+    .btn, .no-print, form { display: none !important; }
+    .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+    .sidebar, .navbar { display: none !important; }
+    .main-content { margin-left: 0 !important; padding: 0 !important; }
+}
+</style>
+{% endblock %}

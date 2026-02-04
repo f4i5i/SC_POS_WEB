@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Reconciliation Report - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-balance-scale text-primary me-2"></i>Stock Reconciliation Report</h2>
+            <p class="text-muted mb-0">Track stock movements and validate inventory</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="window.print()" class="btn btn-outline-secondary">
+                <i class="fas fa-print me-2"></i>Print
+            </button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>
+                            {{ loc.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-2"></i>Apply Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="text-white-50">Purchases (Period)</h6>
+                    <h3 class="mb-0">{{ format_currency(purchase_summary.total_value) }}</h3>
+                    <small>{{ purchase_summary.total_orders }} orders received</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-success text-white">
+                <div class="card-body">
+                    <h6 class="text-white-50">Sales (Period)</h6>
+                    <h3 class="mb-0">{{ format_currency(sales_summary.total_revenue) }}</h3>
+                    <small>{{ sales_summary.total_transactions }} transactions</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-warning text-dark">
+                <div class="card-body">
+                    <h6 class="text-dark-50">Amount Paid</h6>
+                    <h3 class="mb-0">{{ format_currency(purchase_summary.total_paid) }}</h3>
+                    <small>to suppliers</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-danger text-white">
+                <div class="card-body">
+                    <h6 class="text-white-50">Amount Due</h6>
+                    <h3 class="mb-0">{{ format_currency(purchase_summary.total_due) }}</h3>
+                    <small>pending payment</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock Movement Details -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>Stock Movement Summary</h5>
+            <span class="badge bg-primary">{{ reconciliation_data|length }} Products</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Product</th>
+                            <th class="text-center text-success">Purchases</th>
+                            <th class="text-center text-info">Transfers In</th>
+                            <th class="text-center text-primary">Production</th>
+                            <th class="text-center text-warning">Returns</th>
+                            <th class="text-center text-danger">Sales</th>
+                            <th class="text-center text-secondary">Transfers Out</th>
+                            <th class="text-center text-dark">Damage</th>
+                            <th class="text-center">Adjustments</th>
+                            <th class="text-end fw-bold">Current Stock</th>
+                            <th class="text-end">Stock Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set grand_totals = {'purchases': 0, 'transfers_in': 0, 'production': 0, 'returns': 0, 'sales': 0, 'transfers_out': 0, 'damage': 0, 'adjustments': 0, 'current': 0, 'value': 0} %}
+                        {% for item in reconciliation_data %}
+                        <tr>
+                            <td>
+                                <strong>{{ item.product.name }}</strong>
+                                <div class="small text-muted">{{ item.product.sku }}</div>
+                            </td>
+                            <td class="text-center text-success">{% if item.purchases_in > 0 %}+{{ item.purchases_in }}{% else %}-{% endif %}</td>
+                            <td class="text-center text-info">{% if item.transfers_in > 0 %}+{{ item.transfers_in }}{% else %}-{% endif %}</td>
+                            <td class="text-center text-primary">{% if item.production_in > 0 %}+{{ item.production_in }}{% else %}-{% endif %}</td>
+                            <td class="text-center text-warning">{% if item.returns_in > 0 %}+{{ item.returns_in }}{% else %}-{% endif %}</td>
+                            <td class="text-center text-danger">{% if item.sales_out > 0 %}-{{ item.sales_out }}{% else %}-{% endif %}</td>
+                            <td class="text-center text-secondary">{% if item.transfers_out > 0 %}-{{ item.transfers_out }}{% else %}-{% endif %}</td>
+                            <td class="text-center text-dark">{% if item.damage_out > 0 %}-{{ item.damage_out }}{% else %}-{% endif %}</td>
+                            <td class="text-center">
+                                {% if item.adjustments > 0 %}
+                                <span class="text-success">+{{ item.adjustments }}</span>
+                                {% elif item.adjustments < 0 %}
+                                <span class="text-danger">{{ item.adjustments }}</span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-end fw-bold">{{ item.current_stock }}</td>
+                            <td class="text-end">{{ format_currency(item.stock_value) }}</td>
+                        </tr>
+                        {% set _ = grand_totals.update({
+                            'purchases': grand_totals.purchases + item.purchases_in,
+                            'transfers_in': grand_totals.transfers_in + item.transfers_in,
+                            'production': grand_totals.production + item.production_in,
+                            'returns': grand_totals.returns + item.returns_in,
+                            'sales': grand_totals.sales + item.sales_out,
+                            'transfers_out': grand_totals.transfers_out + item.transfers_out,
+                            'damage': grand_totals.damage + item.damage_out,
+                            'adjustments': grand_totals.adjustments + item.adjustments,
+                            'current': grand_totals.current + item.current_stock,
+                            'value': grand_totals.value + item.stock_value
+                        }) %}
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td>TOTAL</td>
+                            <td class="text-center text-success">+{{ grand_totals.purchases }}</td>
+                            <td class="text-center text-info">+{{ grand_totals.transfers_in }}</td>
+                            <td class="text-center text-primary">+{{ grand_totals.production }}</td>
+                            <td class="text-center text-warning">+{{ grand_totals.returns }}</td>
+                            <td class="text-center text-danger">-{{ grand_totals.sales }}</td>
+                            <td class="text-center text-secondary">-{{ grand_totals.transfers_out }}</td>
+                            <td class="text-center text-dark">-{{ grand_totals.damage }}</td>
+                            <td class="text-center">{{ grand_totals.adjustments }}</td>
+                            <td class="text-end">{{ grand_totals.current }}</td>
+                            <td class="text-end">{{ format_currency(grand_totals.value) }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="card mt-4">
+        <div class="card-body">
+            <h6 class="mb-3">Movement Types Legend:</h6>
+            <div class="row">
+                <div class="col-md-3"><span class="badge bg-success me-2">Purchases</span> Stock received from suppliers</div>
+                <div class="col-md-3"><span class="badge bg-info me-2">Transfers In</span> Stock received from other locations</div>
+                <div class="col-md-3"><span class="badge bg-primary me-2">Production</span> Stock created from production</div>
+                <div class="col-md-3"><span class="badge bg-warning me-2">Returns</span> Customer returns</div>
+                <div class="col-md-3 mt-2"><span class="badge bg-danger me-2">Sales</span> Stock sold to customers</div>
+                <div class="col-md-3 mt-2"><span class="badge bg-secondary me-2">Transfers Out</span> Stock sent to other locations</div>
+                <div class="col-md-3 mt-2"><span class="badge bg-dark me-2">Damage</span> Damaged/expired stock</div>
+                <div class="col-md-3 mt-2"><span class="badge bg-light text-dark me-2">Adjustments</span> Manual stock corrections</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .btn, .no-print, form { display: none !important; }
+    .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+    .sidebar, .navbar { display: none !important; }
+    .main-content { margin-left: 0 !important; padding: 0 !important; }
+}
+</style>
+{% endblock %}

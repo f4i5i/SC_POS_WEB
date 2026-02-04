@@ -143,6 +143,76 @@
         </div>
     </div>
 
+    <!-- Stock Reconciliation Report -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #7C3AED;">
+            <div class="report-icon" style="background: #EDE9FE; color: #7C3AED;">
+                <i class="fas fa-balance-scale"></i>
+            </div>
+            <div class="report-title">Stock Reconciliation</div>
+            <p class="report-description">Validate stock with purchases, sales & adjustments</p>
+            <a href="{{ url_for('reports.stock_reconciliation') }}" class="btn btn-outline-primary w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Raw Material Stock Report -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #D97706;">
+            <div class="report-icon" style="background: #FEF3C7; color: #D97706;">
+                <i class="fas fa-flask"></i>
+            </div>
+            <div class="report-title">Raw Material Stock</div>
+            <p class="report-description">Track oils, ethanol, bottles & production materials</p>
+            <a href="{{ url_for('reports.raw_material_stock') }}" class="btn btn-outline-warning w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Purchase Register -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #0891B2;">
+            <div class="report-icon" style="background: #CFFAFE; color: #0891B2;">
+                <i class="fas fa-file-invoice-dollar"></i>
+            </div>
+            <div class="report-title">Purchase Register</div>
+            <p class="report-description">All purchases with payment status and dues</p>
+            <a href="{{ url_for('reports.purchase_register') }}" class="btn btn-outline-info w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Stock Movement Audit Trail -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #475569;">
+            <div class="report-icon" style="background: #F1F5F9; color: #475569;">
+                <i class="fas fa-history"></i>
+            </div>
+            <div class="report-title">Stock Movement Audit</div>
+            <p class="report-description">Complete history of all stock changes</p>
+            <a href="{{ url_for('reports.stock_movement_audit') }}" class="btn btn-outline-secondary w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Transfer Discrepancy Report -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #DC2626;">
+            <div class="report-icon" style="background: #FEE2E2; color: #DC2626;">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="report-title">Transfer Discrepancy</div>
+            <p class="report-description">Variances between dispatched and received stock</p>
+            <a href="{{ url_for('reports.transfer_discrepancy') }}" class="btn btn-outline-danger w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
     <!-- Employee Performance Report -->
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="report-card" style="border-left-color: #06B6D4;">

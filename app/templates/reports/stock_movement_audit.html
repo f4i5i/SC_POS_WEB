@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Movement Audit Trail - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-history text-primary me-2"></i>Stock Movement Audit Trail</h2>
+            <p class="text-muted mb-0">Complete history of all stock changes</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="window.print()" class="btn btn-outline-secondary">
+                <i class="fas fa-print me-2"></i>Print
+            </button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-2">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ from_date.strftime('%Y-%m-%d') }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control" value="{{ to_date.strftime('%Y-%m-%d') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Product</label>
+                    <select name="product_id" class="form-select">
+                        <option value="">All Products</option>
+                        {% for product in products %}
+                        <option value="{{ product.id }}" {% if selected_product_id == product.id %}selected{% endif %}>
+                            {{ product.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>
+                            {{ loc.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Movement Type</label>
+                    <select name="movement_type" class="form-select">
+                        <option value="">All Types</option>
+                        {% for type in movement_types %}
+                        <option value="{{ type }}" {% if selected_movement_type == type %}selected{% endif %}>
+                            {{ type|replace('_', ' ')|title }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary by Type -->
+    <div class="row g-3 mb-4">
+        {% for type, data in summary_by_type.items() %}
+        <div class="col-md-2">
+            <div class="card shadow-sm h-100">
+                <div class="card-body text-center py-2">
+                    <h5 class="mb-0 {% if data.quantity > 0 %}text-success{% elif data.quantity < 0 %}text-danger{% endif %}">
+                        {% if data.quantity > 0 %}+{% endif %}{{ data.quantity }}
+                    </h5>
+                    <small class="text-muted">{{ type|replace('_', ' ')|title }}</small>
+                    <div class="small text-muted">{{ data.count }} records</div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Movement List -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-list me-2"></i>Movement History</h5>
+            <span class="badge bg-primary">{{ movements|length }} records (max 500)</span>
+        </div>
+        <div class="card-body p-0">
+            {% if movements %}
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date/Time</th>
+                            <th>Product</th>
+                            <th>Location</th>
+                            <th>Type</th>
+                            <th class="text-center">Quantity</th>
+                            <th>Reference</th>
+                            <th>User</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in movements %}
+                        <tr>
+                            <td>
+                                <div>{{ m.timestamp.strftime('%d %b %Y') }}</div>
+                                <small class="text-muted">{{ m.timestamp.strftime('%H:%M') }}</small>
+                            </td>
+                            <td>
+                                {% if m.product %}
+                                <strong>{{ m.product.name }}</strong>
+                                <div class="small text-muted">{{ m.product.sku }}</div>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ m.location.name if m.location else '-' }}</td>
+                            <td>
+                                {% if m.movement_type == 'purchase' %}
+                                <span class="badge bg-success">Purchase</span>
+                                {% elif m.movement_type == 'sale' %}
+                                <span class="badge bg-danger">Sale</span>
+                                {% elif m.movement_type == 'adjustment' %}
+                                <span class="badge bg-warning">Adjustment</span>
+                                {% elif m.movement_type == 'transfer_in' %}
+                                <span class="badge bg-info">Transfer In</span>
+                                {% elif m.movement_type == 'transfer_out' %}
+                                <span class="badge bg-secondary">Transfer Out</span>
+                                {% elif m.movement_type == 'production' %}
+                                <span class="badge bg-primary">Production</span>
+                                {% elif m.movement_type == 'return' %}
+                                <span class="badge bg-warning text-dark">Return</span>
+                                {% elif m.movement_type == 'damage' %}
+                                <span class="badge bg-dark">Damage</span>
+                                {% else %}
+                                <span class="badge bg-light text-dark">{{ m.movement_type }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if m.quantity > 0 %}
+                                <span class="text-success fw-bold">+{{ m.quantity }}</span>
+                                {% else %}
+                                <span class="text-danger fw-bold">{{ m.quantity }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if m.reference %}
+                                <small>{{ m.reference }}</small>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if m.user %}
+                                <small>{{ m.user.full_name or m.user.username }}</small>
+                                {% else %}
+                                <span class="text-muted">System</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if m.notes %}
+                                <small class="text-muted" title="{{ m.notes }}">{{ m.notes[:30] }}{% if m.notes|length > 30 %}...{% endif %}</small>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-inbox fa-3x mb-3"></i>
+                <p>No stock movements found for the selected criteria</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .btn, .no-print, form { display: none !important; }
+    .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+    .sidebar, .navbar { display: none !important; }
+    .main-content { margin-left: 0 !important; padding: 0 !important; }
+    .table-sm td, .table-sm th { padding: 0.2rem !important; font-size: 0.75rem !important; }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Raw Material Stock Report - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-flask text-primary me-2"></i>Raw Material Stock Report</h2>
+            <p class="text-muted mb-0">Track oils, ethanol, bottles and production materials</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="window.print()" class="btn btn-outline-secondary">
+                <i class="fas fa-print me-2"></i>Print
+            </button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-2">
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>
+                            {{ loc.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Category</label>
+                    <select name="category_id" class="form-select">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if selected_category_id == cat.id %}selected{% endif %}>
+                            {{ cat.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-2"></i>Apply
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50 mb-1">Current Stock Value</h6>
+                            <h3 class="mb-0">{{ format_currency(total_stock_value) }}</h3>
+                            <small>Raw materials on hand</small>
+                        </div>
+                        <i class="fas fa-warehouse fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50 mb-1">Purchased (Period)</h6>
+                            <h3 class="mb-0">{{ format_currency(total_purchased_value) }}</h3>
+                            <small>Materials received</small>
+                        </div>
+                        <i class="fas fa-truck-loading fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-warning text-dark">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-dark-50 mb-1">Consumed (Period)</h6>
+                            <h3 class="mb-0">{{ format_currency(total_consumed_value) }}</h3>
+                            <small>Used in production</small>
+                        </div>
+                        <i class="fas fa-industry fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50 mb-1">Production Orders</h6>
+                            <h3 class="mb-0">{{ production_summary.completed_orders }}</h3>
+                            <small>{{ production_summary.total_produced }} units produced</small>
+                        </div>
+                        <i class="fas fa-boxes fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Summary -->
+    <div class="row g-4 mb-4">
+        {% for cat_name, cat_data in category_summary.items() %}
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0">
+                        {% if 'Oil' in cat_name %}
+                        <i class="fas fa-tint text-warning me-2"></i>
+                        {% elif 'Ethanol' in cat_name %}
+                        <i class="fas fa-flask text-info me-2"></i>
+                        {% else %}
+                        <i class="fas fa-box text-secondary me-2"></i>
+                        {% endif %}
+                        {{ cat_name }}
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <h5 class="text-primary mb-0">{{ cat_data.items }}</h5>
+                            <small class="text-muted">Items</small>
+                        </div>
+                        <div class="col-4">
+                            <h5 class="text-success mb-0">{{ format_currency(cat_data.stock_value) }}</h5>
+                            <small class="text-muted">Stock Value</small>
+                        </div>
+                        <div class="col-4">
+                            <h5 class="text-warning mb-0">{{ format_currency(cat_data.consumed_value) }}</h5>
+                            <small class="text-muted">Consumed</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Raw Material Details -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-list me-2"></i>Raw Material Stock Details</h5>
+            <span class="badge bg-primary">{{ raw_material_data|length }} Materials</span>
+        </div>
+        <div class="card-body p-0">
+            {% if raw_material_data %}
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Material</th>
+                            <th>Category</th>
+                            <th class="text-center text-success">Purchased</th>
+                            <th class="text-center text-info">Transfer In</th>
+                            <th class="text-center text-danger">Production</th>
+                            <th class="text-center text-secondary">Transfer Out</th>
+                            <th class="text-center text-dark">Damage</th>
+                            <th class="text-center">Adjust</th>
+                            <th class="text-end fw-bold">Current Stock</th>
+                            <th class="text-end">Cost/Unit</th>
+                            <th class="text-end">Stock Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set grand_totals = {'purchases': 0, 'transfers_in': 0, 'production': 0, 'transfers_out': 0, 'damage': 0, 'adjustments': 0, 'stock_value': 0} %}
+                        {% for item in raw_material_data %}
+                        <tr>
+                            <td>
+                                <strong>{{ item.material.name }}</strong>
+                                <div class="small text-muted">{{ item.material.code }}</div>
+                            </td>
+                            <td>
+                                <span class="badge
+                                    {% if 'Oil' in item.category %}bg-warning text-dark
+                                    {% elif 'Ethanol' in item.category %}bg-info
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ item.category }}
+                                </span>
+                            </td>
+                            <td class="text-center text-success">
+                                {% if item.purchases_in > 0 %}+{{ "%.2f"|format(item.purchases_in) }}{% else %}-{% endif %}
+                            </td>
+                            <td class="text-center text-info">
+                                {% if item.transfers_in > 0 %}+{{ "%.2f"|format(item.transfers_in) }}{% else %}-{% endif %}
+                            </td>
+                            <td class="text-center text-danger">
+                                {% if item.production_out > 0 %}-{{ "%.2f"|format(item.production_out) }}{% else %}-{% endif %}
+                            </td>
+                            <td class="text-center text-secondary">
+                                {% if item.transfers_out > 0 %}-{{ "%.2f"|format(item.transfers_out) }}{% else %}-{% endif %}
+                            </td>
+                            <td class="text-center text-dark">
+                                {% if item.damage_out > 0 %}-{{ "%.2f"|format(item.damage_out) }}{% else %}-{% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if item.adjustments > 0 %}
+                                <span class="text-success">+{{ "%.2f"|format(item.adjustments) }}</span>
+                                {% elif item.adjustments < 0 %}
+                                <span class="text-danger">{{ "%.2f"|format(item.adjustments) }}</span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-end fw-bold">{{ "%.2f"|format(item.current_stock) }} {{ item.unit }}</td>
+                            <td class="text-end">{{ format_currency(item.cost_per_unit) }}</td>
+                            <td class="text-end text-primary fw-bold">{{ format_currency(item.stock_value) }}</td>
+                        </tr>
+                        {% set _ = grand_totals.update({
+                            'purchases': grand_totals.purchases + item.purchases_in,
+                            'transfers_in': grand_totals.transfers_in + item.transfers_in,
+                            'production': grand_totals.production + item.production_out,
+                            'transfers_out': grand_totals.transfers_out + item.transfers_out,
+                            'damage': grand_totals.damage + item.damage_out,
+                            'adjustments': grand_totals.adjustments + item.adjustments,
+                            'stock_value': grand_totals.stock_value + item.stock_value
+                        }) %}
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="2">TOTAL</td>
+                            <td class="text-center text-success">+{{ "%.2f"|format(grand_totals.purchases) }}</td>
+                            <td class="text-center text-info">+{{ "%.2f"|format(grand_totals.transfers_in) }}</td>
+                            <td class="text-center text-danger">-{{ "%.2f"|format(grand_totals.production) }}</td>
+                            <td class="text-center text-secondary">-{{ "%.2f"|format(grand_totals.transfers_out) }}</td>
+                            <td class="text-center text-dark">-{{ "%.2f"|format(grand_totals.damage) }}</td>
+                            <td class="text-center">{{ "%.2f"|format(grand_totals.adjustments) }}</td>
+                            <td colspan="2"></td>
+                            <td class="text-end text-primary">{{ format_currency(grand_totals.stock_value) }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-flask fa-3x mb-3"></i>
+                <p>No raw materials found for the selected criteria</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="card mt-4">
+        <div class="card-body">
+            <h6 class="mb-3">Movement Types:</h6>
+            <div class="row">
+                <div class="col-md-4"><span class="badge bg-success me-2">Purchased</span> Materials received from suppliers</div>
+                <div class="col-md-4"><span class="badge bg-info me-2">Transfer In</span> Materials received from other locations</div>
+                <div class="col-md-4"><span class="badge bg-danger me-2">Production</span> Materials consumed in production orders</div>
+                <div class="col-md-4 mt-2"><span class="badge bg-secondary me-2">Transfer Out</span> Materials sent to other locations</div>
+                <div class="col-md-4 mt-2"><span class="badge bg-dark me-2">Damage</span> Damaged/expired materials</div>
+                <div class="col-md-4 mt-2"><span class="badge bg-light text-dark me-2">Adjust</span> Manual stock corrections</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .btn, .no-print, form { display: none !important; }
+    .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+    .sidebar, .navbar { display: none !important; }
+    .main-content { margin-left: 0 !important; padding: 0 !important; }
+}
+</style>
+{% endblock %}

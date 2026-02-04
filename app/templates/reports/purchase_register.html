@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Purchase Register - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-file-invoice-dollar text-primary me-2"></i>Purchase Register</h2>
+            <p class="text-muted mb-0">All purchases with payment status and reconciliation</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="window.print()" class="btn btn-outline-secondary">
+                <i class="fas fa-print me-2"></i>Print
+            </button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-2">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Supplier</label>
+                    <select name="supplier_id" class="form-select">
+                        <option value="">All Suppliers</option>
+                        {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}" {% if selected_supplier_id == supplier.id %}selected{% endif %}>
+                            {{ supplier.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Payment Status</label>
+                    <select name="payment_status" class="form-select">
+                        <option value="">All</option>
+                        <option value="unpaid" {% if selected_payment_status == 'unpaid' %}selected{% endif %}>Unpaid</option>
+                        <option value="partial" {% if selected_payment_status == 'partial' %}selected{% endif %}>Partial</option>
+                        <option value="paid" {% if selected_payment_status == 'paid' %}selected{% endif %}>Paid</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-2"></i>Apply Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-2">
+            <div class="card shadow-sm border-0 bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ totals.count }}</h4>
+                    <small>Total Orders</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card shadow-sm border-0 bg-info text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ format_currency(totals.ordered_value) }}</h4>
+                    <small>Total Value</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card shadow-sm border-0 bg-success text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ format_currency(totals.paid) }}</h4>
+                    <small>Amount Paid</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card shadow-sm border-0 bg-danger text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ format_currency(totals.due) }}</h4>
+                    <small>Amount Due</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card shadow-sm border-0 bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ totals.unpaid_count }}</h4>
+                    <small>Unpaid</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card shadow-sm border-0 bg-secondary text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ totals.partial_count }}</h4>
+                    <small>Partial Paid</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Purchase List -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="fas fa-list me-2"></i>Purchase Orders</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if purchases %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>PO Number</th>
+                            <th>Date</th>
+                            <th>Supplier</th>
+                            <th>Status</th>
+                            <th class="text-end">Total Value</th>
+                            <th class="text-end">Paid</th>
+                            <th class="text-end">Due</th>
+                            <th>Payment Status</th>
+                            <th>Received</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for po in purchases %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('purchase_orders.view_order', id=po.id) }}" class="fw-bold">
+                                    {{ po.po_number }}
+                                </a>
+                            </td>
+                            <td>{{ po.order_date.strftime('%d %b %Y') if po.order_date else '-' }}</td>
+                            <td>{{ po.supplier.name if po.supplier else '-' }}</td>
+                            <td>
+                                {% if po.status == 'received' %}
+                                <span class="badge bg-success">Received</span>
+                                {% elif po.status == 'partial' %}
+                                <span class="badge bg-warning">Partial</span>
+                                {% elif po.status == 'ordered' %}
+                                <span class="badge bg-info">Ordered</span>
+                                {% elif po.status == 'cancelled' %}
+                                <span class="badge bg-danger">Cancelled</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ po.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">{{ format_currency(po.grand_total_landed or 0) }}</td>
+                            <td class="text-end text-success">{{ format_currency(po.amount_paid or 0) }}</td>
+                            <td class="text-end text-danger fw-bold">{{ format_currency(po.amount_due or 0) }}</td>
+                            <td>
+                                {% if po.payment_status == 'paid' %}
+                                <span class="badge bg-success"><i class="fas fa-check"></i> Paid</span>
+                                {% elif po.payment_status == 'partial' %}
+                                <span class="badge bg-warning"><i class="fas fa-clock"></i> Partial</span>
+                                {% else %}
+                                <span class="badge bg-danger"><i class="fas fa-times"></i> Unpaid</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ po.received_date.strftime('%d %b') if po.received_date else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="4">TOTAL ({{ purchases|length }} orders)</td>
+                            <td class="text-end">{{ format_currency(totals.ordered_value) }}</td>
+                            <td class="text-end text-success">{{ format_currency(totals.paid) }}</td>
+                            <td class="text-end text-danger">{{ format_currency(totals.due) }}</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-inbox fa-3x mb-3"></i>
+                <p>No purchase orders found for the selected criteria</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .btn, .no-print, form { display: none !important; }
+    .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+    .sidebar, .navbar { display: none !important; }
+    .main-content { margin-left: 0 !important; padding: 0 !important; }
+}
+</style>
+{% endblock %}
