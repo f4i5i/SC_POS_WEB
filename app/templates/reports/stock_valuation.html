@@ -79,6 +79,37 @@
         </div>
     </div>
 
+    <!-- Cost Breakdown Legend -->
+    <div class="alert alert-light border mb-4">
+        <div class="row text-center">
+            <div class="col">
+                <i class="fas fa-tag text-primary me-1"></i>
+                <strong>Base Cost</strong>
+                <small class="d-block text-muted">Supplier price</small>
+            </div>
+            <div class="col">
+                <i class="fas fa-box text-secondary me-1"></i>
+                <strong>Packaging</strong>
+                <small class="d-block text-muted">Box/wrapper</small>
+            </div>
+            <div class="col">
+                <i class="fas fa-truck text-info me-1"></i>
+                <strong>Delivery</strong>
+                <small class="d-block text-muted">Freight cost</small>
+            </div>
+            <div class="col">
+                <i class="fas fa-wine-bottle text-warning me-1"></i>
+                <strong>Bottle</strong>
+                <small class="d-block text-muted">Container cost</small>
+            </div>
+            <div class="col">
+                <i class="fas fa-calculator text-success me-1"></i>
+                <strong>Total Cost</strong>
+                <small class="d-block text-muted">All costs combined</small>
+            </div>
+        </div>
+    </div>
+
     <!-- Production Orders Summary -->
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-white">
@@ -177,20 +208,22 @@
                 <div class="card-body p-0">
                     {% if location_stock_details %}
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0">
+                        <table class="table table-hover table-sm mb-0">
                             <thead class="table-light">
                                 <tr>
                                     <th>Product</th>
                                     <th class="text-center">Qty</th>
-                                    <th class="text-end">Cost/Unit</th>
-                                    <th class="text-end">Sell/Unit</th>
-                                    <th class="text-end">Cost Value</th>
-                                    <th class="text-end">Sell Value</th>
-                                    <th class="text-end">Profit</th>
+                                    <th class="text-end bg-light">Base Cost</th>
+                                    <th class="text-end bg-light">Packaging</th>
+                                    <th class="text-end bg-light">Delivery</th>
+                                    <th class="text-end bg-light">Bottle</th>
+                                    <th class="text-end fw-bold">Total Cost</th>
+                                    <th class="text-end">Sell Price</th>
+                                    <th class="text-end text-info">Profit</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% set totals = {'cost': 0, 'sell': 0, 'profit': 0, 'qty': 0} %}
+                                {% set totals = {'base': 0, 'packaging': 0, 'delivery': 0, 'bottle': 0, 'cost': 0, 'sell': 0, 'profit': 0, 'qty': 0} %}
                                 {% for item in location_stock_details %}
                                 <tr>
                                     <td>
@@ -198,27 +231,78 @@
                                         <div class="small text-muted">{{ item.product.sku }}</div>
                                     </td>
                                     <td class="text-center">{{ item.quantity }}</td>
-                                    <td class="text-end">{{ format_currency(item.cost_price) }}</td>
-                                    <td class="text-end">{{ format_currency(item.selling_price) }}</td>
-                                    <td class="text-end">{{ format_currency(item.cost_value) }}</td>
+                                    <td class="text-end bg-light">
+                                        <small class="text-muted d-block">{{ format_currency(item.base_cost) }}/u</small>
+                                        {{ format_currency(item.base_value) }}
+                                    </td>
+                                    <td class="text-end bg-light">
+                                        {% if item.packaging_value > 0 %}
+                                        <small class="text-muted d-block">{{ format_currency(item.packaging_cost) }}/u</small>
+                                        {{ format_currency(item.packaging_value) }}
+                                        {% else %}-{% endif %}
+                                    </td>
+                                    <td class="text-end bg-light">
+                                        {% if item.delivery_value > 0 %}
+                                        <small class="text-muted d-block">{{ format_currency(item.delivery_cost) }}/u</small>
+                                        {{ format_currency(item.delivery_value) }}
+                                        {% else %}-{% endif %}
+                                    </td>
+                                    <td class="text-end bg-light">
+                                        {% if item.bottle_value > 0 %}
+                                        <small class="text-muted d-block">{{ format_currency(item.bottle_cost) }}/u</small>
+                                        {{ format_currency(item.bottle_value) }}
+                                        {% else %}-{% endif %}
+                                    </td>
+                                    <td class="text-end fw-bold">{{ format_currency(item.cost_value) }}</td>
                                     <td class="text-end text-success fw-bold">{{ format_currency(item.selling_value) }}</td>
                                     <td class="text-end text-info">{{ format_currency(item.profit) }}</td>
                                 </tr>
-                                {% set _ = totals.update({'cost': totals.cost + item.cost_value, 'sell': totals.sell + item.selling_value, 'profit': totals.profit + item.profit, 'qty': totals.qty + item.quantity}) %}
+                                {% set _ = totals.update({'base': totals.base + item.base_value, 'packaging': totals.packaging + item.packaging_value, 'delivery': totals.delivery + item.delivery_value, 'bottle': totals.bottle + item.bottle_value, 'cost': totals.cost + item.cost_value, 'sell': totals.sell + item.selling_value, 'profit': totals.profit + item.profit, 'qty': totals.qty + item.quantity}) %}
                                 {% endfor %}
                             </tbody>
                             <tfoot class="table-light fw-bold">
                                 <tr>
                                     <td>Total</td>
                                     <td class="text-center">{{ totals.qty }}</td>
-                                    <td></td>
-                                    <td></td>
+                                    <td class="text-end">{{ format_currency(totals.base) }}</td>
+                                    <td class="text-end">{{ format_currency(totals.packaging) }}</td>
+                                    <td class="text-end">{{ format_currency(totals.delivery) }}</td>
+                                    <td class="text-end">{{ format_currency(totals.bottle) }}</td>
                                     <td class="text-end">{{ format_currency(totals.cost) }}</td>
                                     <td class="text-end text-success">{{ format_currency(totals.sell) }}</td>
                                     <td class="text-end text-info">{{ format_currency(totals.profit) }}</td>
                                 </tr>
                             </tfoot>
                         </table>
+                    </div>
+                    <!-- Cost Breakdown Summary -->
+                    <div class="card-footer bg-light">
+                        <div class="row text-center">
+                            <div class="col">
+                                <small class="text-muted d-block">Base Cost</small>
+                                <strong>{{ format_currency(totals.base) }}</strong>
+                            </div>
+                            <div class="col">
+                                <small class="text-muted d-block">Packaging</small>
+                                <strong>{{ format_currency(totals.packaging) }}</strong>
+                            </div>
+                            <div class="col">
+                                <small class="text-muted d-block">Delivery</small>
+                                <strong>{{ format_currency(totals.delivery) }}</strong>
+                            </div>
+                            <div class="col">
+                                <small class="text-muted d-block">Bottle</small>
+                                <strong>{{ format_currency(totals.bottle) }}</strong>
+                            </div>
+                            <div class="col">
+                                <small class="text-muted d-block">Total Cost</small>
+                                <strong class="text-primary">{{ format_currency(totals.cost) }}</strong>
+                            </div>
+                            <div class="col">
+                                <small class="text-muted d-block">Selling Value</small>
+                                <strong class="text-success">{{ format_currency(totals.sell) }}</strong>
+                            </div>
+                        </div>
                     </div>
                     {% else %}
                     <div class="text-center py-5 text-muted">

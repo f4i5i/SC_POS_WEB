@@ -1183,13 +1183,41 @@ def stock_valuation():
 
             for stock in stocks:
                 if stock.product:
-                    cost_val = float(stock.quantity) * float(stock.product.cost_price or 0)
-                    sell_val = float(stock.quantity) * float(stock.product.selling_price or 0)
+                    # Get individual cost components
+                    base_cost = float(stock.product.base_cost or 0)
+                    packaging_cost = float(stock.product.packaging_cost or 0)
+                    delivery_cost = float(stock.product.delivery_cost or 0)
+                    bottle_cost = float(stock.product.bottle_cost or 0)
+                    kiosk_cost = float(stock.product.kiosk_cost or 0)
+                    total_cost = base_cost + packaging_cost + delivery_cost + bottle_cost + kiosk_cost
+
+                    # Calculate values
+                    qty = float(stock.quantity)
+                    base_value = qty * base_cost
+                    packaging_value = qty * packaging_cost
+                    delivery_value = qty * delivery_cost
+                    bottle_value = qty * bottle_cost
+                    kiosk_value = qty * kiosk_cost
+                    cost_val = qty * total_cost
+                    sell_val = qty * float(stock.product.selling_price or 0)
+
                     location_stock_details.append({
                         'product': stock.product,
                         'quantity': stock.quantity,
-                        'cost_price': float(stock.product.cost_price or 0),
+                        # Per unit costs
+                        'base_cost': base_cost,
+                        'packaging_cost': packaging_cost,
+                        'delivery_cost': delivery_cost,
+                        'bottle_cost': bottle_cost,
+                        'kiosk_cost': kiosk_cost,
+                        'cost_price': total_cost,
                         'selling_price': float(stock.product.selling_price or 0),
+                        # Total values
+                        'base_value': base_value,
+                        'packaging_value': packaging_value,
+                        'delivery_value': delivery_value,
+                        'bottle_value': bottle_value,
+                        'kiosk_value': kiosk_value,
                         'cost_value': cost_val,
                         'selling_value': sell_val,
                         'profit': sell_val - cost_val
