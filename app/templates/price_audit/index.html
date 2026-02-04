@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Price Change Audit - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-tags text-primary me-2"></i>Price Change Audit</h2>
+            <p class="text-muted mb-0">Track all price changes in the system</p>
+        </div>
+        <div>
+            {% if pending_approvals > 0 %}
+            <a href="{{ url_for('price_audit.pending_approvals') }}" class="btn btn-warning me-2">
+                <i class="fas fa-clock me-2"></i>Pending ({{ pending_approvals }})
+            </a>
+            {% endif %}
+            <a href="{{ url_for('price_audit.summary') }}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-chart-bar me-2"></i>Summary
+            </a>
+            <a href="{{ url_for('price_audit.rules') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-cog me-2"></i>Rules
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-primary border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Total Changes</h6>
+                    <h3>{{ logs|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-success border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Price Increases</h6>
+                    <h3 class="text-success">{{ total_increases }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-danger border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Price Decreases</h6>
+                    <h3 class="text-danger">{{ total_decreases }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-warning border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Pending Approval</h6>
+                    <h3 class="text-warning">{{ pending_approvals }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-2">
+                    <label class="form-label">User</label>
+                    <select name="user_id" class="form-select">
+                        <option value="">All Users</option>
+                        {% for user in users %}
+                        <option value="{{ user.id }}" {% if user_id == user.id %}selected{% endif %}>{{ user.full_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Price Type</label>
+                    <select name="price_type" class="form-select">
+                        <option value="">All Types</option>
+                        {% for key, label in price_types %}
+                        <option value="{{ key }}" {% if price_type == key %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">From Date</label>
+                    <input type="date" class="form-control" name="from_date" value="{{ from_date or '' }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">To Date</label>
+                    <input type="date" class="form-control" name="to_date" value="{{ to_date or '' }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Min Change %</label>
+                    <input type="number" class="form-control" name="min_change" value="{{ min_change or '' }}" placeholder="e.g., 10">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2"><i class="fas fa-filter me-1"></i>Filter</button>
+                    <a href="{{ url_for('price_audit.index') }}" class="btn btn-outline-secondary"><i class="fas fa-times"></i></a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date/Time</th>
+                            <th>Product</th>
+                            <th>Price Type</th>
+                            <th class="text-end">Old Price</th>
+                            <th class="text-end">New Price</th>
+                            <th class="text-center">Change</th>
+                            <th>Changed By</th>
+                            <th>Reason</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td>
+                                <small>{{ log.changed_at.strftime('%d/%m/%Y') }}</small>
+                                <div class="text-muted small">{{ log.changed_at.strftime('%H:%M') }}</div>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('price_audit.product_history', product_id=log.product_id) }}">
+                                    {{ log.product.name if log.product else 'Unknown' }}
+                                </a>
+                                <div class="text-muted small">{{ log.product.sku if log.product else '' }}</div>
+                            </td>
+                            <td><span class="badge bg-secondary">{{ log.price_type|replace('_', ' ')|title }}</span></td>
+                            <td class="text-end">{{ format_currency(log.old_value) }}</td>
+                            <td class="text-end">{{ format_currency(log.new_value) }}</td>
+                            <td class="text-center">
+                                {% if log.change_percentage %}
+                                    {% if log.change_percentage > 0 %}
+                                    <span class="badge bg-success">+{{ "%.1f"|format(log.change_percentage) }}%</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">{{ "%.1f"|format(log.change_percentage) }}%</span>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td>{{ log.user.full_name if log.user else 'N/A' }}</td>
+                            <td>{{ log.reason or '-' }}</td>
+                            <td class="text-center">
+                                {% if log.approval_status == 'auto' %}
+                                <span class="badge bg-secondary">Auto</span>
+                                {% elif log.approval_status == 'pending' %}
+                                <span class="badge bg-warning text-dark">Pending</span>
+                                {% elif log.approval_status == 'approved' %}
+                                <span class="badge bg-success">Approved</span>
+                                {% else %}
+                                <span class="badge bg-danger">Rejected</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not logs %}
+                        <tr>
+                            <td colspan="9" class="text-center py-4 text-muted">No price changes found.</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

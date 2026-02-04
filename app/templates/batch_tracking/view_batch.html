@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}Batch {{ batch.batch_number }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                <i class="fas fa-box text-primary me-2"></i>
+                Batch: <code>{{ batch.batch_number }}</code>
+            </h2>
+            <p class="text-muted mb-0">{{ batch.product.name if batch.product else 'Unknown Product' }}</p>
+        </div>
+        <div class="btn-group">
+            {% if batch.status == 'active' %}
+            <a href="{{ url_for('batch_tracking.adjust_batch', batch_id=batch.id) }}" class="btn btn-outline-primary">
+                <i class="fas fa-edit me-2"></i>Adjust
+            </a>
+            <a href="{{ url_for('batch_tracking.dispose_batch', batch_id=batch.id) }}" class="btn btn-outline-danger">
+                <i class="fas fa-trash me-2"></i>Dispose
+            </a>
+            {% endif %}
+            <a href="{{ url_for('batch_tracking.batch_list') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Batch Info -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Batch Information</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td class="text-muted">Status</td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if batch.status == 'active' else 'secondary' if batch.status == 'depleted' else 'danger' }} fs-6">
+                                    {{ batch.status|title }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Product</td>
+                            <td>{{ batch.product.name if batch.product else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">SKU</td>
+                            <td><code>{{ batch.product.sku if batch.product else '-' }}</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Location</td>
+                            <td>{{ batch.location.name if batch.location else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Supplier</td>
+                            <td>{{ batch.supplier.name if batch.supplier else '-' }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stock Info -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-cubes me-2"></i>Stock Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center mb-3">
+                        <div class="col-6">
+                            <div class="border rounded p-3">
+                                <h4 class="mb-0">{{ batch.current_quantity|int }}</h4>
+                                <small class="text-muted">Current Qty</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="border rounded p-3">
+                                <h4 class="mb-0">{{ batch.initial_quantity|int }}</h4>
+                                <small class="text-muted">Initial Qty</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% if batch.reserved_quantity > 0 %}
+                    <div class="alert alert-warning py-2">
+                        <i class="fas fa-lock me-2"></i>
+                        {{ batch.reserved_quantity|int }} units reserved
+                    </div>
+                    {% endif %}
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td class="text-muted">Unit Cost</td>
+                            <td>{{ format_currency(batch.unit_cost) if batch.unit_cost else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Total Cost</td>
+                            <td>{{ format_currency(batch.total_cost) if batch.total_cost else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Current Value</td>
+                            <td>
+                                {% if batch.unit_cost %}
+                                {{ format_currency(batch.unit_cost * batch.current_quantity) }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dates -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm h-100 {% if batch.is_expired %}border-danger{% elif batch.is_critical_expiry %}border-warning{% endif %}">
+                <div class="card-header {% if batch.is_expired %}bg-danger text-white{% elif batch.is_critical_expiry %}bg-warning{% endif %}">
+                    <h5 class="mb-0"><i class="fas fa-calendar me-2"></i>Dates & Expiry</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td class="text-muted">Received</td>
+                            <td>{{ batch.received_date.strftime('%d/%m/%Y') if batch.received_date else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Manufacture</td>
+                            <td>{{ batch.manufacture_date.strftime('%d/%m/%Y') if batch.manufacture_date else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Expiry</td>
+                            <td>
+                                {% if batch.expiry_date %}
+                                <strong>{{ batch.expiry_date.strftime('%d/%m/%Y') }}</strong>
+                                {% else %}
+                                <span class="text-muted">No expiry</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+
+                    {% if batch.expiry_date %}
+                    <hr>
+                    <div class="text-center">
+                        {% if batch.is_expired %}
+                        <span class="badge bg-danger fs-5 p-2">
+                            <i class="fas fa-skull-crossbones me-2"></i>EXPIRED
+                        </span>
+                        <p class="text-danger mt-2 mb-0">{{ -batch.days_until_expiry }} days past expiry</p>
+                        {% elif batch.is_critical_expiry %}
+                        <span class="badge bg-warning text-dark fs-5 p-2">
+                            <i class="fas fa-exclamation-triangle me-2"></i>CRITICAL
+                        </span>
+                        <p class="text-warning mt-2 mb-0">{{ batch.days_until_expiry }} days until expiry</p>
+                        {% elif batch.is_near_expiry %}
+                        <span class="badge bg-info fs-5 p-2">
+                            <i class="fas fa-clock me-2"></i>WARNING
+                        </span>
+                        <p class="text-info mt-2 mb-0">{{ batch.days_until_expiry }} days until expiry</p>
+                        {% else %}
+                        <span class="badge bg-success fs-5 p-2">
+                            <i class="fas fa-check-circle me-2"></i>OK
+                        </span>
+                        <p class="text-success mt-2 mb-0">{{ batch.days_until_expiry }} days until expiry</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Movement History -->
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-history me-2"></i>Movement History</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if movements %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th class="text-end">Quantity</th>
+                            <th class="text-end">Before</th>
+                            <th class="text-end">After</th>
+                            <th>Reason</th>
+                            <th>By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for movement in movements %}
+                        <tr>
+                            <td>{{ movement.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if movement.quantity > 0 else 'danger' }}">
+                                    {{ movement.movement_type|title }}
+                                </span>
+                            </td>
+                            <td class="text-end {% if movement.quantity > 0 %}text-success{% else %}text-danger{% endif %}">
+                                {% if movement.quantity > 0 %}+{% endif %}{{ movement.quantity|int }}
+                            </td>
+                            <td class="text-end">{{ movement.quantity_before|int }}</td>
+                            <td class="text-end"><strong>{{ movement.quantity_after|int }}</strong></td>
+                            <td>{{ movement.reason or '-' }}</td>
+                            <td>{{ movement.user.full_name if movement.user else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted">
+                <i class="fas fa-history fa-2x mb-2"></i>
+                <p>No movement history</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if batch.notes %}
+    <div class="card shadow-sm mt-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Notes</h5>
+        </div>
+        <div class="card-body">
+            {{ batch.notes }}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

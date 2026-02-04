@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Adjust Batch - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-edit text-primary me-2"></i>Adjust Batch Quantity</h2>
+        <a href="{{ url_for('batch_tracking.view_batch', batch_id=batch.id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <!-- Current Info -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Current Batch Info</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td class="text-muted">Batch Number</td>
+                            <td><code>{{ batch.batch_number }}</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Product</td>
+                            <td>{{ batch.product.name if batch.product else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Current Quantity</td>
+                            <td><strong class="fs-4">{{ batch.current_quantity|int }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Reserved</td>
+                            <td>{{ batch.reserved_quantity|int }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Available</td>
+                            <td>{{ batch.available_quantity|int }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <!-- Adjustment Form -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Make Adjustment</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="mb-3">
+                            <label class="form-label">Adjustment Type *</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="adjustment_type" id="typeAdd" value="add" checked>
+                                <label class="btn btn-outline-success" for="typeAdd">
+                                    <i class="fas fa-plus me-2"></i>Add
+                                </label>
+
+                                <input type="radio" class="btn-check" name="adjustment_type" id="typeRemove" value="remove">
+                                <label class="btn btn-outline-danger" for="typeRemove">
+                                    <i class="fas fa-minus me-2"></i>Remove
+                                </label>
+
+                                <input type="radio" class="btn-check" name="adjustment_type" id="typeSet" value="set">
+                                <label class="btn btn-outline-primary" for="typeSet">
+                                    <i class="fas fa-equals me-2"></i>Set To
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Quantity *</label>
+                            <input type="number" name="quantity" class="form-control form-control-lg"
+                                   required min="0" step="0.01" placeholder="0">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Reason *</label>
+                            <select name="reason" class="form-select" required>
+                                <option value="">Select Reason...</option>
+                                <option value="Physical Count Correction">Physical Count Correction</option>
+                                <option value="Damaged Stock">Damaged Stock</option>
+                                <option value="Stock Transfer">Stock Transfer</option>
+                                <option value="Return to Supplier">Return to Supplier</option>
+                                <option value="Sample/Testing">Sample/Testing</option>
+                                <option value="System Error Correction">System Error Correction</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-2"></i>Apply Adjustment
+                            </button>
+                            <a href="{{ url_for('batch_tracking.view_batch', batch_id=batch.id) }}" class="btn btn-outline-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

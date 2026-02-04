@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Dead Stock Report - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-archive text-warning me-2"></i>Dead Stock Report</h2>
+            <p class="text-muted mb-0">Products with no sales in the specified period</p>
+        </div>
+        <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Reports
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label">No Sales For</label>
+                    <select name="days" class="form-select">
+                        <option value="30" {% if days == 30 %}selected{% endif %}>30 Days</option>
+                        <option value="60" {% if days == 60 %}selected{% endif %}>60 Days</option>
+                        <option value="90" {% if days == 90 %}selected{% endif %}>90 Days</option>
+                        <option value="180" {% if days == 180 %}selected{% endif %}>180 Days</option>
+                        <option value="365" {% if days == 365 %}selected{% endif %}>1 Year</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Category</label>
+                    <select name="category_id" class="form-select">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if cat.id == category_id %}selected{% endif %}>{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Min Stock Value</label>
+                    <div class="input-group">
+                        <span class="input-group-text">Rs.</span>
+                        <input type="number" name="min_value" class="form-control" value="{{ min_value }}" step="100">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-check mt-4">
+                        <input type="checkbox" name="include_zero" value="true" class="form-check-input" id="includeZero"
+                               {% if include_zero_stock %}checked{% endif %}>
+                        <label class="form-check-label" for="includeZero">Include Zero Stock</label>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-2"></i>Apply
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-warning bg-opacity-10 border-warning">
+                <div class="card-body text-center">
+                    <h6 class="text-warning">Dead Stock Items</h6>
+                    <h2 class="mb-0">{{ items|length }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-danger bg-opacity-10 border-danger">
+                <div class="card-body text-center">
+                    <h6 class="text-danger">Total Units</h6>
+                    <h2 class="mb-0">{{ total_units|int }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-dark bg-opacity-10 border-dark">
+                <div class="card-body text-center">
+                    <h6 class="text-dark">Stock Value at Cost</h6>
+                    <h2 class="mb-0">{{ format_currency(total_value) }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Table -->
+    {% if items %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-list me-2"></i>Dead Stock Items</h5>
+            <button class="btn btn-sm btn-outline-dark" onclick="exportTable()">
+                <i class="fas fa-download me-2"></i>Export
+            </button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="deadStockTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Product</th>
+                            <th>SKU</th>
+                            <th>Category</th>
+                            <th class="text-end">Stock Qty</th>
+                            <th class="text-end">Cost Price</th>
+                            <th class="text-end">Stock Value</th>
+                            <th class="text-center">Last Sale</th>
+                            <th class="text-center">Days Since Sale</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>
+                                <strong>{{ item.product.name }}</strong>
+                            </td>
+                            <td><code>{{ item.product.sku }}</code></td>
+                            <td>{{ item.product.category.name if item.product.category else '-' }}</td>
+                            <td class="text-end">{{ item.stock_qty }}</td>
+                            <td class="text-end">{{ format_currency(item.cost_price) }}</td>
+                            <td class="text-end">
+                                <strong class="text-danger">{{ format_currency(item.stock_value) }}</strong>
+                            </td>
+                            <td class="text-center">
+                                {% if item.last_sale_date %}
+                                {{ item.last_sale_date.strftime('%d/%m/%Y') }}
+                                {% else %}
+                                <span class="text-muted">Never</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if item.days_since_sale %}
+                                <span class="badge {% if item.days_since_sale > 180 %}bg-danger{% elif item.days_since_sale > 90 %}bg-warning{% else %}bg-secondary{% endif %}">
+                                    {{ item.days_since_sale }} days
+                                </span>
+                                {% else %}
+                                <span class="badge bg-dark">Never Sold</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+            <h4>No Dead Stock Found</h4>
+            <p class="text-muted">All products have had sales within the last {{ days }} days.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function exportTable() {
+    const table = document.getElementById('deadStockTable');
+    let csv = [];
+    const rows = table.querySelectorAll('tr');
+
+    for (const row of rows) {
+        const cols = row.querySelectorAll('td, th');
+        const rowData = [];
+        for (const col of cols) {
+            rowData.push('"' + col.innerText.replace(/"/g, '""') + '"');
+        }
+        csv.push(rowData.join(','));
+    }
+
+    const csvContent = csv.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'dead_stock_report.csv';
+    a.click();
+}
+</script>
+{% endblock %}

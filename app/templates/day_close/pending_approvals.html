@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Pending Variance Approvals - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-exclamation-triangle text-warning me-2"></i>Pending Variance Approvals</h2>
+            <p class="text-muted mb-0">Review and approve/reject cash variances</p>
+        </div>
+        <a href="{{ url_for('day_close.history') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to History
+        </a>
+    </div>
+
+    {% if pending %}
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Location</th>
+                            <th>Closed By</th>
+                            <th class="text-end">Expected</th>
+                            <th class="text-end">Counted</th>
+                            <th class="text-end">Variance</th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for dc in pending %}
+                        <tr>
+                            <td>
+                                <strong>{{ dc.close_date.strftime('%d %b %Y') }}</strong>
+                                <div class="small text-muted">{{ dc.close_date.strftime('%A') }}</div>
+                            </td>
+                            <td>{{ dc.location.name if dc.location else 'N/A' }}</td>
+                            <td>
+                                {{ dc.user.full_name if dc.user else 'N/A' }}
+                                <div class="small text-muted">{{ dc.closed_at.strftime('%H:%M') if dc.closed_at else '' }}</div>
+                            </td>
+                            <td class="text-end">{{ format_currency(dc.expected_cash or 0) }}</td>
+                            <td class="text-end">{{ format_currency(dc.closing_balance or 0) }}</td>
+                            <td class="text-end">
+                                {% if dc.cash_variance > 0 %}
+                                <span class="badge bg-warning text-dark fs-6">+{{ format_currency(dc.cash_variance) }}</span>
+                                <div class="small text-warning">Over</div>
+                                {% else %}
+                                <span class="badge bg-danger fs-6">{{ format_currency(dc.cash_variance) }}</span>
+                                <div class="small text-danger">Short</div>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ url_for('day_close.detail', close_id=dc.id) }}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-eye me-1"></i>Review
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+            <h4>No Pending Approvals</h4>
+            <p class="text-muted">All cash variances have been reviewed</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

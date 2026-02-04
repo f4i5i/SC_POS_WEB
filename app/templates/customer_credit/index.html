@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Customer Credit Management - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-hand-holding-usd text-primary me-2"></i>Customer Credit Management</h2>
+            <p class="text-muted mb-0">Track customer dues and collect receivables</p>
+        </div>
+        <div class="btn-group">
+            <a href="{{ url_for('customer_credit.aging_report') }}" class="btn btn-outline-warning">
+                <i class="fas fa-chart-pie me-2"></i>Aging Report
+            </a>
+            <a href="{{ url_for('customer_credit.reminders') }}" class="btn btn-outline-danger">
+                <i class="fas fa-bell me-2"></i>Reminders
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary bg-opacity-10 border-primary h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-money-bill-wave fa-2x text-primary mb-2"></i>
+                    <h3 class="mb-1">{{ format_currency(total_receivables) }}</h3>
+                    <p class="text-muted mb-0">Total Receivables</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger bg-opacity-10 border-danger h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i>
+                    <h3 class="mb-1 text-danger">{{ format_currency(overdue_amount) }}</h3>
+                    <p class="text-muted mb-0">Overdue Amount</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info bg-opacity-10 border-info h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-users fa-2x text-info mb-2"></i>
+                    <h3 class="mb-1">{{ customers_with_dues }}</h3>
+                    <p class="text-muted mb-0">Customers with Dues</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning bg-opacity-10 border-warning h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-user-clock fa-2x text-warning mb-2"></i>
+                    <h3 class="mb-1 text-warning">{{ overdue_customers }}</h3>
+                    <p class="text-muted mb-0">Overdue Customers</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Recent Dues -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-clock text-warning me-2"></i>Pending Dues</h5>
+                    <a href="{{ url_for('customer_credit.dues_list') }}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_dues %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Customer</th>
+                                    <th class="text-end">Due Amount</th>
+                                    <th class="text-center">Due Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for due in recent_dues %}
+                                <tr class="{% if due.is_overdue %}table-danger{% endif %}">
+                                    <td>
+                                        <a href="{{ url_for('customer_credit.customer_ledger', customer_id=due.customer_id) }}">
+                                            {{ due.customer.name if due.customer else '-' }}
+                                        </a>
+                                    </td>
+                                    <td class="text-end"><strong>{{ format_currency(due.due_amount) }}</strong></td>
+                                    <td class="text-center">
+                                        {{ due.due_date.strftime('%d/%m/%Y') if due.due_date else '-' }}
+                                    </td>
+                                    <td>
+                                        {% if due.is_overdue %}
+                                        <span class="badge bg-danger">{{ due.days_overdue }}d overdue</span>
+                                        {% elif due.status == 'partial' %}
+                                        <span class="badge bg-warning">Partial</span>
+                                        {% else %}
+                                        <span class="badge bg-info">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                        <p>No pending dues</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Payments -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-hand-holding-usd text-success me-2"></i>Recent Payments Received</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_payments %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Customer</th>
+                                    <th class="text-end">Amount</th>
+                                    <th>Method</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in recent_payments %}
+                                <tr>
+                                    <td>{{ payment.due_payment.customer.name if payment.due_payment and payment.due_payment.customer else '-' }}</td>
+                                    <td class="text-end text-success"><strong>{{ format_currency(payment.amount) }}</strong></td>
+                                    <td>{{ payment.payment_method|title }}</td>
+                                    <td>{{ payment.paid_at.strftime('%d/%m %H:%M') if payment.paid_at else '-' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-inbox fa-2x mb-2"></i>
+                        <p>No recent payments</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Quick Actions</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <a href="{{ url_for('customer_credit.dues_list') }}" class="btn btn-outline-primary w-100 py-3">
+                        <i class="fas fa-list fa-lg d-block mb-2"></i>
+                        View All Dues
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="{{ url_for('customer_credit.dues_list', status='overdue') }}" class="btn btn-outline-danger w-100 py-3">
+                        <i class="fas fa-exclamation-circle fa-lg d-block mb-2"></i>
+                        Overdue Dues
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="{{ url_for('customer_credit.aging_report') }}" class="btn btn-outline-warning w-100 py-3">
+                        <i class="fas fa-chart-bar fa-lg d-block mb-2"></i>
+                        Aging Report
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="{{ url_for('customer_credit.reminders') }}" class="btn btn-outline-info w-100 py-3">
+                        <i class="fas fa-bell fa-lg d-block mb-2"></i>
+                        Collection Reminders
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

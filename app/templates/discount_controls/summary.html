@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block title %}Discount Summary - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-chart-bar text-primary me-2"></i>Discount Summary Report</h2>
+            <p class="text-muted mb-0">{{ from_date }} to {{ to_date }}</p>
+        </div>
+        <div>
+            <a href="{{ url_for('discount_controls.logs') }}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-list me-2"></i>View All Logs
+            </a>
+            <a href="{{ url_for('discount_controls.limits') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-sliders-h me-2"></i>Limits
+            </a>
+        </div>
+    </div>
+
+    <!-- Date Filter -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" class="form-control" name="from_date" value="{{ from_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" class="form-control" name="to_date" value="{{ to_date }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-sync me-2"></i>Update Report
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-danger border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Total Discounts Given</h6>
+                    <h2 class="text-danger">{{ format_currency(total_discount_amount) }}</h2>
+                    <small class="text-muted">{{ total_discount_count }} transactions</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-success border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Approved Discounts</h6>
+                    <h2 class="text-success">{{ approved_count }}</h2>
+                    <small class="text-muted">Required manager approval</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-warning border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Self-Approved</h6>
+                    <h2 class="text-warning">{{ unapproved_count }}</h2>
+                    <small class="text-muted">Within user limits</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-info border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Avg Discount</h6>
+                    <h2 class="text-info">
+                        {% if total_discount_count > 0 %}
+                        {{ format_currency(total_discount_amount / total_discount_count) }}
+                        {% else %}
+                        {{ format_currency(0) }}
+                        {% endif %}
+                    </h2>
+                    <small class="text-muted">Per transaction</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- By User -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-users me-2"></i>Discounts by User</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>User</th>
+                                    <th class="text-center">Count</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in by_user %}
+                                <tr>
+                                    <td>{{ user.full_name }}</td>
+                                    <td class="text-center">{{ user.count }}</td>
+                                    <td class="text-end text-danger">{{ format_currency(user.total or 0) }}</td>
+                                </tr>
+                                {% endfor %}
+                                {% if not by_user %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-3">No data</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- By Reason -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-tags me-2"></i>Discounts by Reason</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Reason</th>
+                                    <th class="text-center">Count</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for reason in by_reason %}
+                                <tr>
+                                    <td><span class="badge bg-secondary">{{ reason.discount_reason or 'Unknown' }}</span></td>
+                                    <td class="text-center">{{ reason.count }}</td>
+                                    <td class="text-end text-danger">{{ format_currency(reason.total or 0) }}</td>
+                                </tr>
+                                {% endfor %}
+                                {% if not by_reason %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-3">No data</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Daily Trend -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Daily Discount Trend</h5>
+        </div>
+        <div class="card-body">
+            <canvas id="dailyChart" height="100"></canvas>
+        </div>
+    </div>
+
+    <!-- High Value Discounts -->
+    {% if high_value %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>High-Value Discounts (>Rs. 1,000)</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>User</th>
+                            <th>Product</th>
+                            <th>Reason</th>
+                            <th class="text-end">Amount</th>
+                            <th class="text-center">Approval</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in high_value %}
+                        <tr>
+                            <td>{{ log.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ log.user.full_name if log.user else 'N/A' }}</td>
+                            <td>{{ log.product_name or 'Sale-level' }}</td>
+                            <td><span class="badge bg-secondary">{{ log.discount_reason }}</span></td>
+                            <td class="text-end text-danger fw-bold">{{ format_currency(log.discount_amount) }}</td>
+                            <td class="text-center">
+                                {% if log.approval_id %}
+                                <span class="badge bg-success">Approved</span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">Self</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('dailyChart').getContext('2d');
+
+    const labels = [{% for d in by_day %}'{{ d.date }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+    const amounts = [{% for d in by_day %}{{ d.total or 0 }}{% if not loop.last %}, {% endif %}{% endfor %}];
+    const counts = [{% for d in by_day %}{{ d.count }}{% if not loop.last %}, {% endif %}{% endfor %}];
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Discount Amount',
+                data: amounts,
+                backgroundColor: 'rgba(220, 53, 69, 0.7)',
+                borderColor: 'rgba(220, 53, 69, 1)',
+                borderWidth: 1,
+                yAxisID: 'y'
+            }, {
+                label: 'Count',
+                data: counts,
+                type: 'line',
+                borderColor: 'rgba(13, 110, 253, 1)',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                fill: true,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Amount (Rs.)'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: {
+                        drawOnChartArea: false
+                    },
+                    title: {
+                        display: true,
+                        text: 'Count'
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

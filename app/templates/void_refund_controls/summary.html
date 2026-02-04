@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}Void/Refund Summary - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-chart-bar text-primary me-2"></i>Void/Refund Summary Report</h2>
+            <p class="text-muted mb-0">{{ from_date }} to {{ to_date }}</p>
+        </div>
+        <a href="{{ url_for('void_refund_controls.logs') }}" class="btn btn-outline-primary">
+            <i class="fas fa-list me-2"></i>View All Logs
+        </a>
+    </div>
+
+    <!-- Date Filter -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" class="form-control" name="from_date" value="{{ from_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" class="form-control" name="to_date" value="{{ to_date }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-sync me-2"></i>Update
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-danger border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Total Voided</h6>
+                    <h2 class="text-danger">{{ format_currency(total_void_amount) }}</h2>
+                    <small class="text-muted">{{ total_void_count }} transactions</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-warning border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Total Refunded</h6>
+                    <h2 class="text-warning">{{ format_currency(total_refund_amount) }}</h2>
+                    <small class="text-muted">{{ total_refund_count }} transactions</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-info border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Quick Voids (< 1hr)</h6>
+                    <h2 class="text-info">{{ quick_voids }}</h2>
+                    <small class="text-muted">Voided within an hour</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-success border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Same Day Voids</h6>
+                    <h2 class="text-success">{{ same_day_voids }}</h2>
+                    <small class="text-muted">Voided within 24 hours</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- By User -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-users me-2"></i>By User</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>User</th>
+                                    <th>Type</th>
+                                    <th class="text-center">Count</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in by_user %}
+                                <tr>
+                                    <td>{{ row.full_name }}</td>
+                                    <td>
+                                        {% if row.action_type == 'void' %}
+                                        <span class="badge bg-danger">Void</span>
+                                        {% else %}
+                                        <span class="badge bg-warning text-dark">Refund</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">{{ row.count }}</td>
+                                    <td class="text-end text-danger">{{ format_currency(row.total or 0) }}</td>
+                                </tr>
+                                {% endfor %}
+                                {% if not by_user %}
+                                <tr><td colspan="4" class="text-center text-muted py-3">No data</td></tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- By Reason -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-tags me-2"></i>By Reason</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Reason</th>
+                                    <th>Type</th>
+                                    <th class="text-center">Count</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in by_reason %}
+                                <tr>
+                                    <td><span class="badge bg-secondary">{{ row.reason or 'Unknown' }}</span></td>
+                                    <td>
+                                        {% if row.action_type == 'void' %}
+                                        <span class="badge bg-danger">Void</span>
+                                        {% else %}
+                                        <span class="badge bg-warning text-dark">Refund</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">{{ row.count }}</td>
+                                    <td class="text-end text-danger">{{ format_currency(row.total or 0) }}</td>
+                                </tr>
+                                {% endfor %}
+                                {% if not by_reason %}
+                                <tr><td colspan="4" class="text-center text-muted py-3">No data</td></tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- High Value -->
+    {% if high_value %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>High-Value Voids/Refunds (>Rs. 5,000)</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>User</th>
+                            <th>Sale #</th>
+                            <th>Reason</th>
+                            <th class="text-end">Amount</th>
+                            <th>Time After Sale</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in high_value %}
+                        <tr>
+                            <td>{{ log.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>
+                                {% if log.action_type == 'void' %}
+                                <span class="badge bg-danger">VOID</span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">REFUND</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ log.user.full_name if log.user else 'N/A' }}</td>
+                            <td>{{ log.sale_number or log.sale_id }}</td>
+                            <td><span class="badge bg-secondary">{{ log.reason }}</span></td>
+                            <td class="text-end text-danger fw-bold">{{ format_currency(log.voided_refunded_amount) }}</td>
+                            <td>
+                                {% if log.hours_since_sale is not none %}
+                                {{ (log.hours_since_sale / 24)|round(1) }} days
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

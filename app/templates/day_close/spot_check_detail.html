@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+
+{% block title %}Spot Check Details - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-clipboard-check text-primary me-2"></i>Spot Check Details</h2>
+            <p class="text-muted mb-0">{{ spot_check.location.name if spot_check.location else 'Unknown' }} - {{ spot_check.check_date.strftime('%d %b %Y') }}</p>
+        </div>
+        <div>
+            <a href="{{ url_for('day_close.spot_check_history') }}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-history me-2"></i>History
+            </a>
+            <a href="{{ url_for('day_close.spot_check', location_id=spot_check.location_id) }}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>New Check
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-primary border-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted mb-1">Items Checked</h6>
+                            <h3 class="mb-0">{{ spot_check.total_items_checked }}</h3>
+                        </div>
+                        <div class="bg-primary bg-opacity-10 rounded p-3">
+                            <i class="fas fa-boxes fa-2x text-primary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-success border-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted mb-1">Matched</h6>
+                            <h3 class="mb-0 text-success">{{ spot_check.items_matched }}</h3>
+                        </div>
+                        <div class="bg-success bg-opacity-10 rounded p-3">
+                            <i class="fas fa-check-circle fa-2x text-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-danger border-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted mb-1">Variances</h6>
+                            <h3 class="mb-0 text-danger">{{ spot_check.items_variance }}</h3>
+                        </div>
+                        <div class="bg-danger bg-opacity-10 rounded p-3">
+                            <i class="fas fa-exclamation-triangle fa-2x text-danger"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-warning border-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted mb-1">Variance Value</h6>
+                            <h3 class="mb-0 {% if spot_check.total_variance_value < 0 %}text-danger{% elif spot_check.total_variance_value > 0 %}text-warning{% else %}text-success{% endif %}">
+                                {{ format_currency(spot_check.total_variance_value or 0) }}
+                            </h3>
+                        </div>
+                        <div class="bg-warning bg-opacity-10 rounded p-3">
+                            <i class="fas fa-money-bill-wave fa-2x text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Check Info -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Check Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <td class="text-muted">Check Type:</td>
+                                    <td>
+                                        <span class="badge {% if spot_check.check_type == 'daily' %}bg-primary{% elif spot_check.check_type == 'fortnightly' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                                            {{ spot_check.check_type|title }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Date:</td>
+                                    <td>{{ spot_check.check_date.strftime('%A, %d %B %Y') }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Checked By:</td>
+                                    <td>{{ spot_check.user.full_name if spot_check.user else 'N/A' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <td class="text-muted">Status:</td>
+                                    <td>
+                                        {% if spot_check.status == 'approved' %}
+                                        <span class="badge bg-success"><i class="fas fa-check me-1"></i>Approved</span>
+                                        {% elif spot_check.status == 'rejected' %}
+                                        <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Rejected</span>
+                                        {% elif spot_check.status == 'pending' %}
+                                        <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Pending Approval</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ spot_check.status|title }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% if spot_check.approved_by %}
+                                <tr>
+                                    <td class="text-muted">Approved By:</td>
+                                    <td>{{ spot_check.approver.full_name if spot_check.approver else 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Approved At:</td>
+                                    <td>{{ spot_check.approved_at.strftime('%d/%m/%Y %H:%M') if spot_check.approved_at else '-' }}</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                    </div>
+                    {% if spot_check.notes %}
+                    <div class="mt-3">
+                        <strong>Notes:</strong>
+                        <p class="mb-0 bg-light p-2 rounded">{{ spot_check.notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Approval Actions -->
+        <div class="col-md-4">
+            {% if spot_check.status == 'pending' and spot_check.items_variance > 0 %}
+            <div class="card shadow-sm border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-gavel me-2"></i>Manager Approval Required</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('day_close.approve_spot_check', check_id=spot_check.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label class="form-label">Approval Notes</label>
+                            <textarea class="form-control" name="notes" rows="2" placeholder="Enter notes..."></textarea>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" name="action" value="approve" class="btn btn-success">
+                                <i class="fas fa-check me-2"></i>Approve Variance
+                            </button>
+                            <button type="submit" name="action" value="adjust" class="btn btn-warning"
+                                    onclick="return confirm('This will adjust system inventory to match physical count. Continue?')">
+                                <i class="fas fa-sync-alt me-2"></i>Adjust Inventory
+                            </button>
+                            <button type="submit" name="action" value="reject" class="btn btn-outline-danger">
+                                <i class="fas fa-times me-2"></i>Reject
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% elif spot_check.status == 'approved' %}
+            <div class="card shadow-sm border-success">
+                <div class="card-body text-center py-4">
+                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                    <h5>Approved</h5>
+                    {% if spot_check.items_variance == 0 %}
+                    <p class="text-muted mb-0">No variances - auto-approved</p>
+                    {% else %}
+                    <p class="text-muted mb-0">Approved by {{ spot_check.approver.full_name if spot_check.approver else 'Manager' }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Product Items -->
+    {% if product_items %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-box me-2"></i>Products Checked ({{ product_items|length }})</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Product</th>
+                            <th class="text-center">System Qty</th>
+                            <th class="text-center">Physical Qty</th>
+                            <th class="text-center">Variance</th>
+                            <th class="text-end">Variance Value</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in product_items %}
+                        <tr class="{% if item.variance < 0 %}table-danger{% elif item.variance > 0 %}table-warning{% endif %}">
+                            <td>{{ loop.index }}</td>
+                            <td>
+                                <strong>{{ item.product.name if item.product else 'Unknown' }}</strong>
+                                <div class="small text-muted">{{ item.product.sku if item.product else '' }}</div>
+                            </td>
+                            <td class="text-center">{{ item.system_quantity }}</td>
+                            <td class="text-center"><strong>{{ item.physical_quantity }}</strong></td>
+                            <td class="text-center">
+                                {% if item.variance == 0 %}
+                                <span class="badge bg-success">0</span>
+                                {% elif item.variance > 0 %}
+                                <span class="badge bg-warning text-dark">+{{ item.variance }}</span>
+                                {% else %}
+                                <span class="badge bg-danger">{{ item.variance }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if item.variance_value != 0 %}
+                                {{ format_currency(item.variance_value) }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.variance_reason %}
+                                <span class="badge bg-secondary">{{ item.variance_reason|replace('_', ' ')|title }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Raw Material Items -->
+    {% if rm_items %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="fas fa-flask me-2"></i>Raw Materials Checked ({{ rm_items|length }})</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Raw Material</th>
+                            <th class="text-center">System Qty</th>
+                            <th class="text-center">Physical Qty</th>
+                            <th class="text-center">Variance</th>
+                            <th class="text-end">Variance Value</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in rm_items %}
+                        <tr class="{% if item.variance < 0 %}table-danger{% elif item.variance > 0 %}table-warning{% endif %}">
+                            <td>{{ loop.index }}</td>
+                            <td>
+                                <strong>{{ item.raw_material.name if item.raw_material else 'Unknown' }}</strong>
+                                <div class="small text-muted">{{ item.raw_material.sku if item.raw_material else '' }}</div>
+                            </td>
+                            <td class="text-center">{{ item.system_quantity }}</td>
+                            <td class="text-center"><strong>{{ item.physical_quantity }}</strong></td>
+                            <td class="text-center">
+                                {% if item.variance == 0 %}
+                                <span class="badge bg-success">0</span>
+                                {% elif item.variance > 0 %}
+                                <span class="badge bg-warning text-dark">+{{ item.variance }}</span>
+                                {% else %}
+                                <span class="badge bg-danger">{{ item.variance }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if item.variance_value != 0 %}
+                                {{ format_currency(item.variance_value) }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.variance_reason %}
+                                <span class="badge bg-secondary">{{ item.variance_reason|replace('_', ' ')|title }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Day Close Link -->
+    {% if spot_check.day_close %}
+    <div class="alert alert-info">
+        <i class="fas fa-link me-2"></i>
+        This spot check is linked to
+        <a href="{{ url_for('day_close.detail', close_id=spot_check.day_close_id) }}" class="alert-link">
+            Day Close #{{ spot_check.day_close_id }}
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

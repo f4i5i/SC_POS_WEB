@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Spot Check History - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-history text-primary me-2"></i>Spot Check History</h2>
+            <p class="text-muted mb-0">Inventory verification records</p>
+        </div>
+        <div>
+            <a href="{{ url_for('day_close.spot_check') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>New Spot Check
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm border-start border-primary border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Total Checks</h6>
+                    <h3>{{ spot_checks|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm border-start border-warning border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Pending Approvals</h6>
+                    <h3 class="{% if pending_approvals > 0 %}text-warning{% endif %}">{{ pending_approvals }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm border-start border-danger border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Total Variance Value</h6>
+                    <h3 class="{% if total_variance < 0 %}text-danger{% elif total_variance > 0 %}text-warning{% else %}text-success{% endif %}">
+                        {{ format_currency(total_variance) }}
+                    </h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                {% if current_user.is_global_admin %}
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>
+                            {{ loc.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="col-md-2">
+                    <label class="form-label">Check Type</label>
+                    <select name="check_type" class="form-select">
+                        <option value="">All Types</option>
+                        <option value="daily" {% if check_type == 'daily' %}selected{% endif %}>Daily</option>
+                        <option value="random" {% if check_type == 'random' %}selected{% endif %}>Random</option>
+                        <option value="fortnightly" {% if check_type == 'fortnightly' %}selected{% endif %}>Fortnightly</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">From Date</label>
+                    <input type="date" class="form-control" name="from_date" value="{{ from_date or '' }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">To Date</label>
+                    <input type="date" class="form-control" name="to_date" value="{{ to_date or '' }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-filter me-1"></i>Filter
+                    </button>
+                    <a href="{{ url_for('day_close.spot_check_history') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- History Table -->
+    {% if spot_checks %}
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Location</th>
+                            <th>Type</th>
+                            <th>Checked By</th>
+                            <th class="text-center">Items</th>
+                            <th class="text-center">Matched</th>
+                            <th class="text-center">Variance</th>
+                            <th class="text-end">Variance Value</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sc in spot_checks %}
+                        <tr>
+                            <td>
+                                <strong>{{ sc.check_date.strftime('%d %b %Y') }}</strong>
+                                <div class="small text-muted">{{ sc.check_date.strftime('%A') }}</div>
+                            </td>
+                            <td>{{ sc.location.name if sc.location else 'N/A' }}</td>
+                            <td>
+                                <span class="badge {% if sc.check_type == 'daily' %}bg-primary{% elif sc.check_type == 'fortnightly' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                                    {{ sc.check_type|title }}
+                                </span>
+                            </td>
+                            <td>
+                                {{ sc.user.full_name if sc.user else 'N/A' }}
+                                <div class="small text-muted">{{ sc.created_at.strftime('%H:%M') if sc.created_at else '' }}</div>
+                            </td>
+                            <td class="text-center">{{ sc.total_items_checked }}</td>
+                            <td class="text-center">
+                                <span class="text-success">{{ sc.items_matched }}</span>
+                            </td>
+                            <td class="text-center">
+                                {% if sc.items_variance > 0 %}
+                                <span class="text-danger">{{ sc.items_variance }}</span>
+                                {% else %}
+                                <span class="text-success">0</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if sc.total_variance_value != 0 %}
+                                <span class="{% if sc.total_variance_value < 0 %}text-danger{% else %}text-warning{% endif %}">
+                                    {{ format_currency(sc.total_variance_value) }}
+                                </span>
+                                {% else %}
+                                <span class="text-success">{{ format_currency(0) }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if sc.status == 'approved' %}
+                                <span class="badge bg-success"><i class="fas fa-check me-1"></i>Approved</span>
+                                {% elif sc.status == 'rejected' %}
+                                <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Rejected</span>
+                                {% elif sc.status == 'pending' %}
+                                <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Pending</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ sc.status|title }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ url_for('day_close.spot_check_detail', check_id=sc.id) }}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+            <h4>No Spot Checks Found</h4>
+            <p class="text-muted">No spot checks match your filter criteria</p>
+            <a href="{{ url_for('day_close.spot_check') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Start First Spot Check
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

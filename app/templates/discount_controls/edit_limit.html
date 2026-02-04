@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Discount Limit - {{ role }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-sliders-h text-primary me-2"></i>Discount Limit: {{ role|title|replace('_', ' ') }}</h2>
+            <p class="text-muted mb-0">Configure maximum discounts for this role</p>
+        </div>
+        <a href="{{ url_for('discount_controls.limits') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Limits
+        </a>
+    </div>
+
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="row">
+            <!-- Main Settings -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-percentage me-2"></i>Discount Limits</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Maximum Discount Percentage</label>
+                            <div class="input-group">
+                                <input type="number" name="max_percentage" class="form-control"
+                                       value="{{ limit.max_percentage or '' }}" step="0.01" min="0" max="100"
+                                       placeholder="e.g., 10">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <small class="text-muted">Maximum percentage discount allowed for this role</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Maximum Discount Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rs.</span>
+                                <input type="number" name="max_amount" class="form-control"
+                                       value="{{ limit.max_amount or '' }}" step="0.01" min="0"
+                                       placeholder="e.g., 500">
+                            </div>
+                            <small class="text-muted">Maximum absolute amount discount allowed</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Max Per-Item Discount %</label>
+                            <div class="input-group">
+                                <input type="number" name="max_per_item_percentage" class="form-control"
+                                       value="{{ limit.max_per_item_percentage or '' }}" step="0.01" min="0" max="100"
+                                       placeholder="e.g., 15">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <small class="text-muted">Maximum discount on a single item</small>
+                        </div>
+
+                        <hr>
+
+                        <div class="mb-3">
+                            <label class="form-label">Requires Approval Above</label>
+                            <div class="input-group">
+                                <input type="number" name="requires_approval_above" class="form-control"
+                                       value="{{ limit.requires_approval_above or '' }}" step="0.01" min="0" max="100"
+                                       placeholder="e.g., 5">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <small class="text-muted">Discounts above this % require manager approval</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Daily Limits -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-calendar-day me-2"></i>Daily Limits</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Max Daily Discount Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rs.</span>
+                                <input type="number" name="max_daily_discount_amount" class="form-control"
+                                       value="{{ limit.max_daily_discount_amount or '' }}" step="0.01" min="0"
+                                       placeholder="Leave empty for no limit">
+                            </div>
+                            <small class="text-muted">Maximum total discounts this role can give per day</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Max Daily Discount Count</label>
+                            <input type="number" name="max_daily_discount_count" class="form-control"
+                                   value="{{ limit.max_daily_discount_count or '' }}" min="0"
+                                   placeholder="Leave empty for no limit">
+                            <small class="text-muted">Maximum number of discounts per day</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Restrictions & Reasons -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-lock me-2"></i>Restrictions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="can_give_free_items"
+                                   id="canGiveFreeItems" {% if limit.can_give_free_items %}checked{% endif %}>
+                            <label class="form-check-label" for="canGiveFreeItems">
+                                Can Give Free Items (100% discount)
+                            </label>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="requires_reason"
+                                   id="requiresReason" {% if limit.requires_reason or not limit.id %}checked{% endif %}>
+                            <label class="form-check-label" for="requiresReason">
+                                Requires Discount Reason
+                            </label>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="is_active"
+                                   id="isActive" {% if limit.is_active or not limit.id %}checked{% endif %}>
+                            <label class="form-check-label" for="isActive">
+                                Limit is Active
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Allowed Reasons -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-list-alt me-2"></i>Allowed Discount Reasons</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">Select which reasons this role can use. Leave all unchecked to allow any reason.</p>
+
+                        {% set current_reasons = limit.get_allowed_reasons() %}
+                        {% for reason in default_reasons %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="allowed_reasons[]"
+                                   value="{{ reason }}" id="reason_{{ loop.index }}"
+                                   {% if reason in current_reasons %}checked{% endif %}>
+                            <label class="form-check-label" for="reason_{{ loop.index }}">
+                                {{ reason }}
+                            </label>
+                        </div>
+                        {% endfor %}
+
+                        <div class="mt-3">
+                            <label class="form-label">Custom Reasons (comma-separated)</label>
+                            <input type="text" name="custom_reasons" class="form-control"
+                                   placeholder="e.g., Festival Discount, VIP Customer">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="fas fa-save me-2"></i>Save Discount Limits
+            </button>
+            <a href="{{ url_for('discount_controls.limits') }}" class="btn btn-outline-secondary btn-lg">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

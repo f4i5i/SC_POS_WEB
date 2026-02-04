@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Receivables Aging Report - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-chart-pie text-warning me-2"></i>Receivables Aging Report</h2>
+            <p class="text-muted mb-0">Analyze outstanding receivables by age</p>
+        </div>
+        <a href="{{ url_for('customer_credit.index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+
+    <!-- Aging Summary -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card bg-success bg-opacity-10 border-success">
+                <div class="card-body text-center py-3">
+                    <h5 class="mb-1 text-success">{{ format_currency(totals.current) }}</h5>
+                    <small class="text-muted">Current</small>
+                    <br><small>({{ buckets.current|length }})</small>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card bg-info bg-opacity-10 border-info">
+                <div class="card-body text-center py-3">
+                    <h5 class="mb-1 text-info">{{ format_currency(totals['1_30']) }}</h5>
+                    <small class="text-muted">1-30 Days</small>
+                    <br><small>({{ buckets['1_30']|length }})</small>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card bg-warning bg-opacity-10 border-warning">
+                <div class="card-body text-center py-3">
+                    <h5 class="mb-1 text-warning">{{ format_currency(totals['31_60']) }}</h5>
+                    <small class="text-muted">31-60 Days</small>
+                    <br><small>({{ buckets['31_60']|length }})</small>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card bg-danger bg-opacity-10 border-danger">
+                <div class="card-body text-center py-3">
+                    <h5 class="mb-1 text-danger">{{ format_currency(totals['61_90']) }}</h5>
+                    <small class="text-muted">61-90 Days</small>
+                    <br><small>({{ buckets['61_90']|length }})</small>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card bg-dark bg-opacity-10 border-dark">
+                <div class="card-body text-center py-3">
+                    <h5 class="mb-1 text-dark">{{ format_currency(totals.over_90) }}</h5>
+                    <small class="text-muted">>90 Days</small>
+                    <br><small>({{ buckets.over_90|length }})</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grand Total -->
+    <div class="alert alert-primary text-center mb-4">
+        <h4 class="mb-0">Total Receivables: <strong>{{ format_currency(grand_total) }}</strong></h4>
+    </div>
+
+    <div class="row">
+        <!-- Top Customers -->
+        <div class="col-lg-5 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-users me-2"></i>Top 20 Customers by Amount Due</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Customer</th>
+                                    <th class="text-end">Total Due</th>
+                                    <th class="text-end">Overdue</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in top_customers %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('customer_credit.customer_ledger', customer_id=item.customer.id) }}">
+                                            {{ item.customer.name }}
+                                        </a>
+                                    </td>
+                                    <td class="text-end">{{ format_currency(item.total) }}</td>
+                                    <td class="text-end text-danger">{{ format_currency(item.overdue) }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="3" class="text-center py-3 text-muted">No data</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Aging Details -->
+        <div class="col-lg-7 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-list me-2"></i>Overdue Details (>30 days)</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>Customer</th>
+                                    <th class="text-end">Amount</th>
+                                    <th class="text-center">Due Date</th>
+                                    <th class="text-center">Days Overdue</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for due in buckets['31_60'] + buckets['61_90'] + buckets.over_90 %}
+                                <tr class="{% if due.days_overdue_calc > 90 %}table-dark{% elif due.days_overdue_calc > 60 %}table-danger{% else %}table-warning{% endif %}">
+                                    <td>{{ due.customer.name if due.customer else '-' }}</td>
+                                    <td class="text-end"><strong>{{ format_currency(due.due_amount) }}</strong></td>
+                                    <td class="text-center">{{ due.due_date.strftime('%d/%m/%Y') if due.due_date else '-' }}</td>
+                                    <td class="text-center">
+                                        <span class="badge bg-{% if due.days_overdue_calc > 90 %}dark{% elif due.days_overdue_calc > 60 %}danger{% else %}warning text-dark{% endif %}">
+                                            {{ due.days_overdue_calc }} days
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center py-4 text-muted">
+                                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                        <p>No severely overdue items</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

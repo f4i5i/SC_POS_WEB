@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}Day Close - {{ location.name }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-cash-register text-primary me-2"></i>Day Close</h2>
+            <p class="text-muted mb-0">
+                {{ location.name }} | {{ today.strftime('%A, %B %d, %Y') }}
+            </p>
+        </div>
+        <div>
+            <a href="{{ url_for('day_close.spot_check', location_id=location.id) }}" class="btn btn-outline-success me-2">
+                <i class="fas fa-clipboard-check me-2"></i>Spot Check
+            </a>
+            <a href="{{ url_for('day_close.history') }}" class="btn btn-outline-primary">
+                <i class="fas fa-history me-2"></i>History
+            </a>
+        </div>
+    </div>
+
+    <!-- Spot Check Reminder -->
+    <div class="alert alert-info d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <i class="fas fa-clipboard-check me-2"></i>
+            <strong>Daily Inventory Spot Check:</strong> Verify a sample of inventory items before closing.
+        </div>
+        <a href="{{ url_for('day_close.spot_check', location_id=location.id, check_type='daily') }}" class="btn btn-sm btn-info">
+            <i class="fas fa-play me-1"></i>Start Spot Check
+        </a>
+    </div>
+
+    <form method="POST" action="{{ url_for('day_close.close_day') }}" id="dayCloseForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="location_id" value="{{ location.id }}">
+
+        <div class="row g-4">
+            <!-- Left Column: Sales Summary -->
+            <div class="col-lg-5">
+                <!-- Sales Summary Card -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Today's Sales Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tr>
+                                <td>Total Transactions</td>
+                                <td class="text-end fw-bold">{{ total_sales }}</td>
+                            </tr>
+                            <tr>
+                                <td>Gross Sales</td>
+                                <td class="text-end">{{ format_currency(gross_sales) }}</td>
+                            </tr>
+                            <tr class="text-danger">
+                                <td>(-) Discounts</td>
+                                <td class="text-end">{{ format_currency(total_discounts) }}</td>
+                            </tr>
+                            <tr>
+                                <td>(+) Tax</td>
+                                <td class="text-end">{{ format_currency(total_tax) }}</td>
+                            </tr>
+                            <tr class="table-primary fw-bold">
+                                <td>Net Sales</td>
+                                <td class="text-end">{{ format_currency(net_sales) }}</td>
+                            </tr>
+                            {% if refund_count > 0 %}
+                            <tr class="text-danger">
+                                <td>Refunds ({{ refund_count }})</td>
+                                <td class="text-end">{{ format_currency(total_refunds) }}</td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Payment Breakdown Card -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-money-bill-wave me-2"></i>Payment Breakdown</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tr>
+                                <td><i class="fas fa-money-bill text-success me-2"></i>Cash</td>
+                                <td class="text-end fw-bold text-success">{{ format_currency(total_cash) }}</td>
+                            </tr>
+                            <tr>
+                                <td><i class="fas fa-credit-card text-primary me-2"></i>Card</td>
+                                <td class="text-end">{{ format_currency(total_card) }}</td>
+                            </tr>
+                            <tr>
+                                <td><i class="fas fa-mobile-alt text-info me-2"></i>EasyPaisa</td>
+                                <td class="text-end">{{ format_currency(total_easypaisa) }}</td>
+                            </tr>
+                            <tr>
+                                <td><i class="fas fa-mobile-alt text-danger me-2"></i>JazzCash</td>
+                                <td class="text-end">{{ format_currency(total_jazzcash) }}</td>
+                            </tr>
+                            <tr>
+                                <td><i class="fas fa-university text-secondary me-2"></i>Bank Transfer</td>
+                                <td class="text-end">{{ format_currency(total_bank) }}</td>
+                            </tr>
+                            <tr>
+                                <td><i class="fas fa-hand-holding-usd text-warning me-2"></i>Credit</td>
+                                <td class="text-end">{{ format_currency(total_credit) }}</td>
+                            </tr>
+                            {% if total_other > 0 %}
+                            <tr>
+                                <td>Other</td>
+                                <td class="text-end">{{ format_currency(total_other) }}</td>
+                            </tr>
+                            {% endif %}
+                            <tr class="table-light fw-bold">
+                                <td>Total</td>
+                                <td class="text-end">{{ format_currency(net_sales) }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Cash Movement Card -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>Cash Movements</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Opening Balance</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rs.</span>
+                                <input type="text" class="form-control" value="{{ '{:,.2f}'.format(opening_balance) }}" readonly>
+                            </div>
+                            <small class="text-muted">From last day close{% if last_close %} ({{ last_close.close_date }}){% endif %}</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Cash In (Added to Drawer)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rs.</span>
+                                <input type="number" name="cash_in" class="form-control" value="0" min="0" step="0.01" id="cashIn">
+                            </div>
+                            <small class="text-muted">e.g., Change added, petty cash</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Cash Out (Removed from Drawer)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rs.</span>
+                                <input type="number" name="cash_out" class="form-control" value="0" min="0" step="0.01" id="cashOut">
+                            </div>
+                            <small class="text-muted">e.g., Expenses, bank deposits</small>
+                        </div>
+                        <hr>
+                        <div class="alert alert-info mb-0">
+                            <div class="d-flex justify-content-between">
+                                <span><strong>Expected Cash in Drawer:</strong></span>
+                                <span class="fw-bold" id="expectedCash">Rs. {{ '{:,.2f}'.format(expected_cash) }}</span>
+                            </div>
+                            <small class="text-muted">Opening + Cash Sales - Cash Out + Cash In</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Cash Counting -->
+            <div class="col-lg-7">
+                <!-- Denomination Counting Card -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Cash Counting (Denomination)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">Count the physical cash in drawer by denomination:</p>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Denomination</th>
+                                        <th class="text-center" style="width: 120px;">Count</th>
+                                        <th class="text-end">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="badge bg-success">Rs. 5,000</span></td>
+                                        <td><input type="number" name="denom_5000" class="form-control form-control-sm text-center denom-input" value="0" min="0" data-value="5000"></td>
+                                        <td class="text-end fw-bold denom-total" id="total_5000">0</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="badge bg-success">Rs. 1,000</span></td>
+                                        <td><input type="number" name="denom_1000" class="form-control form-control-sm text-center denom-input" value="0" min="0" data-value="1000"></td>
+                                        <td class="text-end fw-bold denom-total" id="total_1000">0</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="badge bg-primary">Rs. 500</span></td>
+                                        <td><input type="number" name="denom_500" class="form-control form-control-sm text-center denom-input" value="0" min="0" data-value="500"></td>
+                                        <td class="text-end fw-bold denom-total" id="total_500">0</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="badge bg-warning text-dark">Rs. 100</span></td>
+                                        <td><input type="number" name="denom_100" class="form-control form-control-sm text-center denom-input" value="0" min="0" data-value="100"></td>
+                                        <td class="text-end fw-bold denom-total" id="total_100">0</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="badge bg-secondary">Rs. 50</span></td>
+                                        <td><input type="number" name="denom_50" class="form-control form-control-sm text-center denom-input" value="0" min="0" data-value="50"></td>
+                                        <td class="text-end fw-bold denom-total" id="total_50">0</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="badge bg-secondary">Rs. 20</span></td>
+                                        <td><input type="number" name="denom_20" class="form-control form-control-sm text-center denom-input" value="0" min="0" data-value="20"></td>
+                                        <td class="text-end fw-bold denom-total" id="total_20">0</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="badge bg-dark">Rs. 10</span></td>
+                                        <td><input type="number" name="denom_10" class="form-control form-control-sm text-center denom-input" value="0" min="0" data-value="10"></td>
+                                        <td class="text-end fw-bold denom-total" id="total_10">0</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="badge bg-dark">Rs. 5</span></td>
+                                        <td><input type="number" name="denom_5" class="form-control form-control-sm text-center denom-input" value="0" min="0" data-value="5"></td>
+                                        <td class="text-end fw-bold denom-total" id="total_5">0</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="badge bg-dark">Rs. 2</span></td>
+                                        <td><input type="number" name="denom_2" class="form-control form-control-sm text-center denom-input" value="0" min="0" data-value="2"></td>
+                                        <td class="text-end fw-bold denom-total" id="total_2">0</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="badge bg-dark">Rs. 1</span></td>
+                                        <td><input type="number" name="denom_1" class="form-control form-control-sm text-center denom-input" value="0" min="0" data-value="1"></td>
+                                        <td class="text-end fw-bold denom-total" id="total_1">0</td>
+                                    </tr>
+                                </tbody>
+                                <tfoot class="table-success">
+                                    <tr class="fw-bold">
+                                        <td colspan="2">TOTAL COUNTED</td>
+                                        <td class="text-end fs-5" id="grandTotal">Rs. 0</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Variance Card -->
+                <div class="card shadow-sm mb-4" id="varianceCard">
+                    <div class="card-header" id="varianceHeader">
+                        <h5 class="mb-0"><i class="fas fa-balance-scale me-2"></i>Cash Variance</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <small class="text-muted">Expected</small>
+                                <h4 id="varianceExpected">Rs. {{ '{:,.2f}'.format(expected_cash) }}</h4>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted">Counted</small>
+                                <h4 id="varianceCounted">Rs. 0</h4>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted">Variance</small>
+                                <h4 id="varianceAmount">Rs. 0</h4>
+                            </div>
+                        </div>
+                        <div id="varianceAlert" class="alert alert-info mt-3 mb-0 d-none">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <span id="varianceMessage">Count the cash to see variance</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Notes</h5>
+                    </div>
+                    <div class="card-body">
+                        <textarea name="notes" class="form-control" rows="3" placeholder="Any notes for this day close..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-lg btn-primary" id="submitBtn">
+                        <i class="fas fa-lock me-2"></i>Close Day & Generate Z-Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+$(document).ready(function() {
+    const openingBalance = {{ opening_balance }};
+    const cashSales = {{ total_cash }};
+
+    // Calculate denomination totals
+    function calculateTotals() {
+        let grandTotal = 0;
+
+        $('.denom-input').each(function() {
+            const count = parseInt($(this).val()) || 0;
+            const value = parseInt($(this).data('value'));
+            const total = count * value;
+            const denomId = $(this).attr('name').replace('denom_', '');
+
+            $('#total_' + denomId).text(total.toLocaleString());
+            grandTotal += total;
+        });
+
+        $('#grandTotal').text('Rs. ' + grandTotal.toLocaleString());
+        $('#varianceCounted').text('Rs. ' + grandTotal.toLocaleString());
+
+        // Calculate expected cash
+        const cashIn = parseFloat($('#cashIn').val()) || 0;
+        const cashOut = parseFloat($('#cashOut').val()) || 0;
+        const expectedCash = openingBalance + cashSales - cashOut + cashIn;
+
+        $('#expectedCash').text('Rs. ' + expectedCash.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+        $('#varianceExpected').text('Rs. ' + expectedCash.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+
+        // Calculate variance
+        const variance = grandTotal - expectedCash;
+        $('#varianceAmount').text('Rs. ' + variance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+
+        // Update variance styling
+        const varianceCard = $('#varianceCard');
+        const varianceHeader = $('#varianceHeader');
+        const varianceAlert = $('#varianceAlert');
+        const varianceMessage = $('#varianceMessage');
+
+        varianceAlert.removeClass('d-none');
+
+        if (variance === 0) {
+            varianceHeader.removeClass('bg-danger bg-warning').addClass('bg-success text-white');
+            varianceAlert.removeClass('alert-danger alert-warning').addClass('alert-success');
+            varianceMessage.html('<i class="fas fa-check-circle me-2"></i>Perfect! Cash matches expected amount.');
+            $('#varianceAmount').removeClass('text-danger text-warning').addClass('text-success');
+        } else if (variance > 0) {
+            varianceHeader.removeClass('bg-success bg-danger').addClass('bg-warning text-dark');
+            varianceAlert.removeClass('alert-success alert-danger').addClass('alert-warning');
+            varianceMessage.html('<i class="fas fa-exclamation-triangle me-2"></i>Cash OVER by Rs. ' + Math.abs(variance).toLocaleString(undefined, {minimumFractionDigits: 2}) + '. Please verify count.');
+            $('#varianceAmount').removeClass('text-success text-danger').addClass('text-warning');
+        } else {
+            varianceHeader.removeClass('bg-success bg-warning').addClass('bg-danger text-white');
+            varianceAlert.removeClass('alert-success alert-warning').addClass('alert-danger');
+            varianceMessage.html('<i class="fas fa-times-circle me-2"></i>Cash SHORT by Rs. ' + Math.abs(variance).toLocaleString(undefined, {minimumFractionDigits: 2}) + '. Manager approval required.');
+            $('#varianceAmount').removeClass('text-success text-warning').addClass('text-danger');
+        }
+    }
+
+    // Bind events
+    $('.denom-input, #cashIn, #cashOut').on('input change', calculateTotals);
+
+    // Form submission
+    $('#dayCloseForm').on('submit', function(e) {
+        const grandTotal = parseInt($('#grandTotal').text().replace(/[^0-9]/g, '')) || 0;
+
+        if (grandTotal === 0) {
+            e.preventDefault();
+            alert('Please count the cash in drawer before closing.');
+            return false;
+        }
+
+        return confirm('Are you sure you want to close the day? This action cannot be undone.');
+    });
+});
+</script>
+{% endblock %}

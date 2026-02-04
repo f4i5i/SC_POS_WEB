@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Yield Variance Report - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-balance-scale text-primary me-2"></i>Yield Variance Report</h2>
+            <p class="text-muted mb-0">Compare expected vs actual production output</p>
+        </div>
+        <a href="{{ url_for('production.index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Production
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Recipe</label>
+                    <select name="recipe_id" class="form-select">
+                        <option value="">All Recipes</option>
+                        {% for recipe in recipes %}
+                        <option value="{{ recipe.id }}" {% if recipe.id == recipe_id %}selected{% endif %}>{{ recipe.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-2"></i>Apply
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary bg-opacity-10 border-primary">
+                <div class="card-body text-center">
+                    <h6 class="text-primary">Expected Output</h6>
+                    <h3 class="mb-0">{{ total_expected|int }}</h3>
+                    <small class="text-muted">units</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success bg-opacity-10 border-success">
+                <div class="card-body text-center">
+                    <h6 class="text-success">Actual Output</h6>
+                    <h3 class="mb-0">{{ total_actual|int }}</h3>
+                    <small class="text-muted">units</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card {% if total_variance >= 0 %}bg-success{% else %}bg-danger{% endif %} bg-opacity-10 border-{% if total_variance >= 0 %}success{% else %}danger{% endif %}">
+                <div class="card-body text-center">
+                    <h6 class="{% if total_variance >= 0 %}text-success{% else %}text-danger{% endif %}">Total Variance</h6>
+                    <h3 class="mb-0">{% if total_variance > 0 %}+{% endif %}{{ total_variance|int }}</h3>
+                    <small class="text-muted">({{ "%.1f"|format(overall_variance_pct) }}%)</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card {% if total_variance_cost >= 0 %}bg-warning{% else %}bg-danger{% endif %} bg-opacity-10 border-{% if total_variance_cost >= 0 %}warning{% else %}danger{% endif %}">
+                <div class="card-body text-center">
+                    <h6 class="{% if total_variance_cost >= 0 %}text-warning{% else %}text-danger{% endif %}">Variance Cost</h6>
+                    <h3 class="mb-0">{{ format_currency(total_variance_cost|abs) }}</h3>
+                    <small class="text-muted">{% if total_variance_cost >= 0 %}gain{% else %}loss{% endif %}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recipe Summary -->
+    {% if recipe_summary %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-flask me-2"></i>Variance by Recipe</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Recipe</th>
+                            <th class="text-center">Batches</th>
+                            <th class="text-end">Expected</th>
+                            <th class="text-end">Actual</th>
+                            <th class="text-end">Variance</th>
+                            <th class="text-center">Variance %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rid, data in recipe_summary.items() %}
+                        <tr>
+                            <td><strong>{{ data.recipe.name if data.recipe else 'Unknown' }}</strong></td>
+                            <td class="text-center">{{ data.orders }}</td>
+                            <td class="text-end">{{ data.expected|int }}</td>
+                            <td class="text-end">{{ data.actual|int }}</td>
+                            <td class="text-end {% if data.variance >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                {% if data.variance > 0 %}+{% endif %}{{ data.variance|int }}
+                            </td>
+                            <td class="text-center">
+                                {% set pct = ((data.variance / data.expected * 100) if data.expected else 0) %}
+                                <span class="badge {% if pct >= 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                    {% if pct > 0 %}+{% endif %}{{ "%.1f"|format(pct) }}%
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Detailed Data -->
+    {% if variance_data %}
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-list me-2"></i>Batch Details</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Order #</th>
+                            <th>Recipe</th>
+                            <th>Date</th>
+                            <th class="text-end">Expected</th>
+                            <th class="text-end">Actual</th>
+                            <th class="text-end">Variance</th>
+                            <th class="text-center">%</th>
+                            <th class="text-end">Cost Impact</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in variance_data %}
+                        <tr class="{% if item.variance_qty < 0 %}table-danger{% elif item.variance_qty > 0 %}table-success{% endif %}">
+                            <td>
+                                <a href="{{ url_for('production_reports.batch_detail', order_id=item.order.id) }}">
+                                    <code>{{ item.order.order_number }}</code>
+                                </a>
+                            </td>
+                            <td>{{ item.recipe.name if item.recipe else '-' }}</td>
+                            <td>{{ item.order.completed_at.strftime('%d/%m/%Y') if item.order.completed_at else '-' }}</td>
+                            <td class="text-end">{{ item.expected_qty|int }}</td>
+                            <td class="text-end"><strong>{{ item.actual_qty|int }}</strong></td>
+                            <td class="text-end {% if item.variance_qty >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                {% if item.variance_qty > 0 %}+{% endif %}{{ item.variance_qty|int }}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge {% if item.variance_pct >= 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                    {% if item.variance_pct > 0 %}+{% endif %}{{ "%.1f"|format(item.variance_pct) }}%
+                                </span>
+                            </td>
+                            <td class="text-end {% if item.variance_cost >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ format_currency(item.variance_cost|abs) }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+            <h4>No Production Data</h4>
+            <p class="text-muted">No completed production orders found for the selected period.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

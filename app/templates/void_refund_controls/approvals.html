@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Void/Refund Approvals - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-gavel text-primary me-2"></i>Void/Refund Approvals</h2>
+            <p class="text-muted mb-0">Review and approve void/refund requests</p>
+        </div>
+        {% if pending_count > 0 %}
+        <span class="badge bg-warning fs-5">{{ pending_count }} Pending</span>
+        {% endif %}
+    </div>
+
+    <!-- Status Tabs -->
+    <ul class="nav nav-tabs mb-4">
+        <li class="nav-item">
+            <a class="nav-link {% if status_filter == 'pending' %}active{% endif %}"
+               href="{{ url_for('void_refund_controls.approvals', status='pending') }}">
+                <i class="fas fa-clock me-1"></i>Pending
+                {% if pending_count > 0 %}<span class="badge bg-warning text-dark ms-1">{{ pending_count }}</span>{% endif %}
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if status_filter == 'approved' %}active{% endif %}"
+               href="{{ url_for('void_refund_controls.approvals', status='approved') }}">
+                <i class="fas fa-check me-1"></i>Approved
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if status_filter == 'rejected' %}active{% endif %}"
+               href="{{ url_for('void_refund_controls.approvals', status='rejected') }}">
+                <i class="fas fa-times me-1"></i>Rejected
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if status_filter == 'all' %}active{% endif %}"
+               href="{{ url_for('void_refund_controls.approvals', status='all') }}">
+                <i class="fas fa-list me-1"></i>All
+            </a>
+        </li>
+    </ul>
+
+    {% if approvals %}
+    <div class="row">
+        {% for approval in approvals %}
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm {% if approval.status == 'pending' %}border-warning{% elif approval.status == 'approved' %}border-success{% else %}border-danger{% endif %} border-2">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="badge {% if approval.request_type == 'void' %}bg-danger{% else %}bg-warning text-dark{% endif %} me-2">
+                            {{ approval.request_type|upper }}
+                        </span>
+                        <strong>{{ approval.location.name if approval.location else 'Unknown' }}</strong>
+                    </div>
+                    <span class="badge {% if approval.status == 'pending' %}bg-warning text-dark{% elif approval.status == 'approved' %}bg-success{% else %}bg-danger{% endif %}">
+                        {{ approval.status|title }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <small class="text-muted">Requested By</small>
+                            <div><strong>{{ approval.requester.full_name if approval.requester else 'N/A' }}</strong></div>
+                            <small class="text-muted">{{ approval.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+                        </div>
+                        <div class="col-6 text-end">
+                            <small class="text-muted">Amount</small>
+                            <div class="fs-4 text-danger">{{ format_currency(approval.amount) }}</div>
+                            <small class="text-muted">of {{ format_currency(approval.original_sale_total) }}</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <small class="text-muted">Reason</small>
+                        <div>
+                            <span class="badge bg-secondary">{{ approval.reason }}</span>
+                            {% if approval.reason_details %}
+                            <div class="small text-muted mt-1">{{ approval.reason_details }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if approval.sale %}
+                    <div class="mb-3">
+                        <small class="text-muted">Sale</small>
+                        <div>
+                            <a href="{{ url_for('pos.sale_detail', sale_id=approval.sale_id) }}">
+                                #{{ approval.sale.sale_number }}
+                            </a>
+                            - {{ approval.sale.sale_date.strftime('%d/%m/%Y %H:%M') if approval.sale.sale_date else '' }}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if approval.approval_code and approval.status == 'pending' %}
+                    <div class="alert alert-info mb-3">
+                        <strong>Approval Code:</strong> <code class="fs-5">{{ approval.approval_code }}</code>
+                        {% if approval.expires_at %}
+                        <div class="small">Expires: {{ approval.expires_at.strftime('%H:%M') }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if approval.status == 'pending' %}
+                    <form method="POST" action="{{ url_for('void_refund_controls.process_approval', approval_id=approval.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <input type="text" name="rejection_reason" class="form-control form-control-sm"
+                                   placeholder="Rejection reason (optional)">
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" name="action" value="approve" class="btn btn-success flex-fill">
+                                <i class="fas fa-check me-1"></i>Approve
+                            </button>
+                            <button type="submit" name="action" value="reject" class="btn btn-danger flex-fill">
+                                <i class="fas fa-times me-1"></i>Reject
+                            </button>
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="text-muted small">
+                        {% if approval.approver %}
+                        <i class="fas fa-user me-1"></i>{{ approval.status|title }} by {{ approval.approver.full_name }}
+                        {% if approval.approved_at %}on {{ approval.approved_at.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+                        {% endif %}
+                        {% if approval.rejection_reason %}
+                        <div class="mt-1"><strong>Reason:</strong> {{ approval.rejection_reason }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+            <h4>No {{ status_filter if status_filter != 'all' else '' }} Requests</h4>
+            <p class="text-muted">No void/refund approval requests found.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

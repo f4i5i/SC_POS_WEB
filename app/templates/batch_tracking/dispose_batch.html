@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Dispose Batch - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-trash text-danger me-2"></i>Dispose Batch</h2>
+        <a href="{{ url_for('batch_tracking.view_batch', batch_id=batch.id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <!-- Batch Info -->
+            <div class="card shadow-sm mb-4 border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Batch to Dispose</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td class="text-muted">Batch Number</td>
+                            <td><code>{{ batch.batch_number }}</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Product</td>
+                            <td>{{ batch.product.name if batch.product else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Quantity to Dispose</td>
+                            <td><strong class="text-danger fs-4">{{ batch.current_quantity|int }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Unit Cost</td>
+                            <td>{{ format_currency(batch.unit_cost) if batch.unit_cost else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Value Lost</td>
+                            <td class="text-danger">
+                                {% if batch.unit_cost %}
+                                <strong>{{ format_currency(batch.unit_cost * batch.current_quantity) }}</strong>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% if batch.expiry_date %}
+                        <tr>
+                            <td class="text-muted">Expiry Date</td>
+                            <td>
+                                {{ batch.expiry_date.strftime('%d/%m/%Y') }}
+                                {% if batch.is_expired %}
+                                <span class="badge bg-danger ms-2">Expired</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </table>
+
+                    <div class="alert alert-danger mt-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Warning:</strong> This action cannot be undone. All {{ batch.current_quantity|int }} units will be removed from inventory.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <!-- Disposal Form -->
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">Disposal Details</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="mb-3">
+                            <label class="form-label">Disposal Reason *</label>
+                            <select name="reason" class="form-select" required>
+                                <option value="">Select Reason...</option>
+                                <option value="Expired" {% if batch.is_expired %}selected{% endif %}>Expired</option>
+                                <option value="Damaged">Damaged</option>
+                                <option value="Quality Issue">Quality Issue</option>
+                                <option value="Contaminated">Contaminated</option>
+                                <option value="Recall">Product Recall</option>
+                                <option value="Obsolete">Obsolete/Discontinued</option>
+                                <option value="Theft/Loss">Theft/Loss</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Disposal Method *</label>
+                            <select name="disposal_method" class="form-select" required>
+                                <option value="">Select Method...</option>
+                                <option value="Destroyed">Destroyed/Disposed</option>
+                                <option value="Returned to Supplier">Returned to Supplier</option>
+                                <option value="Donated">Donated</option>
+                                <option value="Sold at Discount">Sold at Discount</option>
+                                <option value="Written Off">Written Off</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Additional Notes</label>
+                            <textarea name="notes" class="form-control" rows="3"
+                                      placeholder="Any additional details about this disposal..."></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger btn-lg"
+                                    onclick="return confirm('Are you sure you want to dispose of this batch? This cannot be undone.')">
+                                <i class="fas fa-trash me-2"></i>Confirm Disposal
+                            </button>
+                            <a href="{{ url_for('batch_tracking.view_batch', batch_id=batch.id) }}" class="btn btn-outline-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

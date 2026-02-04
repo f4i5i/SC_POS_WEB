@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Add Price Change Rule - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-plus text-primary me-2"></i>Add Price Change Rule</h2>
+        <a href="{{ url_for('price_audit.rules') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Rule Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Rule Name *</label>
+                            <input type="text" name="name" class="form-control" required placeholder="e.g., Large Price Changes">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea name="description" class="form-control" rows="2" placeholder="What this rule does..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Rule Type</label>
+                            <select name="rule_type" class="form-select">
+                                <option value="percentage">Percentage Change</option>
+                                <option value="amount">Amount Change</option>
+                                <option value="any">Any Change</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Minimum Change Percentage</label>
+                            <div class="input-group">
+                                <input type="number" name="min_change_percentage" class="form-control" step="0.01" placeholder="e.g., 10">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <small class="text-muted">Trigger rule when change >= this %</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Minimum Change Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rs.</span>
+                                <input type="number" name="min_change_amount" class="form-control" step="0.01" placeholder="e.g., 100">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Actions & Scope</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="requires_approval" id="requiresApproval" checked>
+                            <label class="form-check-label" for="requiresApproval">Requires Manager Approval</label>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="notify_managers" id="notifyManagers" checked>
+                            <label class="form-check-label" for="notifyManagers">Notify Managers</label>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notify Email (optional)</label>
+                            <input type="email" name="notify_email" class="form-control" placeholder="manager@example.com">
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="is_active" id="isActive" checked>
+                            <label class="form-check-label" for="isActive">Rule Active</label>
+                        </div>
+
+                        <hr>
+                        <h6>Applies to Roles</h6>
+                        <div class="row">
+                            {% for role_key, role_data in default_roles.items() %}
+                            <div class="col-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="applies_to_roles[]" value="{{ role_key }}" id="role_{{ role_key }}">
+                                    <label class="form-check-label" for="role_{{ role_key }}">{{ role_data.display_name }}</label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <small class="text-muted">Leave unchecked to apply to all roles</small>
+
+                        <hr>
+                        <h6>Applies to Price Types</h6>
+                        {% for key, label in price_types %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="applies_to_price_types[]" value="{{ key }}" id="pt_{{ key }}">
+                            <label class="form-check-label" for="pt_{{ key }}">{{ label }}</label>
+                        </div>
+                        {% endfor %}
+                        <small class="text-muted">Leave unchecked to apply to all price types</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save me-2"></i>Create Rule</button>
+            <a href="{{ url_for('price_audit.rules') }}" class="btn btn-outline-secondary btn-lg">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Void/Refund Limits - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-undo text-primary me-2"></i>Void/Refund Limits by Role</h2>
+            <p class="text-muted mb-0">Configure void and refund permissions for each role</p>
+        </div>
+        <div>
+            <a href="{{ url_for('void_refund_controls.summary') }}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-chart-bar me-2"></i>Summary Report
+            </a>
+            <a href="{{ url_for('void_refund_controls.logs') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-history me-2"></i>Audit Logs
+            </a>
+        </div>
+    </div>
+
+    <!-- Existing Limits -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="fas fa-sliders-h me-2"></i>Configured Limits</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Role</th>
+                            <th class="text-center">Can Void</th>
+                            <th class="text-center">Void Time Limit</th>
+                            <th class="text-center">Can Refund</th>
+                            <th class="text-center">Refund Time Limit</th>
+                            <th class="text-center">Max Amount</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for limit in limits %}
+                        <tr>
+                            <td><strong>{{ limit.role|title|replace('_', ' ') }}</strong></td>
+                            <td class="text-center">
+                                {% if limit.can_void_sale %}
+                                <i class="fas fa-check text-success"></i>
+                                {% else %}
+                                <i class="fas fa-times text-danger"></i>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if limit.void_time_limit_hours %}
+                                {{ limit.void_time_limit_hours }}h
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if limit.can_refund %}
+                                <i class="fas fa-check text-success"></i>
+                                {% else %}
+                                <i class="fas fa-times text-danger"></i>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if limit.refund_time_limit_days %}
+                                {{ limit.refund_time_limit_days }} days
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if limit.max_void_amount or limit.max_refund_amount %}
+                                <small>
+                                    V: {{ format_currency(limit.max_void_amount or 0) }}<br>
+                                    R: {{ format_currency(limit.max_refund_amount or 0) }}
+                                </small>
+                                {% else %}
+                                <span class="text-muted">No limit</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if limit.is_active %}
+                                <span class="badge bg-success">Active</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ url_for('void_refund_controls.edit_limit', role=limit.role) }}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <form method="POST" action="{{ url_for('void_refund_controls.delete_limit', role=limit.role) }}"
+                                      class="d-inline" onsubmit="return confirm('Delete limit for {{ limit.role }}?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not limits %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4 text-muted">
+                                No void/refund limits configured.
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add New Role Limit -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-plus me-2"></i>Configure Role Permissions</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">Select a role to configure void/refund permissions:</p>
+            <div class="row">
+                {% for role_key, role_data in default_roles.items() %}
+                {% set has_limit = limits|selectattr('role', 'equalto', role_key)|list %}
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100 {% if has_limit %}border-success{% endif %}">
+                        <div class="card-body">
+                            <h6 class="card-title">
+                                {{ role_data.display_name }}
+                                {% if has_limit %}
+                                <span class="badge bg-success float-end">Configured</span>
+                                {% endif %}
+                            </h6>
+                            <p class="card-text small text-muted">{{ role_data.description }}</p>
+                            <a href="{{ url_for('void_refund_controls.edit_limit', role=role_key) }}"
+                               class="btn btn-sm {% if has_limit %}btn-outline-primary{% else %}btn-primary{% endif %}">
+                                {% if has_limit %}Edit{% else %}Configure{% endif %}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

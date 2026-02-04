@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Void/Refund Limit - {{ role }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-undo text-primary me-2"></i>Void/Refund Limit: {{ role|title|replace('_', ' ') }}</h2>
+            <p class="text-muted mb-0">Configure void and refund permissions for this role</p>
+        </div>
+        <a href="{{ url_for('void_refund_controls.limits') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="row">
+            <!-- Void Settings -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0"><i class="fas fa-ban me-2"></i>Void Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="can_void_sale"
+                                   id="canVoidSale" {% if limit.can_void_sale %}checked{% endif %}>
+                            <label class="form-check-label" for="canVoidSale">
+                                <strong>Can Void Sales</strong>
+                            </label>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Void Time Limit (Hours)</label>
+                            <input type="number" name="void_time_limit_hours" class="form-control"
+                                   value="{{ limit.void_time_limit_hours or 24 }}" min="1">
+                            <small class="text-muted">Can only void sales within this many hours</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Maximum Void Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rs.</span>
+                                <input type="number" name="max_void_amount" class="form-control"
+                                       value="{{ limit.max_void_amount or '' }}" step="0.01" min="0"
+                                       placeholder="Leave empty for no limit">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Requires Approval Above</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rs.</span>
+                                <input type="number" name="void_requires_approval_above" class="form-control"
+                                       value="{{ limit.void_requires_approval_above or '' }}" step="0.01" min="0"
+                                       placeholder="Leave empty for no approval">
+                            </div>
+                            <small class="text-muted">Manager approval required for voids above this amount</small>
+                        </div>
+
+                        <hr>
+
+                        <h6>Daily Limits</h6>
+                        <div class="row">
+                            <div class="col-6">
+                                <label class="form-label">Max Void Count/Day</label>
+                                <input type="number" name="max_daily_void_count" class="form-control"
+                                       value="{{ limit.max_daily_void_count or '' }}" min="0"
+                                       placeholder="No limit">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Max Void Amount/Day</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Rs.</span>
+                                    <input type="number" name="max_daily_void_amount" class="form-control"
+                                           value="{{ limit.max_daily_void_amount or '' }}" step="0.01" min="0"
+                                           placeholder="No limit">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Refund Settings -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-undo-alt me-2"></i>Refund Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="can_refund"
+                                   id="canRefund" {% if limit.can_refund %}checked{% endif %}>
+                            <label class="form-check-label" for="canRefund">
+                                <strong>Can Process Refunds</strong>
+                            </label>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Refund Time Limit (Days)</label>
+                            <input type="number" name="refund_time_limit_days" class="form-control"
+                                   value="{{ limit.refund_time_limit_days or 7 }}" min="1">
+                            <small class="text-muted">Can only refund sales within this many days</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Maximum Refund Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rs.</span>
+                                <input type="number" name="max_refund_amount" class="form-control"
+                                       value="{{ limit.max_refund_amount or '' }}" step="0.01" min="0"
+                                       placeholder="Leave empty for no limit">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Requires Approval Above</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rs.</span>
+                                <input type="number" name="refund_requires_approval_above" class="form-control"
+                                       value="{{ limit.refund_requires_approval_above or '' }}" step="0.01" min="0"
+                                       placeholder="Leave empty for no approval">
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <h6>Daily Limits</h6>
+                        <div class="row">
+                            <div class="col-6">
+                                <label class="form-label">Max Refund Count/Day</label>
+                                <input type="number" name="max_daily_refund_count" class="form-control"
+                                       value="{{ limit.max_daily_refund_count or '' }}" min="0"
+                                       placeholder="No limit">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Max Refund Amount/Day</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Rs.</span>
+                                    <input type="number" name="max_daily_refund_amount" class="form-control"
+                                           value="{{ limit.max_daily_refund_amount or '' }}" step="0.01" min="0"
+                                           placeholder="No limit">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Requirements & Reasons -->
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-clipboard-check me-2"></i>Requirements</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="requires_reason"
+                                   id="requiresReason" {% if limit.requires_reason or not limit.id %}checked{% endif %}>
+                            <label class="form-check-label" for="requiresReason">
+                                Requires Reason
+                            </label>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="requires_receipt_return"
+                                   id="requiresReceipt" {% if limit.requires_receipt_return or not limit.id %}checked{% endif %}>
+                            <label class="form-check-label" for="requiresReceipt">
+                                Requires Receipt Return
+                            </label>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="requires_customer_signature"
+                                   id="requiresSignature" {% if limit.requires_customer_signature %}checked{% endif %}>
+                            <label class="form-check-label" for="requiresSignature">
+                                Requires Customer Signature
+                            </label>
+                        </div>
+
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" name="is_active"
+                                   id="isActive" {% if limit.is_active or not limit.id %}checked{% endif %}>
+                            <label class="form-check-label" for="isActive">
+                                Settings Active
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-list-alt me-2"></i>Allowed Reasons</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">Select allowed refund reasons (leave unchecked for any):</p>
+
+                        {% set current_reasons = limit.get_allowed_reasons() %}
+                        {% for reason in default_reasons %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="allowed_reasons[]"
+                                   value="{{ reason }}" id="reason_{{ loop.index }}"
+                                   {% if reason in current_reasons %}checked{% endif %}>
+                            <label class="form-check-label" for="reason_{{ loop.index }}">
+                                {{ reason }}
+                            </label>
+                        </div>
+                        {% endfor %}
+
+                        <div class="mt-3">
+                            <label class="form-label">Custom Reasons (comma-separated)</label>
+                            <input type="text" name="custom_reasons" class="form-control"
+                                   placeholder="e.g., Special Case, VIP Customer">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="fas fa-save me-2"></i>Save Settings
+            </button>
+            <a href="{{ url_for('void_refund_controls.limits') }}" class="btn btn-outline-secondary btn-lg">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

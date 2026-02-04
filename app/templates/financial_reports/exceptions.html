@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}Exception Reports Dashboard - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-exclamation-circle text-danger me-2"></i>Exception Reports Dashboard</h2>
+            <p class="text-muted mb-0">Unusual activities requiring attention</p>
+        </div>
+        <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Reports
+        </a>
+    </div>
+
+    <!-- Date Filter -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-2"></i>Apply
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-dark bg-opacity-10 border-dark">
+                <div class="card-body text-center">
+                    <h6 class="text-dark">Total Exceptions</h6>
+                    <h2 class="mb-0">{{ summary.total_exceptions }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-danger bg-opacity-10 border-danger">
+                <div class="card-body text-center">
+                    <h6 class="text-danger">High Severity</h6>
+                    <h2 class="mb-0">{{ summary.high_severity }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-warning bg-opacity-10 border-warning">
+                <div class="card-body text-center">
+                    <h6 class="text-warning">Medium Severity</h6>
+                    <h2 class="mb-0">{{ summary.medium_severity }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if exceptions %}
+    <!-- Exception Categories -->
+    {% for exc in exceptions %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-{{ exc.severity }} {% if exc.severity == 'danger' %}text-white{% else %}text-dark{% endif %} d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                {% if exc.type == 'high_discount' %}
+                <i class="fas fa-percent me-2"></i>
+                {% elif exc.type == 'voided_sales' %}
+                <i class="fas fa-ban me-2"></i>
+                {% elif exc.type == 'large_refunds' %}
+                <i class="fas fa-undo me-2"></i>
+                {% elif exc.type == 'price_changes' %}
+                <i class="fas fa-tag me-2"></i>
+                {% elif exc.type == 'cash_variance' %}
+                <i class="fas fa-cash-register me-2"></i>
+                {% elif exc.type == 'credit_no_customer' %}
+                <i class="fas fa-user-slash me-2"></i>
+                {% elif exc.type == 'discount_abuse' %}
+                <i class="fas fa-user-secret me-2"></i>
+                {% endif %}
+                {{ exc.title }}
+            </h5>
+            <span class="badge bg-light text-dark">{{ exc.count }} items</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                    <!-- High Discount Sales -->
+                    {% if exc.type == 'high_discount' %}
+                    <thead class="table-light">
+                        <tr>
+                            <th>Sale #</th>
+                            <th>Date</th>
+                            <th class="text-end">Total</th>
+                            <th class="text-center">Discount</th>
+                            <th>Cashier</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in exc.items %}
+                        <tr>
+                            <td><code>{{ item.sale.receipt_number or item.sale.id }}</code></td>
+                            <td>{{ item.sale.sale_date.strftime('%d/%m/%Y %H:%M') if item.sale.sale_date else '-' }}</td>
+                            <td class="text-end">{{ format_currency(item.sale.total) }}</td>
+                            <td class="text-center"><span class="badge bg-warning text-dark">{{ item.value }}</span></td>
+                            <td>{{ item.sale.user.full_name if item.sale.user else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+
+                    <!-- Voided Sales -->
+                    {% elif exc.type == 'voided_sales' %}
+                    <thead class="table-light">
+                        <tr>
+                            <th>Sale #</th>
+                            <th>Date</th>
+                            <th class="text-end">Amount</th>
+                            <th>Reason</th>
+                            <th>By</th>
+                            <th>Approved By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in exc.items %}
+                        <tr>
+                            <td><code>{{ item.sale_id or '-' }}</code></td>
+                            <td>{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td class="text-end text-danger"><strong>{{ format_currency(item.voided_refunded_amount) }}</strong></td>
+                            <td>{{ item.reason or '-' }}</td>
+                            <td>{{ item.user.full_name if item.user else '-' }}</td>
+                            <td>{{ item.approved_by_user.full_name if item.approved_by_user else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <td colspan="2"><strong>Total Voided</strong></td>
+                            <td class="text-end text-danger"><strong>{{ format_currency(exc.total) }}</strong></td>
+                            <td colspan="3"></td>
+                        </tr>
+                    </tfoot>
+
+                    <!-- Large Refunds -->
+                    {% elif exc.type == 'large_refunds' %}
+                    <thead class="table-light">
+                        <tr>
+                            <th>Sale #</th>
+                            <th>Date</th>
+                            <th class="text-end">Refund Amount</th>
+                            <th>Method</th>
+                            <th>Reason</th>
+                            <th>By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in exc.items %}
+                        <tr>
+                            <td><code>{{ item.sale_id or '-' }}</code></td>
+                            <td>{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td class="text-end text-danger"><strong>{{ format_currency(item.voided_refunded_amount) }}</strong></td>
+                            <td>{{ item.refund_method or '-' }}</td>
+                            <td>{{ item.reason or '-' }}</td>
+                            <td>{{ item.user.full_name if item.user else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+
+                    <!-- Large Price Changes -->
+                    {% elif exc.type == 'price_changes' %}
+                    <thead class="table-light">
+                        <tr>
+                            <th>Product</th>
+                            <th>Price Type</th>
+                            <th class="text-end">Old Price</th>
+                            <th class="text-end">New Price</th>
+                            <th class="text-center">Change %</th>
+                            <th>Changed By</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in exc.items %}
+                        <tr>
+                            <td>{{ item.product.name if item.product else '-' }}</td>
+                            <td>{{ item.price_type|replace('_', ' ')|title }}</td>
+                            <td class="text-end">{{ format_currency(item.old_value) }}</td>
+                            <td class="text-end">{{ format_currency(item.new_value) }}</td>
+                            <td class="text-center">
+                                <span class="badge {% if item.change_percentage > 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                    {% if item.change_percentage > 0 %}+{% endif %}{{ "%.1f"|format(item.change_percentage) }}%
+                                </span>
+                            </td>
+                            <td>{{ item.user.full_name if item.user else '-' }}</td>
+                            <td>{{ item.changed_at.strftime('%d/%m/%Y') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+
+                    <!-- Cash Variances -->
+                    {% elif exc.type == 'cash_variance' %}
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Location</th>
+                            <th class="text-end">Expected</th>
+                            <th class="text-end">Actual</th>
+                            <th class="text-end">Variance</th>
+                            <th>Closed By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in exc.items %}
+                        <tr>
+                            <td>{{ item.close_date.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ item.location.name if item.location else '-' }}</td>
+                            <td class="text-end">{{ format_currency(item.expected_cash) }}</td>
+                            <td class="text-end">{{ format_currency(item.actual_cash) }}</td>
+                            <td class="text-end">
+                                <span class="{% if item.cash_variance < 0 %}text-danger{% else %}text-success{% endif %}">
+                                    <strong>{{ format_currency(item.cash_variance) }}</strong>
+                                </span>
+                            </td>
+                            <td>{{ item.closed_by_user.full_name if item.closed_by_user else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <td colspan="4"><strong>Total Absolute Variance</strong></td>
+                            <td class="text-end text-danger"><strong>{{ format_currency(exc.total) }}</strong></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+
+                    <!-- Credit Sales Without Customer -->
+                    {% elif exc.type == 'credit_no_customer' %}
+                    <thead class="table-light">
+                        <tr>
+                            <th>Sale #</th>
+                            <th>Date</th>
+                            <th class="text-end">Amount</th>
+                            <th>Cashier</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in exc.items %}
+                        <tr>
+                            <td><code>{{ item.sale.receipt_number or item.sale.id }}</code></td>
+                            <td>{{ item.sale.sale_date.strftime('%d/%m/%Y %H:%M') if item.sale.sale_date else '-' }}</td>
+                            <td class="text-end"><strong>{{ format_currency(item.sale.total) }}</strong></td>
+                            <td>{{ item.sale.user.full_name if item.sale.user else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+
+                    <!-- Discount Abuse -->
+                    {% elif exc.type == 'discount_abuse' %}
+                    <thead class="table-light">
+                        <tr>
+                            <th>User</th>
+                            <th>Date</th>
+                            <th class="text-center">Discount Count</th>
+                            <th class="text-end">Total Discounted</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in exc.items %}
+                        <tr>
+                            <td><strong>{{ item.user.full_name if item.user else 'Unknown' }}</strong></td>
+                            <td>{{ item.date.strftime('%d/%m/%Y') if item.date else '-' }}</td>
+                            <td class="text-center"><span class="badge bg-danger">{{ item.count }}</span></td>
+                            <td class="text-end">{{ format_currency(item.total) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% else %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+            <h4>No Exceptions Found</h4>
+            <p class="text-muted">No unusual activities detected for the selected period. Great job!</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

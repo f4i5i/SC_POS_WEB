@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Price History - {{ product.name }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-history text-primary me-2"></i>Price History</h2>
+            <p class="text-muted mb-0">{{ product.name }} ({{ product.sku }})</p>
+        </div>
+        <a href="{{ url_for('price_audit.index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+
+    <!-- Current Prices -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-tag me-2"></i>Current Prices</h5>
+        </div>
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col">
+                    <small class="text-muted">Selling Price</small>
+                    <h4>{{ format_currency(product.selling_price or 0) }}</h4>
+                </div>
+                <div class="col">
+                    <small class="text-muted">Cost Price</small>
+                    <h4>{{ format_currency(product.cost_price or 0) }}</h4>
+                </div>
+                <div class="col">
+                    <small class="text-muted">Base Cost</small>
+                    <h4>{{ format_currency(product.base_cost or 0) }}</h4>
+                </div>
+                <div class="col">
+                    <small class="text-muted">Packaging</small>
+                    <h4>{{ format_currency(product.packaging_cost or 0) }}</h4>
+                </div>
+                <div class="col">
+                    <small class="text-muted">Bottle</small>
+                    <h4>{{ format_currency(product.bottle_cost or 0) }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History by Type -->
+    {% for price_type, type_logs in by_type.items() %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">{{ price_type|replace('_', ' ')|title }} History ({{ type_logs|length }})</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date</th>
+                        <th class="text-end">Old Price</th>
+                        <th class="text-end">New Price</th>
+                        <th class="text-center">Change</th>
+                        <th>Changed By</th>
+                        <th>Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in type_logs %}
+                    <tr>
+                        <td>{{ log.changed_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td class="text-end">{{ format_currency(log.old_value) }}</td>
+                        <td class="text-end">{{ format_currency(log.new_value) }}</td>
+                        <td class="text-center">
+                            {% if log.change_percentage > 0 %}
+                            <span class="badge bg-success">+{{ "%.1f"|format(log.change_percentage) }}%</span>
+                            {% else %}
+                            <span class="badge bg-danger">{{ "%.1f"|format(log.change_percentage) }}%</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.user.full_name if log.user else 'N/A' }}</td>
+                        <td>{{ log.reason or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if not logs %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-history fa-3x text-muted mb-3"></i>
+            <h4>No Price History</h4>
+            <p class="text-muted">No price changes recorded for this product.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

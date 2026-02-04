@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Batch {{ order.order_number }} - Cost Detail - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-file-invoice-dollar text-primary me-2"></i>Batch Cost Detail</h2>
+            <p class="text-muted mb-0">Order: <code>{{ order.order_number }}</code></p>
+        </div>
+        <a href="{{ url_for('production_reports.batch_costing') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Report
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Order Info -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Order Information</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td class="text-muted">Order #</td>
+                            <td><code>{{ order.order_number }}</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Recipe</td>
+                            <td>{{ order.recipe.name if order.recipe else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Status</td>
+                            <td><span class="badge bg-success">{{ order.status|title }}</span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Planned Qty</td>
+                            <td>{{ order.planned_quantity|int }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Actual Qty</td>
+                            <td><strong>{{ (order.actual_quantity or order.planned_quantity)|int }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Completed</td>
+                            <td>{{ order.completed_at.strftime('%d/%m/%Y %H:%M') if order.completed_at else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Location</td>
+                            <td>{{ order.location.name if order.location else '-' }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cost Summary -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Cost Summary</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr>
+                            <td>Material Cost</td>
+                            <td class="text-end">{{ format_currency(cost_breakdown.material_cost) }}</td>
+                        </tr>
+                        <tr>
+                            <td>Labor Cost</td>
+                            <td class="text-end">{{ format_currency(cost_breakdown.labor_cost) }}</td>
+                        </tr>
+                        <tr>
+                            <td>Overhead (10%)</td>
+                            <td class="text-end">{{ format_currency(cost_breakdown.overhead_cost) }}</td>
+                        </tr>
+                        <tr class="table-primary">
+                            <th>Total Cost</th>
+                            <th class="text-end">{{ format_currency(cost_breakdown.total_cost) }}</th>
+                        </tr>
+                    </table>
+                    <hr>
+                    <div class="text-center">
+                        <h6 class="text-muted">Unit Cost</h6>
+                        <h2 class="text-primary">{{ format_currency(cost_breakdown.unit_cost) }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Variance Summary -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm h-100 {% if material_variance.total_variance_cost < 0 %}border-danger{% elif material_variance.total_variance_cost > 0 %}border-warning{% endif %}">
+                <div class="card-header {% if material_variance.total_variance_cost < 0 %}bg-danger text-white{% elif material_variance.total_variance_cost > 0 %}bg-warning{% endif %}">
+                    <h5 class="mb-0"><i class="fas fa-balance-scale me-2"></i>Material Variance</h5>
+                </div>
+                <div class="card-body text-center">
+                    {% if material_variance.items %}
+                    <h3 class="{% if material_variance.total_variance_cost < 0 %}text-danger{% elif material_variance.total_variance_cost > 0 %}text-warning{% else %}text-success{% endif %}">
+                        {{ format_currency(material_variance.total_variance_cost|abs) }}
+                    </h3>
+                    <p class="text-muted mb-0">
+                        {% if material_variance.total_variance_cost < 0 %}
+                        Over Budget
+                        {% elif material_variance.total_variance_cost > 0 %}
+                        Under Budget
+                        {% else %}
+                        On Target
+                        {% endif %}
+                    </p>
+                    {% else %}
+                    <div class="text-muted py-3">
+                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                        <p>No variance data</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Material Breakdown -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-cubes me-2"></i>Material Cost Breakdown</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if cost_breakdown.materials %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Material</th>
+                            <th class="text-end">Quantity</th>
+                            <th class="text-end">Unit Cost</th>
+                            <th class="text-end">Total Cost</th>
+                            <th class="text-end">% of Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mat in cost_breakdown.materials %}
+                        <tr>
+                            <td>
+                                <strong>{{ mat.material.name if mat.material else '-' }}</strong>
+                                {% if mat.material %}
+                                <br><small class="text-muted">{{ mat.material.category.unit if mat.material.category else 'units' }}</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">{{ "%.2f"|format(mat.quantity) }}</td>
+                            <td class="text-end">{{ format_currency(mat.unit_cost) }}</td>
+                            <td class="text-end"><strong>{{ format_currency(mat.total_cost) }}</strong></td>
+                            <td class="text-end">
+                                {% if cost_breakdown.material_cost > 0 %}
+                                {{ "%.1f"|format(mat.total_cost / cost_breakdown.material_cost * 100) }}%
+                                {% else %}
+                                0%
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <th colspan="3">Total Material Cost</th>
+                            <th class="text-end">{{ format_currency(cost_breakdown.material_cost) }}</th>
+                            <th class="text-end">100%</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted">
+                <i class="fas fa-inbox fa-2x mb-2"></i>
+                <p>No material consumption recorded</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Material Variance Details -->
+    {% if material_variance.items %}
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>Material Variance Details</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Material</th>
+                            <th class="text-end">Expected</th>
+                            <th class="text-end">Actual</th>
+                            <th class="text-end">Variance</th>
+                            <th class="text-end">Cost Impact</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in material_variance.items %}
+                        <tr class="{% if item.variance > 0 %}table-danger{% elif item.variance < 0 %}table-success{% endif %}">
+                            <td>{{ item.material.name if item.material else '-' }}</td>
+                            <td class="text-end">{{ "%.2f"|format(item.expected) }}</td>
+                            <td class="text-end">{{ "%.2f"|format(item.actual) }}</td>
+                            <td class="text-end {% if item.variance > 0 %}text-danger{% elif item.variance < 0 %}text-success{% endif %}">
+                                {% if item.variance > 0 %}+{% endif %}{{ "%.2f"|format(item.variance) }}
+                            </td>
+                            <td class="text-end {% if item.variance_cost > 0 %}text-danger{% elif item.variance_cost < 0 %}text-success{% endif %}">
+                                {{ format_currency(item.variance_cost|abs) }}
+                                {% if item.variance_cost > 0 %}(over){% elif item.variance_cost < 0 %}(under){% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <th colspan="4">Total Variance Cost</th>
+                            <th class="text-end {% if material_variance.total_variance_cost > 0 %}text-danger{% else %}text-success{% endif %}">
+                                {{ format_currency(material_variance.total_variance_cost|abs) }}
+                            </th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

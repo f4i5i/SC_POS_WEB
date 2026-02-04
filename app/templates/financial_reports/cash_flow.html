@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+
+{% block title %}Cash Flow Report - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-money-bill-wave text-success me-2"></i>Cash Flow Report</h2>
+            <p class="text-muted mb-0">Track inflows and outflows of cash</p>
+        </div>
+        <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Reports
+        </a>
+    </div>
+
+    <!-- Date Filter -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-2"></i>Apply
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-success bg-opacity-10 border-success h-100">
+                <div class="card-body">
+                    <h6 class="text-success mb-3"><i class="fas fa-arrow-down me-2"></i>Total Inflows</h6>
+                    <h2 class="mb-3">{{ format_currency(total_inflow) }}</h2>
+                    <hr>
+                    <div class="row small">
+                        <div class="col-6">
+                            <span class="text-muted">Cash Sales</span>
+                            <div><strong>{{ format_currency(cash_sales) }}</strong></div>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Card Sales</span>
+                            <div><strong>{{ format_currency(card_sales) }}</strong></div>
+                        </div>
+                    </div>
+                    <div class="row small mt-2">
+                        <div class="col-6">
+                            <span class="text-muted">Digital</span>
+                            <div><strong>{{ format_currency(digital_sales) }}</strong></div>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Bank Transfer</span>
+                            <div><strong>{{ format_currency(bank_sales) }}</strong></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-danger bg-opacity-10 border-danger h-100">
+                <div class="card-body">
+                    <h6 class="text-danger mb-3"><i class="fas fa-arrow-up me-2"></i>Total Outflows</h6>
+                    <h2 class="mb-3">{{ format_currency(total_outflow) }}</h2>
+                    <hr>
+                    <div class="row small">
+                        <div class="col-6">
+                            <span class="text-muted">Expenses</span>
+                            <div><strong>{{ format_currency(total_expenses) }}</strong></div>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Refunds</span>
+                            <div><strong>{{ format_currency(total_refunds) }}</strong></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card {% if net_cash_flow >= 0 %}bg-primary{% else %}bg-warning{% endif %} bg-opacity-10 border-{% if net_cash_flow >= 0 %}primary{% else %}warning{% endif %} h-100">
+                <div class="card-body">
+                    <h6 class="{% if net_cash_flow >= 0 %}text-primary{% else %}text-warning{% endif %} mb-3">
+                        <i class="fas fa-chart-line me-2"></i>Net Cash Flow
+                    </h6>
+                    <h2 class="mb-3 {% if net_cash_flow < 0 %}text-danger{% endif %}">
+                        {{ format_currency(net_cash_flow) }}
+                    </h2>
+                    <hr>
+                    <div class="small">
+                        <span class="text-muted">Cash Flow Ratio</span>
+                        <div>
+                            {% if total_outflow > 0 %}
+                            <strong>{{ "%.2f"|format(total_inflow / total_outflow) }}:1</strong>
+                            {% else %}
+                            <strong>N/A</strong>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Daily Cash Flow Chart -->
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-area me-2"></i>Daily Cash Flow</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="cashFlowChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Expense Breakdown -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-pie-chart me-2"></i>Expense Breakdown</h5>
+                </div>
+                <div class="card-body">
+                    {% if expense_by_category %}
+                    <canvas id="expenseChart" height="250"></canvas>
+                    <ul class="list-group list-group-flush mt-3">
+                        {% for cat, total in expense_by_category %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>{{ cat or 'Other' }}</span>
+                            <strong>{{ format_currency(total) }}</strong>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-receipt fa-2x mb-2"></i>
+                        <p>No expenses recorded</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Daily Breakdown Table -->
+    <div class="card shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Daily Breakdown</h5>
+            <button class="btn btn-sm btn-outline-primary" onclick="exportTable()">
+                <i class="fas fa-download me-2"></i>Export
+            </button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="dailyTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th class="text-end">Inflows</th>
+                            <th class="text-end">Outflows</th>
+                            <th class="text-end">Net Flow</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for day in daily_data %}
+                        <tr>
+                            <td>{{ day.date.strftime('%a, %d/%m/%Y') }}</td>
+                            <td class="text-end text-success">{{ format_currency(day.inflow) }}</td>
+                            <td class="text-end text-danger">{{ format_currency(day.outflow) }}</td>
+                            <td class="text-end {% if day.net >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                <strong>{{ format_currency(day.net) }}</strong>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Cash Flow Chart
+const dailyData = {{ daily_data|tojson|safe }};
+const labels = dailyData.map(d => d.date);
+const inflows = dailyData.map(d => d.inflow);
+const outflows = dailyData.map(d => d.outflow);
+const netFlow = dailyData.map(d => d.net);
+
+new Chart(document.getElementById('cashFlowChart'), {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [
+            {
+                label: 'Inflows',
+                data: inflows,
+                borderColor: '#198754',
+                backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                fill: true,
+                tension: 0.3
+            },
+            {
+                label: 'Outflows',
+                data: outflows,
+                borderColor: '#dc3545',
+                backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                fill: true,
+                tension: 0.3
+            },
+            {
+                label: 'Net Flow',
+                data: netFlow,
+                borderColor: '#0d6efd',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.3
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'top' }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return 'Rs. ' + value.toLocaleString();
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Expense Chart
+{% if expense_by_category %}
+const expenseLabels = {{ [cat or 'Other' for cat, total in expense_by_category]|tojson|safe }};
+const expenseData = {{ [float(total) for cat, total in expense_by_category]|tojson|safe }};
+
+new Chart(document.getElementById('expenseChart'), {
+    type: 'doughnut',
+    data: {
+        labels: expenseLabels,
+        datasets: [{
+            data: expenseData,
+            backgroundColor: ['#dc3545', '#fd7e14', '#ffc107', '#20c997', '#0dcaf0', '#6f42c1']
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12 } }
+        }
+    }
+});
+{% endif %}
+
+function exportTable() {
+    const table = document.getElementById('dailyTable');
+    let csv = [];
+    const rows = table.querySelectorAll('tr');
+
+    for (const row of rows) {
+        const cols = row.querySelectorAll('td, th');
+        const rowData = [];
+        for (const col of cols) {
+            rowData.push('"' + col.innerText.replace(/"/g, '""') + '"');
+        }
+        csv.push(rowData.join(','));
+    }
+
+    const csvContent = csv.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'cash_flow_report.csv';
+    a.click();
+}
+</script>
+{% endblock %}

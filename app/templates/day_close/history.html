@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Day Close History - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-history text-primary me-2"></i>Day Close History</h2>
+            <p class="text-muted mb-0">Review past day closes and reconciliation</p>
+        </div>
+        <div>
+            <a href="{{ url_for('day_close.index') }}" class="btn btn-primary">
+                <i class="fas fa-cash-register me-2"></i>Close Today
+            </a>
+            {% if pending_approvals > 0 %}
+            <a href="{{ url_for('day_close.pending_approvals') }}" class="btn btn-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>Pending Approvals ({{ pending_approvals }})
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                {% if current_user.is_global_admin %}
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>
+                            {{ loc.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ from_date or '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control" value="{{ to_date or '' }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-2"></i>Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="text-white-50">Total Revenue</h6>
+                    <h3 class="mb-0">{{ format_currency(total_revenue) }}</h3>
+                    <small>{{ day_closes|length }} day closes</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 {% if total_variance == 0 %}bg-success{% elif total_variance > 0 %}bg-warning{% else %}bg-danger{% endif %} text-white">
+                <div class="card-body">
+                    <h6 class="{% if total_variance != 0 and total_variance < 0 %}text-white-50{% else %}text-dark-50{% endif %}">Total Variance</h6>
+                    <h3 class="mb-0 {% if total_variance < 0 %}text-white{% endif %}">{{ format_currency(total_variance) }}</h3>
+                    <small>{% if total_variance == 0 %}Perfect{% elif total_variance > 0 %}Over{% else %}Short{% endif %}</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 {% if pending_approvals > 0 %}bg-warning text-dark{% else %}bg-success text-white{% endif %}">
+                <div class="card-body">
+                    <h6 class="{% if pending_approvals > 0 %}text-dark-50{% else %}text-white-50{% endif %}">Pending Approvals</h6>
+                    <h3 class="mb-0">{{ pending_approvals }}</h3>
+                    <small>Variance approvals</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Day Close List -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Location</th>
+                            <th>Z-Report #</th>
+                            <th class="text-center">Sales</th>
+                            <th class="text-end">Revenue</th>
+                            <th class="text-end">Expected</th>
+                            <th class="text-end">Counted</th>
+                            <th class="text-end">Variance</th>
+                            <th class="text-center">Status</th>
+                            <th>Closed By</th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for dc in day_closes %}
+                        <tr>
+                            <td>
+                                <strong>{{ dc.close_date.strftime('%d %b %Y') }}</strong>
+                                <div class="small text-muted">{{ dc.close_date.strftime('%A') }}</div>
+                            </td>
+                            <td>
+                                <span class="badge {% if dc.location.location_type == 'warehouse' %}bg-primary{% else %}bg-secondary{% endif %}">
+                                    {{ dc.location.name if dc.location else 'N/A' }}
+                                </span>
+                            </td>
+                            <td><code>{{ dc.z_report_number or '-' }}</code></td>
+                            <td class="text-center">{{ dc.total_sales }}</td>
+                            <td class="text-end">{{ format_currency(dc.net_sales or 0) }}</td>
+                            <td class="text-end">{{ format_currency(dc.expected_cash or 0) }}</td>
+                            <td class="text-end">{{ format_currency(dc.closing_balance or 0) }}</td>
+                            <td class="text-end">
+                                {% if dc.cash_variance == 0 %}
+                                <span class="badge bg-success">Rs. 0</span>
+                                {% elif dc.cash_variance > 0 %}
+                                <span class="badge bg-warning text-dark">+{{ format_currency(dc.cash_variance) }}</span>
+                                {% else %}
+                                <span class="badge bg-danger">{{ format_currency(dc.cash_variance) }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if dc.cash_variance == 0 %}
+                                <span class="badge bg-success"><i class="fas fa-check"></i></span>
+                                {% elif dc.variance_status == 'approved' %}
+                                <span class="badge bg-success">Approved</span>
+                                {% elif dc.variance_status == 'rejected' %}
+                                <span class="badge bg-danger">Rejected</span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small>{{ dc.user.full_name if dc.user else 'N/A' }}</small>
+                                <div class="small text-muted">{{ dc.closed_at.strftime('%H:%M') if dc.closed_at else '' }}</div>
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ url_for('day_close.detail', close_id=dc.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{{ url_for('day_close.z_report', close_id=dc.id) }}" class="btn btn-sm btn-outline-secondary" title="Z-Report">
+                                    <i class="fas fa-file-alt"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not day_closes %}
+                        <tr>
+                            <td colspan="11" class="text-center py-4 text-muted">
+                                <i class="fas fa-inbox fa-2x mb-2"></i>
+                                <p class="mb-0">No day closes found</p>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

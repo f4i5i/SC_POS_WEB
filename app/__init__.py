@@ -164,6 +164,30 @@ def create_app(config_name='default'):
     from app.routes.purchase_orders import bp as purchase_orders_bp
     app.register_blueprint(purchase_orders_bp)  # url_prefix is in blueprint
 
+    from app.routes.day_close import bp as day_close_bp
+    app.register_blueprint(day_close_bp)  # url_prefix is in blueprint
+
+    from app.routes.discount_controls import bp as discount_controls_bp
+    app.register_blueprint(discount_controls_bp)  # url_prefix is in blueprint
+
+    from app.routes.void_refund_controls import bp as void_refund_controls_bp
+    app.register_blueprint(void_refund_controls_bp)  # url_prefix is in blueprint
+
+    from app.routes.price_audit import bp as price_audit_bp
+    app.register_blueprint(price_audit_bp)  # url_prefix is in blueprint
+
+    from app.routes.financial_reports import bp as financial_reports_bp
+    app.register_blueprint(financial_reports_bp)  # url_prefix is in blueprint
+
+    from app.routes.batch_tracking import bp as batch_tracking_bp
+    app.register_blueprint(batch_tracking_bp)  # url_prefix is in blueprint
+
+    from app.routes.customer_credit import bp as customer_credit_bp
+    app.register_blueprint(customer_credit_bp)  # url_prefix is in blueprint
+
+    from app.routes.production_reports import bp as production_reports_bp
+    app.register_blueprint(production_reports_bp)  # url_prefix is in blueprint
+
     # Register main routes
     @app.route('/')
     def index():

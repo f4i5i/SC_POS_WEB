@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Price Change Summary - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-chart-bar text-primary me-2"></i>Price Change Summary</h2>
+            <p class="text-muted mb-0">{{ from_date }} to {{ to_date }}</p>
+        </div>
+        <a href="{{ url_for('price_audit.index') }}" class="btn btn-outline-primary">
+            <i class="fas fa-list me-2"></i>View All Changes
+        </a>
+    </div>
+
+    <!-- Date Filter -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" class="form-control" name="from_date" value="{{ from_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" class="form-control" name="to_date" value="{{ to_date }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-sync me-2"></i>Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-primary border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Total Changes</h6>
+                    <h2>{{ total_changes }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-success border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Price Increases</h6>
+                    <h2 class="text-success">{{ increases }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-danger border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Price Decreases</h6>
+                    <h2 class="text-danger">{{ decreases }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-info border-4">
+                <div class="card-body">
+                    <h6 class="text-muted">Increase Ratio</h6>
+                    <h2 class="text-info">
+                        {% if total_changes > 0 %}{{ "%.0f"|format(increases/total_changes*100) }}%{% else %}0%{% endif %}
+                    </h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- By Price Type -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-tags me-2"></i>By Price Type</h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Price Type</th>
+                                <th class="text-center">Changes</th>
+                                <th class="text-end">Avg Change %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in by_type %}
+                            <tr>
+                                <td><span class="badge bg-secondary">{{ row.price_type|replace('_', ' ')|title }}</span></td>
+                                <td class="text-center">{{ row.count }}</td>
+                                <td class="text-end">
+                                    {% if row.avg_change %}
+                                        {% if row.avg_change > 0 %}
+                                        <span class="text-success">+{{ "%.1f"|format(row.avg_change) }}%</span>
+                                        {% else %}
+                                        <span class="text-danger">{{ "%.1f"|format(row.avg_change) }}%</span>
+                                        {% endif %}
+                                    {% else %}0%{% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% if not by_type %}
+                            <tr><td colspan="3" class="text-center text-muted py-3">No data</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- By User -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-users me-2"></i>By User</h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>User</th>
+                                <th class="text-center">Changes Made</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in by_user %}
+                            <tr>
+                                <td>{{ row.full_name }}</td>
+                                <td class="text-center">{{ row.count }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% if not by_user %}
+                            <tr><td colspan="2" class="text-center text-muted py-3">No data</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Large Changes -->
+    {% if large_changes %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Large Price Changes (>20%)</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date</th>
+                        <th>Product</th>
+                        <th>Type</th>
+                        <th class="text-end">Old</th>
+                        <th class="text-end">New</th>
+                        <th class="text-center">Change</th>
+                        <th>User</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in large_changes %}
+                    <tr>
+                        <td>{{ log.changed_at.strftime('%d/%m/%Y') }}</td>
+                        <td>{{ log.product.name if log.product else 'Unknown' }}</td>
+                        <td><span class="badge bg-secondary">{{ log.price_type|replace('_', ' ')|title }}</span></td>
+                        <td class="text-end">{{ format_currency(log.old_value) }}</td>
+                        <td class="text-end">{{ format_currency(log.new_value) }}</td>
+                        <td class="text-center">
+                            {% if log.change_percentage > 0 %}
+                            <span class="badge bg-success fs-6">+{{ "%.1f"|format(log.change_percentage) }}%</span>
+                            {% else %}
+                            <span class="badge bg-danger fs-6">{{ "%.1f"|format(log.change_percentage) }}%</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.user.full_name if log.user else 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}Z-Report {{ day_close.z_report_number }} - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+        <div>
+            <h2><i class="fas fa-file-alt text-primary me-2"></i>Z-Report</h2>
+            <p class="text-muted mb-0">End of Day Report</p>
+        </div>
+        <div>
+            <button onclick="window.print()" class="btn btn-primary">
+                <i class="fas fa-print me-2"></i>Print
+            </button>
+            <a href="{{ url_for('day_close.detail', close_id=day_close.id) }}" class="btn btn-outline-secondary ms-2">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm" id="zReportCard">
+        <div class="card-body">
+            <!-- Header -->
+            <div class="text-center mb-4">
+                <h3 class="mb-1">{{ business_name }}</h3>
+                <p class="mb-0">{{ day_close.location.name if day_close.location else '' }}</p>
+                <p class="mb-0 text-muted">{{ day_close.location.address if day_close.location else '' }}</p>
+                <hr>
+                <h4 class="mb-0">Z-REPORT</h4>
+                <p class="mb-0"><strong>{{ day_close.z_report_number }}</strong></p>
+                <p class="mb-0">{{ day_close.close_date.strftime('%A, %B %d, %Y') }}</p>
+            </div>
+
+            <!-- Report Details -->
+            <div class="row">
+                <div class="col-md-6">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td class="text-muted">Report Date:</td>
+                            <td class="text-end">{{ day_close.close_date.strftime('%d/%m/%Y') }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Closed By:</td>
+                            <td class="text-end">{{ day_close.user.full_name if day_close.user else 'N/A' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Closed At:</td>
+                            <td class="text-end">{{ day_close.closed_at.strftime('%H:%M:%S') if day_close.closed_at else 'N/A' }}</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td class="text-muted">Location:</td>
+                            <td class="text-end">{{ day_close.location.name if day_close.location else 'N/A' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Total Transactions:</td>
+                            <td class="text-end">{{ day_close.total_sales }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <hr>
+
+            <!-- Sales Summary -->
+            <h5 class="mb-3">SALES SUMMARY</h5>
+            <table class="table table-sm">
+                <tr>
+                    <td>Gross Sales</td>
+                    <td class="text-end">{{ format_currency(day_close.gross_sales or 0) }}</td>
+                </tr>
+                <tr>
+                    <td>(-) Discounts</td>
+                    <td class="text-end text-danger">{{ format_currency(day_close.total_discounts or 0) }}</td>
+                </tr>
+                <tr>
+                    <td>(+) Tax</td>
+                    <td class="text-end">{{ format_currency(day_close.total_tax or 0) }}</td>
+                </tr>
+                <tr class="table-dark fw-bold">
+                    <td>NET SALES</td>
+                    <td class="text-end">{{ format_currency(day_close.net_sales or 0) }}</td>
+                </tr>
+                {% if day_close.total_refunds > 0 %}
+                <tr class="text-danger">
+                    <td>Refunds</td>
+                    <td class="text-end">{{ format_currency(day_close.total_refunds) }}</td>
+                </tr>
+                {% endif %}
+            </table>
+
+            <hr>
+
+            <!-- Payment Breakdown -->
+            <h5 class="mb-3">PAYMENT BREAKDOWN</h5>
+            <table class="table table-sm">
+                <tr>
+                    <td>Cash</td>
+                    <td class="text-end">{{ format_currency(day_close.total_cash or 0) }}</td>
+                </tr>
+                <tr>
+                    <td>Card</td>
+                    <td class="text-end">{{ format_currency(day_close.total_card or 0) }}</td>
+                </tr>
+                <tr>
+                    <td>EasyPaisa</td>
+                    <td class="text-end">{{ format_currency(day_close.total_easypaisa or 0) }}</td>
+                </tr>
+                <tr>
+                    <td>JazzCash</td>
+                    <td class="text-end">{{ format_currency(day_close.total_jazzcash or 0) }}</td>
+                </tr>
+                <tr>
+                    <td>Bank Transfer</td>
+                    <td class="text-end">{{ format_currency(day_close.total_bank_transfer or 0) }}</td>
+                </tr>
+                <tr>
+                    <td>Credit</td>
+                    <td class="text-end">{{ format_currency(day_close.total_credit or 0) }}</td>
+                </tr>
+                <tr class="table-primary fw-bold">
+                    <td>TOTAL</td>
+                    <td class="text-end">{{ format_currency(day_close.total_revenue or 0) }}</td>
+                </tr>
+            </table>
+
+            <hr>
+
+            <!-- Cash Drawer -->
+            <h5 class="mb-3">CASH DRAWER RECONCILIATION</h5>
+            <table class="table table-sm">
+                <tr>
+                    <td>Opening Balance</td>
+                    <td class="text-end">{{ format_currency(day_close.opening_balance or 0) }}</td>
+                </tr>
+                <tr>
+                    <td>(+) Cash Sales</td>
+                    <td class="text-end">{{ format_currency(day_close.total_cash or 0) }}</td>
+                </tr>
+                {% if day_close.cash_in > 0 %}
+                <tr>
+                    <td>(+) Cash In</td>
+                    <td class="text-end">{{ format_currency(day_close.cash_in) }}</td>
+                </tr>
+                {% endif %}
+                {% if day_close.cash_out > 0 %}
+                <tr>
+                    <td>(-) Cash Out</td>
+                    <td class="text-end">{{ format_currency(day_close.cash_out) }}</td>
+                </tr>
+                {% endif %}
+                <tr class="table-secondary fw-bold">
+                    <td>EXPECTED CASH</td>
+                    <td class="text-end">{{ format_currency(day_close.expected_cash or 0) }}</td>
+                </tr>
+                <tr class="fw-bold">
+                    <td>COUNTED CASH</td>
+                    <td class="text-end">{{ format_currency(day_close.closing_balance or 0) }}</td>
+                </tr>
+                <tr class="{% if day_close.cash_variance == 0 %}table-success{% elif day_close.cash_variance > 0 %}table-warning{% else %}table-danger{% endif %} fw-bold">
+                    <td>VARIANCE</td>
+                    <td class="text-end">
+                        {% if day_close.cash_variance > 0 %}+{% endif %}{{ format_currency(day_close.cash_variance or 0) }}
+                        {% if day_close.cash_variance != 0 %}
+                        ({{ day_close.variance_status|capitalize }})
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+
+            <hr>
+
+            <!-- Hourly Breakdown -->
+            {% if hourly_sales %}
+            <h5 class="mb-3">HOURLY SALES</h5>
+            <table class="table table-sm">
+                <thead class="table-light">
+                    <tr>
+                        <th>Hour</th>
+                        <th class="text-center">Transactions</th>
+                        <th class="text-end">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for hour in range(24) %}
+                    {% if hour in hourly_sales %}
+                    <tr>
+                        <td>{{ '%02d:00'|format(hour) }} - {{ '%02d:59'|format(hour) }}</td>
+                        <td class="text-center">{{ hourly_sales[hour].count }}</td>
+                        <td class="text-end">{{ format_currency(hourly_sales[hour].total) }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            <!-- Footer -->
+            <hr>
+            <div class="text-center mt-4">
+                <p class="mb-1">*** END OF Z-REPORT ***</p>
+                <p class="mb-0 small text-muted">Generated on {{ now().strftime('%d/%m/%Y %H:%M:%S') if now else '' }}</p>
+            </div>
+
+            <!-- Signatures -->
+            <div class="row mt-5">
+                <div class="col-6 text-center">
+                    <div class="border-top pt-2 mx-4">
+                        <small>Cashier Signature</small>
+                    </div>
+                </div>
+                <div class="col-6 text-center">
+                    <div class="border-top pt-2 mx-4">
+                        <small>Manager Signature</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .no-print { display: none !important; }
+    .card { box-shadow: none !important; border: none !important; }
+    .sidebar, .navbar { display: none !important; }
+    .main-content { margin-left: 0 !important; padding: 0 !important; }
+    body { font-size: 12pt; }
+    #zReportCard { max-width: 80mm; margin: 0 auto; }
+}
+</style>
+{% endblock %}

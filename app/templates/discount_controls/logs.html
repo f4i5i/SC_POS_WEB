@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Discount Logs - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-history text-primary me-2"></i>Discount Audit Log</h2>
+            <p class="text-muted mb-0">All discounts applied in the system</p>
+        </div>
+        <div>
+            <a href="{{ url_for('discount_controls.summary') }}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-chart-bar me-2"></i>Summary
+            </a>
+            <a href="{{ url_for('discount_controls.limits') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-sliders-h me-2"></i>Limits
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Card -->
+    <div class="card shadow-sm mb-4 bg-light">
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col-md-3">
+                    <h5 class="text-primary mb-0">{{ logs|length }}</h5>
+                    <small class="text-muted">Discounts Shown</small>
+                </div>
+                <div class="col-md-3">
+                    <h5 class="text-danger mb-0">{{ format_currency(total_discounts) }}</h5>
+                    <small class="text-muted">Total Discount Amount</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-2">
+                    <label class="form-label">User</label>
+                    <select name="user_id" class="form-select">
+                        <option value="">All Users</option>
+                        {% for user in users %}
+                        <option value="{{ user.id }}" {% if user_id == user.id %}selected{% endif %}>
+                            {{ user.full_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Reason</label>
+                    <select name="reason" class="form-select">
+                        <option value="">All Reasons</option>
+                        {% for r in unique_reasons %}
+                        <option value="{{ r }}" {% if reason == r %}selected{% endif %}>{{ r }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">From Date</label>
+                    <input type="date" class="form-control" name="from_date" value="{{ from_date or '' }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">To Date</label>
+                    <input type="date" class="form-control" name="to_date" value="{{ to_date or '' }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Min Amount</label>
+                    <input type="number" class="form-control" name="min_amount"
+                           value="{{ min_amount or '' }}" placeholder="e.g., 100">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-filter me-1"></i>Filter
+                    </button>
+                    <a href="{{ url_for('discount_controls.logs') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date/Time</th>
+                            <th>User</th>
+                            <th>Sale #</th>
+                            <th>Product</th>
+                            <th class="text-end">Original</th>
+                            <th class="text-end">Discount</th>
+                            <th class="text-end">Final</th>
+                            <th>Reason</th>
+                            <th class="text-center">Approval</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td>
+                                <small>{{ log.created_at.strftime('%d/%m/%Y') }}</small>
+                                <div class="text-muted small">{{ log.created_at.strftime('%H:%M') }}</div>
+                            </td>
+                            <td>
+                                {{ log.user.full_name if log.user else 'N/A' }}
+                                <div class="text-muted small">{{ log.user.role if log.user else '' }}</div>
+                            </td>
+                            <td>
+                                {% if log.sale %}
+                                <a href="{{ url_for('pos.sale_detail', sale_id=log.sale_id) }}">
+                                    #{{ log.sale_id }}
+                                </a>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if log.product_name %}
+                                {{ log.product_name[:20] }}{% if log.product_name|length > 20 %}...{% endif %}
+                                {% else %}
+                                <span class="text-muted">Sale-level</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">{{ format_currency(log.original_price or 0) }}</td>
+                            <td class="text-end text-danger">
+                                <strong>-{{ format_currency(log.discount_amount) }}</strong>
+                                {% if log.discount_percentage %}
+                                <div class="small">({{ log.discount_percentage }}%)</div>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">{{ format_currency(log.discounted_price or 0) }}</td>
+                            <td>
+                                <span class="badge bg-secondary">{{ log.discount_reason }}</span>
+                            </td>
+                            <td class="text-center">
+                                {% if log.required_approval %}
+                                    {% if log.approval_id %}
+                                    <i class="fas fa-check-circle text-success" title="Approved"></i>
+                                    {% else %}
+                                    <i class="fas fa-exclamation-circle text-warning" title="Pending"></i>
+                                    {% endif %}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not logs %}
+                        <tr>
+                            <td colspan="9" class="text-center py-4 text-muted">
+                                No discount logs found for the selected criteria.
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

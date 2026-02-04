@@ -3,7 +3,7 @@ Database Models
 SQLAlchemy ORM models for the POS system
 """
 
-from datetime import datetime
+from datetime import datetime, date
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -1075,6 +1075,29 @@ class DayClose(db.Model):
     expected_cash = db.Column(db.Numeric(12, 2), default=0.00)
     cash_variance = db.Column(db.Numeric(12, 2), default=0.00)  # Difference between actual and expected
 
+    # Denomination counting (Pakistani currency)
+    denom_5000 = db.Column(db.Integer, default=0)  # Rs. 5000 notes
+    denom_1000 = db.Column(db.Integer, default=0)  # Rs. 1000 notes
+    denom_500 = db.Column(db.Integer, default=0)   # Rs. 500 notes
+    denom_100 = db.Column(db.Integer, default=0)   # Rs. 100 notes
+    denom_50 = db.Column(db.Integer, default=0)    # Rs. 50 notes
+    denom_20 = db.Column(db.Integer, default=0)    # Rs. 20 notes
+    denom_10 = db.Column(db.Integer, default=0)    # Rs. 10 notes/coins
+    denom_5 = db.Column(db.Integer, default=0)     # Rs. 5 coins
+    denom_2 = db.Column(db.Integer, default=0)     # Rs. 2 coins
+    denom_1 = db.Column(db.Integer, default=0)     # Rs. 1 coins
+    counted_total = db.Column(db.Numeric(12, 2), default=0.00)  # Total from denomination count
+
+    # Cash movements during the day
+    cash_in = db.Column(db.Numeric(12, 2), default=0.00)   # Cash added to drawer (e.g., change)
+    cash_out = db.Column(db.Numeric(12, 2), default=0.00)  # Cash removed (e.g., expenses, deposits)
+
+    # Variance approval (for discrepancies)
+    variance_status = db.Column(db.String(32), default='pending')  # pending, approved, rejected
+    variance_approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    variance_approved_at = db.Column(db.DateTime)
+    variance_reason = db.Column(db.Text)  # Explanation for variance
+
     # Detailed payment breakdown for Z-Report
     total_easypaisa = db.Column(db.Numeric(12, 2), default=0.00)
     total_jazzcash = db.Column(db.Numeric(12, 2), default=0.00)
@@ -1102,11 +1125,100 @@ class DayClose(db.Model):
     closed_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
-    user = db.relationship('User')
+    user = db.relationship('User', foreign_keys=[closed_by])
     location = db.relationship('Location', backref=db.backref('day_closes', lazy='dynamic'))
+    approved_by_user = db.relationship('User', foreign_keys=[variance_approved_by])
 
     def __repr__(self):
         return f'<DayClose {self.close_date}>'
+
+    def calculate_denomination_total(self):
+        """Calculate total from denomination counts"""
+        total = (
+            (self.denom_5000 or 0) * 5000 +
+            (self.denom_1000 or 0) * 1000 +
+            (self.denom_500 or 0) * 500 +
+            (self.denom_100 or 0) * 100 +
+            (self.denom_50 or 0) * 50 +
+            (self.denom_20 or 0) * 20 +
+            (self.denom_10 or 0) * 10 +
+            (self.denom_5 or 0) * 5 +
+            (self.denom_2 or 0) * 2 +
+            (self.denom_1 or 0) * 1
+        )
+        return total
+
+
+class InventorySpotCheck(db.Model):
+    """Inventory spot check during day close - for daily/fortnightly verification"""
+    __tablename__ = 'inventory_spot_checks'
+
+    id = db.Column(db.Integer, primary_key=True)
+    day_close_id = db.Column(db.Integer, db.ForeignKey('day_closes.id'), index=True)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False, index=True)
+    checked_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    check_date = db.Column(db.Date, nullable=False, index=True)
+    check_type = db.Column(db.String(32), default='daily')  # daily, weekly, fortnightly, monthly, random
+
+    # Summary
+    total_items_checked = db.Column(db.Integer, default=0)
+    items_matched = db.Column(db.Integer, default=0)
+    items_variance = db.Column(db.Integer, default=0)
+    total_variance_value = db.Column(db.Numeric(12, 2), default=0.00)
+
+    # Status
+    status = db.Column(db.String(32), default='pending')  # pending, completed, approved, rejected
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    approved_at = db.Column(db.DateTime)
+
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    day_close = db.relationship('DayClose', backref=db.backref('inventory_checks', lazy='dynamic'))
+    location = db.relationship('Location', backref=db.backref('spot_checks', lazy='dynamic'))
+    user = db.relationship('User', foreign_keys=[checked_by])
+    approver = db.relationship('User', foreign_keys=[approved_by])
+    items = db.relationship('InventorySpotCheckItem', backref='spot_check', lazy='dynamic', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<InventorySpotCheck {self.check_date} - {self.location_id}>'
+
+
+class InventorySpotCheckItem(db.Model):
+    """Individual item in inventory spot check"""
+    __tablename__ = 'inventory_spot_check_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    spot_check_id = db.Column(db.Integer, db.ForeignKey('inventory_spot_checks.id'), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), index=True)
+    raw_material_id = db.Column(db.Integer, db.ForeignKey('raw_materials.id'), index=True)
+
+    # Quantities
+    system_quantity = db.Column(db.Numeric(10, 2), default=0)  # What system says we have
+    physical_quantity = db.Column(db.Numeric(10, 2), default=0)  # What was actually counted
+    variance = db.Column(db.Numeric(10, 2), default=0)  # physical - system
+
+    # Values
+    unit_cost = db.Column(db.Numeric(10, 2), default=0)
+    variance_value = db.Column(db.Numeric(10, 2), default=0)  # variance * unit_cost
+
+    # Variance reason
+    variance_reason = db.Column(db.String(128))  # theft, damage, counting_error, system_error, etc.
+    notes = db.Column(db.Text)
+
+    # Relationships
+    product = db.relationship('Product')
+    raw_material = db.relationship('RawMaterial')
+
+    def __repr__(self):
+        return f'<InventorySpotCheckItem {self.id}>'
+
+    def calculate_variance(self):
+        """Calculate variance between physical and system quantity"""
+        self.variance = (self.physical_quantity or 0) - (self.system_quantity or 0)
+        self.variance_value = self.variance * (self.unit_cost or 0)
+        return self.variance
 
 
 # ============================================================================
@@ -1878,3 +1990,630 @@ class TransferRequest(db.Model):
 
     def __repr__(self):
         return f'<TransferRequest {self.request_number}>'
+
+
+# ============================================================================
+# DISCOUNT CONTROL MODELS
+# ============================================================================
+
+class DiscountLimit(db.Model):
+    """Discount limits per role - controls maximum discount each role can apply"""
+    __tablename__ = 'discount_limits'
+
+    id = db.Column(db.Integer, primary_key=True)
+    role = db.Column(db.String(64), nullable=False, unique=True, index=True)  # cashier, store_manager, etc.
+
+    # Discount limits
+    max_percentage = db.Column(db.Numeric(5, 2), default=0.00)  # Max % discount allowed
+    max_amount = db.Column(db.Numeric(10, 2), default=0.00)  # Max amount discount allowed
+    max_per_item_percentage = db.Column(db.Numeric(5, 2), default=0.00)  # Max % per item
+
+    # Approval thresholds
+    requires_approval_above = db.Column(db.Numeric(5, 2))  # Needs approval if discount % above this
+
+    # Daily limits
+    max_daily_discount_amount = db.Column(db.Numeric(12, 2))  # Max total discounts per day
+    max_daily_discount_count = db.Column(db.Integer)  # Max number of discounts per day
+
+    # Restrictions
+    can_give_free_items = db.Column(db.Boolean, default=False)  # Can give 100% discount
+    requires_reason = db.Column(db.Boolean, default=True)  # Must provide reason for discount
+    allowed_reasons = db.Column(db.Text)  # JSON list of allowed discount reasons
+
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def get_allowed_reasons(self):
+        """Get list of allowed discount reasons"""
+        import json
+        if self.allowed_reasons:
+            try:
+                return json.loads(self.allowed_reasons)
+            except:
+                return []
+        return []
+
+    def __repr__(self):
+        return f'<DiscountLimit {self.role}>'
+
+
+class DiscountApproval(db.Model):
+    """Tracks discount approval requests and approvals"""
+    __tablename__ = 'discount_approvals'
+
+    id = db.Column(db.Integer, primary_key=True)
+    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), index=True)
+
+    # Request details
+    requested_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    requested_at = db.Column(db.DateTime, default=datetime.utcnow)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False, index=True)
+
+    # Discount details
+    discount_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    discount_percentage = db.Column(db.Numeric(5, 2))
+    discount_type = db.Column(db.String(16), default='amount')  # amount or percentage
+    original_total = db.Column(db.Numeric(12, 2), nullable=False)  # Sale total before discount
+    final_total = db.Column(db.Numeric(12, 2))  # Sale total after discount
+
+    # Reason
+    discount_reason = db.Column(db.String(128), nullable=False)
+    reason_details = db.Column(db.Text)
+
+    # Status
+    status = db.Column(db.String(32), default='pending')  # pending, approved, rejected, expired
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    approved_at = db.Column(db.DateTime)
+    rejection_reason = db.Column(db.Text)
+
+    # Approval code (for manager approval at POS)
+    approval_code = db.Column(db.String(32))  # Manager enters this code to approve
+    expires_at = db.Column(db.DateTime)  # Approval request expires after X minutes
+
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    sale = db.relationship('Sale', backref=db.backref('discount_approvals', lazy='dynamic'))
+    requester = db.relationship('User', foreign_keys=[requested_by], backref='discount_requests')
+    approver = db.relationship('User', foreign_keys=[approved_by], backref='discount_approvals')
+    location = db.relationship('Location', backref=db.backref('discount_approvals', lazy='dynamic'))
+
+    def generate_approval_code(self):
+        """Generate a random approval code"""
+        import secrets
+        self.approval_code = secrets.token_hex(4).upper()  # 8 character code
+        return self.approval_code
+
+    def is_expired(self):
+        """Check if approval request has expired"""
+        if self.expires_at:
+            return datetime.utcnow() > self.expires_at
+        return False
+
+    def __repr__(self):
+        return f'<DiscountApproval {self.id} - {self.status}>'
+
+
+# ============================================================================
+# VOID/REFUND CONTROL MODELS
+# ============================================================================
+
+class VoidRefundLimit(db.Model):
+    """Void/Refund limits per role"""
+    __tablename__ = 'void_refund_limits'
+
+    id = db.Column(db.Integer, primary_key=True)
+    role = db.Column(db.String(64), nullable=False, unique=True, index=True)
+
+    # Void limits
+    can_void_sale = db.Column(db.Boolean, default=False)
+    void_time_limit_hours = db.Column(db.Integer, default=24)  # Can only void within X hours
+    max_void_amount = db.Column(db.Numeric(12, 2))  # Max sale amount that can be voided
+    void_requires_approval_above = db.Column(db.Numeric(12, 2))  # Needs approval for amounts above
+
+    # Refund limits
+    can_refund = db.Column(db.Boolean, default=False)
+    refund_time_limit_days = db.Column(db.Integer, default=7)  # Refund within X days
+    max_refund_amount = db.Column(db.Numeric(12, 2))  # Max refund amount per transaction
+    refund_requires_approval_above = db.Column(db.Numeric(12, 2))  # Needs approval above
+
+    # Daily limits
+    max_daily_void_count = db.Column(db.Integer)
+    max_daily_void_amount = db.Column(db.Numeric(12, 2))
+    max_daily_refund_count = db.Column(db.Integer)
+    max_daily_refund_amount = db.Column(db.Numeric(12, 2))
+
+    # Requirements
+    requires_reason = db.Column(db.Boolean, default=True)
+    requires_customer_signature = db.Column(db.Boolean, default=False)
+    requires_receipt_return = db.Column(db.Boolean, default=True)
+
+    allowed_refund_reasons = db.Column(db.Text)  # JSON list
+
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def get_allowed_reasons(self):
+        """Get list of allowed refund reasons"""
+        import json
+        if self.allowed_refund_reasons:
+            try:
+                return json.loads(self.allowed_refund_reasons)
+            except:
+                return []
+        return []
+
+    def __repr__(self):
+        return f'<VoidRefundLimit {self.role}>'
+
+
+class VoidRefundApproval(db.Model):
+    """Tracks void/refund approval requests"""
+    __tablename__ = 'void_refund_approvals'
+
+    id = db.Column(db.Integer, primary_key=True)
+    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=False, index=True)
+    return_id = db.Column(db.Integer, index=True)  # If linked to returns table
+
+    # Request type
+    request_type = db.Column(db.String(32), nullable=False)  # void, refund, partial_refund
+
+    # Requester
+    requested_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    requested_at = db.Column(db.DateTime, default=datetime.utcnow)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False, index=True)
+
+    # Amount
+    amount = db.Column(db.Numeric(12, 2), nullable=False)
+    original_sale_total = db.Column(db.Numeric(12, 2), nullable=False)
+
+    # Reason
+    reason = db.Column(db.String(128), nullable=False)
+    reason_details = db.Column(db.Text)
+
+    # Status
+    status = db.Column(db.String(32), default='pending')  # pending, approved, rejected, expired
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    approved_at = db.Column(db.DateTime)
+    rejection_reason = db.Column(db.Text)
+
+    # Approval code for manager
+    approval_code = db.Column(db.String(32))
+    expires_at = db.Column(db.DateTime)
+
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    sale = db.relationship('Sale', backref=db.backref('void_refund_approvals', lazy='dynamic'))
+    requester = db.relationship('User', foreign_keys=[requested_by])
+    approver = db.relationship('User', foreign_keys=[approved_by])
+    location = db.relationship('Location', backref=db.backref('void_refund_approvals', lazy='dynamic'))
+
+    def generate_approval_code(self):
+        """Generate approval code"""
+        import secrets
+        self.approval_code = secrets.token_hex(4).upper()
+        return self.approval_code
+
+    def is_expired(self):
+        """Check if request has expired"""
+        if self.expires_at:
+            return datetime.utcnow() > self.expires_at
+        return False
+
+    def __repr__(self):
+        return f'<VoidRefundApproval {self.id} - {self.request_type}>'
+
+
+class VoidRefundLog(db.Model):
+    """Audit log for all voids and refunds"""
+    __tablename__ = 'void_refund_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=False, index=True)
+    return_id = db.Column(db.Integer, index=True)
+
+    # Type
+    action_type = db.Column(db.String(32), nullable=False)  # void, refund, partial_refund
+
+    # Who and where
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False, index=True)
+
+    # Sale details
+    sale_number = db.Column(db.String(64))
+    sale_date = db.Column(db.DateTime)
+    original_amount = db.Column(db.Numeric(12, 2), nullable=False)
+    voided_refunded_amount = db.Column(db.Numeric(12, 2), nullable=False)
+
+    # Timing
+    hours_since_sale = db.Column(db.Float)  # How many hours after sale
+
+    # Reason
+    reason = db.Column(db.String(128), nullable=False)
+    reason_details = db.Column(db.Text)
+
+    # Approval
+    required_approval = db.Column(db.Boolean, default=False)
+    approval_id = db.Column(db.Integer, db.ForeignKey('void_refund_approvals.id'))
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # Refund method
+    refund_method = db.Column(db.String(32))  # cash, store_credit, original_payment
+
+    # Customer
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
+    customer_name = db.Column(db.String(256))
+
+    # Items voided/refunded
+    items_json = db.Column(db.Text)  # JSON list of items
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    # Relationships
+    sale = db.relationship('Sale', backref=db.backref('void_refund_logs', lazy='dynamic'))
+    user = db.relationship('User', foreign_keys=[user_id])
+    location = db.relationship('Location', backref=db.backref('void_refund_logs', lazy='dynamic'))
+    approval = db.relationship('VoidRefundApproval')
+    approver_user = db.relationship('User', foreign_keys=[approved_by])
+
+    def __repr__(self):
+        return f'<VoidRefundLog {self.id} - {self.action_type}>'
+
+
+# ============================================================================
+# PRICE CHANGE AUDIT MODELS
+# ============================================================================
+
+class PriceChangeLog(db.Model):
+    """Audit log for all price changes"""
+    __tablename__ = 'price_change_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False, index=True)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), index=True)  # For location-specific pricing
+
+    # Who and when
+    changed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    changed_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    # Price type changed
+    price_type = db.Column(db.String(32), nullable=False)  # selling_price, cost_price, base_cost, etc.
+
+    # Old and new values
+    old_value = db.Column(db.Numeric(12, 2), nullable=False)
+    new_value = db.Column(db.Numeric(12, 2), nullable=False)
+    change_amount = db.Column(db.Numeric(12, 2))  # new - old
+    change_percentage = db.Column(db.Numeric(8, 2))  # ((new-old)/old)*100
+
+    # Reason
+    reason = db.Column(db.String(128))
+    reason_details = db.Column(db.Text)
+
+    # Approval (for large changes)
+    required_approval = db.Column(db.Boolean, default=False)
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    approved_at = db.Column(db.DateTime)
+    approval_status = db.Column(db.String(32), default='auto')  # auto, pending, approved, rejected
+
+    # Context
+    source = db.Column(db.String(64))  # manual, import, promotion, bulk_update
+    batch_id = db.Column(db.String(64))  # For bulk updates
+
+    notes = db.Column(db.Text)
+
+    # Relationships
+    product = db.relationship('Product', backref=db.backref('price_changes', lazy='dynamic'))
+    location = db.relationship('Location', backref=db.backref('price_changes', lazy='dynamic'))
+    user = db.relationship('User', foreign_keys=[changed_by], backref='price_changes_made')
+    approver = db.relationship('User', foreign_keys=[approved_by])
+
+    def calculate_change(self):
+        """Calculate change amount and percentage"""
+        self.change_amount = self.new_value - self.old_value
+        if self.old_value and self.old_value != 0:
+            self.change_percentage = ((self.new_value - self.old_value) / self.old_value) * 100
+        else:
+            self.change_percentage = 100 if self.new_value else 0
+
+    def __repr__(self):
+        return f'<PriceChangeLog {self.product_id} - {self.price_type}>'
+
+
+class PriceChangeRule(db.Model):
+    """Rules for price change approvals"""
+    __tablename__ = 'price_change_rules'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), nullable=False)
+    description = db.Column(db.Text)
+
+    # Rule type
+    rule_type = db.Column(db.String(32), nullable=False)  # percentage, amount, any
+
+    # Thresholds
+    min_change_percentage = db.Column(db.Numeric(8, 2))  # Trigger if change % >= this
+    min_change_amount = db.Column(db.Numeric(12, 2))  # Trigger if change amount >= this
+
+    # Actions
+    requires_approval = db.Column(db.Boolean, default=True)
+    notify_managers = db.Column(db.Boolean, default=True)
+    notify_email = db.Column(db.String(256))  # Comma-separated emails
+
+    # Scope
+    applies_to_roles = db.Column(db.Text)  # JSON list of roles this applies to
+    applies_to_price_types = db.Column(db.Text)  # JSON list: selling_price, cost_price, etc.
+
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def get_roles(self):
+        import json
+        if self.applies_to_roles:
+            try:
+                return json.loads(self.applies_to_roles)
+            except:
+                return []
+        return []
+
+    def get_price_types(self):
+        import json
+        if self.applies_to_price_types:
+            try:
+                return json.loads(self.applies_to_price_types)
+            except:
+                return []
+        return []
+
+    def __repr__(self):
+        return f'<PriceChangeRule {self.name}>'
+
+
+class DiscountLog(db.Model):
+    """Audit log for all discounts applied in the system"""
+    __tablename__ = 'discount_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), index=True)
+    sale_item_id = db.Column(db.Integer, db.ForeignKey('sale_items.id'), index=True)
+
+    # Who and where
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False, index=True)
+
+    # Discount details
+    discount_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    discount_percentage = db.Column(db.Numeric(5, 2))
+    discount_type = db.Column(db.String(16), default='amount')  # amount, percentage, free_item
+
+    # Context
+    original_price = db.Column(db.Numeric(12, 2))  # Price before discount
+    discounted_price = db.Column(db.Numeric(12, 2))  # Price after discount
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), index=True)
+    product_name = db.Column(db.String(256))
+
+    # Reason
+    discount_reason = db.Column(db.String(128), nullable=False)
+    reason_details = db.Column(db.Text)
+
+    # Approval
+    required_approval = db.Column(db.Boolean, default=False)
+    approval_id = db.Column(db.Integer, db.ForeignKey('discount_approvals.id'))
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # Promotion/Coupon link (if applicable)
+    promotion_id = db.Column(db.Integer, db.ForeignKey('promotions.id'))
+    coupon_code = db.Column(db.String(64))
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    # Relationships
+    sale = db.relationship('Sale', backref=db.backref('discount_logs', lazy='dynamic'))
+    user = db.relationship('User', foreign_keys=[user_id], backref='applied_discounts')
+    location = db.relationship('Location', backref=db.backref('discount_logs', lazy='dynamic'))
+    product = db.relationship('Product')
+    approval = db.relationship('DiscountApproval')
+    approver_user = db.relationship('User', foreign_keys=[approved_by])
+
+    def __repr__(self):
+        return f'<DiscountLog {self.id} - {self.discount_amount}>'
+
+
+# ============================================================================
+# BATCH & EXPIRY TRACKING
+# ============================================================================
+
+class ProductBatch(db.Model):
+    """Track individual batches of products with different expiry dates"""
+    __tablename__ = 'product_batches'
+
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False, index=True)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False, index=True)
+
+    # Batch identification
+    batch_number = db.Column(db.String(64), nullable=False, index=True)
+    manufacture_date = db.Column(db.Date)
+    expiry_date = db.Column(db.Date, index=True)
+
+    # Stock levels
+    initial_quantity = db.Column(db.Numeric(12, 4), nullable=False)
+    current_quantity = db.Column(db.Numeric(12, 4), nullable=False, default=0)
+    reserved_quantity = db.Column(db.Numeric(12, 4), default=0)  # For pending orders
+
+    # Cost tracking
+    unit_cost = db.Column(db.Numeric(12, 4))  # Cost when batch was received
+    total_cost = db.Column(db.Numeric(14, 2))
+
+    # Source information
+    supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'))
+    purchase_order_id = db.Column(db.Integer, db.ForeignKey('purchase_orders.id'))
+    received_date = db.Column(db.Date, default=date.today)
+    received_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # Status
+    status = db.Column(db.String(20), default='active')  # active, depleted, expired, disposed
+    disposed_date = db.Column(db.Date)
+    disposed_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    disposal_reason = db.Column(db.Text)
+
+    # Notes
+    notes = db.Column(db.Text)
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    product = db.relationship('Product', backref=db.backref('batches', lazy='dynamic'))
+    location = db.relationship('Location', backref=db.backref('product_batches', lazy='dynamic'))
+    supplier = db.relationship('Supplier', backref=db.backref('product_batches', lazy='dynamic'))
+    received_by_user = db.relationship('User', foreign_keys=[received_by])
+    disposed_by_user = db.relationship('User', foreign_keys=[disposed_by])
+
+    __table_args__ = (
+        db.UniqueConstraint('product_id', 'location_id', 'batch_number', name='uix_batch_product_location'),
+    )
+
+    @property
+    def available_quantity(self):
+        """Get available quantity (current - reserved)"""
+        return float(self.current_quantity or 0) - float(self.reserved_quantity or 0)
+
+    @property
+    def days_until_expiry(self):
+        """Calculate days until expiry"""
+        if not self.expiry_date:
+            return None
+        delta = self.expiry_date - date.today()
+        return delta.days
+
+    @property
+    def is_expired(self):
+        """Check if batch is expired"""
+        if not self.expiry_date:
+            return False
+        return date.today() > self.expiry_date
+
+    @property
+    def is_near_expiry(self):
+        """Check if batch is near expiry (within 30 days)"""
+        days = self.days_until_expiry
+        if days is None:
+            return False
+        return 0 < days <= 30
+
+    @property
+    def is_critical_expiry(self):
+        """Check if batch is critical (within 7 days or expired)"""
+        days = self.days_until_expiry
+        if days is None:
+            return False
+        return days <= 7
+
+    @property
+    def expiry_status(self):
+        """Get expiry status string"""
+        if not self.expiry_date:
+            return 'no_expiry'
+        if self.is_expired:
+            return 'expired'
+        if self.is_critical_expiry:
+            return 'critical'
+        if self.is_near_expiry:
+            return 'warning'
+        return 'ok'
+
+    @staticmethod
+    def get_oldest_batch(product_id, location_id, required_qty=1):
+        """Get oldest non-expired batch with available stock (FIFO)"""
+        return ProductBatch.query.filter(
+            ProductBatch.product_id == product_id,
+            ProductBatch.location_id == location_id,
+            ProductBatch.status == 'active',
+            ProductBatch.current_quantity > ProductBatch.reserved_quantity,
+            db.or_(
+                ProductBatch.expiry_date.is_(None),
+                ProductBatch.expiry_date >= date.today()
+            )
+        ).order_by(
+            ProductBatch.expiry_date.asc().nullslast(),
+            ProductBatch.received_date.asc()
+        ).first()
+
+    def __repr__(self):
+        return f'<ProductBatch {self.batch_number} - {self.product.name if self.product else self.product_id}>'
+
+
+class BatchMovement(db.Model):
+    """Track all batch-level stock movements"""
+    __tablename__ = 'batch_movements'
+
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('product_batches.id'), nullable=False, index=True)
+
+    # Movement details
+    movement_type = db.Column(db.String(32), nullable=False)  # sale, return, adjustment, transfer, disposal, receive
+    quantity = db.Column(db.Numeric(12, 4), nullable=False)  # Positive for in, negative for out
+    quantity_before = db.Column(db.Numeric(12, 4), nullable=False)
+    quantity_after = db.Column(db.Numeric(12, 4), nullable=False)
+
+    # Reference
+    reference_type = db.Column(db.String(32))  # sale, transfer, adjustment, disposal
+    reference_id = db.Column(db.Integer)  # sale_id, transfer_id, etc.
+
+    # Who
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+
+    # Details
+    reason = db.Column(db.Text)
+    notes = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    # Relationships
+    batch = db.relationship('ProductBatch', backref=db.backref('movements', lazy='dynamic'))
+    user = db.relationship('User', backref='batch_movements')
+
+    def __repr__(self):
+        return f'<BatchMovement {self.id} - {self.movement_type} {self.quantity}>'
+
+
+class ExpiryAlert(db.Model):
+    """Track expiry alerts and notifications"""
+    __tablename__ = 'expiry_alerts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('product_batches.id'), nullable=False, index=True)
+
+    alert_type = db.Column(db.String(32), nullable=False)  # warning (30d), critical (7d), expired
+    alert_date = db.Column(db.Date, nullable=False)
+    expiry_date = db.Column(db.Date, nullable=False)
+
+    # Notification tracking
+    notification_sent = db.Column(db.Boolean, default=False)
+    notification_sent_at = db.Column(db.DateTime)
+    notification_method = db.Column(db.String(32))  # email, sms, in_app
+
+    # Action taken
+    action_taken = db.Column(db.String(64))  # none, disposed, discounted, sold, returned_to_supplier
+    action_date = db.Column(db.Date)
+    action_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    action_notes = db.Column(db.Text)
+
+    # Status
+    is_resolved = db.Column(db.Boolean, default=False)
+    resolved_at = db.Column(db.DateTime)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    batch = db.relationship('ProductBatch', backref=db.backref('alerts', lazy='dynamic'))
+    action_by_user = db.relationship('User')
+
+    def __repr__(self):
+        return f'<ExpiryAlert {self.alert_type} - Batch {self.batch_id}>'

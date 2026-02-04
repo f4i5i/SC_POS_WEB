@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Record Payment - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-hand-holding-usd text-success me-2"></i>Record Payment</h2>
+        <a href="{{ url_for('customer_credit.customer_ledger', customer_id=due.customer_id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <!-- Due Info -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Due Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td class="text-muted">Customer</td>
+                            <td><strong>{{ due.customer.name if due.customer else '-' }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Phone</td>
+                            <td>{{ due.customer.phone if due.customer else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Sale #</td>
+                            <td><code>{{ due.sale.receipt_number if due.sale else due.sale_id }}</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Due Date</td>
+                            <td>
+                                {{ due.due_date.strftime('%d/%m/%Y') if due.due_date else '-' }}
+                                {% if due.is_overdue %}
+                                <span class="badge bg-danger ms-2">{{ due.days_overdue }} days overdue</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                    <hr>
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <small class="text-muted">Total</small>
+                            <h5>{{ format_currency(due.total_amount) }}</h5>
+                        </div>
+                        <div class="col-4">
+                            <small class="text-muted">Paid</small>
+                            <h5 class="text-success">{{ format_currency(due.paid_amount) }}</h5>
+                        </div>
+                        <div class="col-4">
+                            <small class="text-muted">Due</small>
+                            <h5 class="text-danger">{{ format_currency(due.due_amount) }}</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <!-- Payment Form -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Payment Details</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="mb-3">
+                            <label class="form-label">Payment Amount *</label>
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text">Rs.</span>
+                                <input type="number" name="amount" class="form-control" required
+                                       min="1" max="{{ due.due_amount }}" step="0.01"
+                                       value="{{ due.due_amount }}">
+                            </div>
+                            <div class="form-text">Maximum: {{ format_currency(due.due_amount) }}</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Payment Method *</label>
+                            <select name="payment_method" class="form-select" required>
+                                <option value="cash">Cash</option>
+                                <option value="card">Card</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="easypaisa">EasyPaisa</option>
+                                <option value="jazzcash">JazzCash</option>
+                                <option value="cheque">Cheque</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Reference Number</label>
+                            <input type="text" name="reference" class="form-control"
+                                   placeholder="Transaction ID, Cheque #, etc.">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea name="notes" class="form-control" rows="2"
+                                      placeholder="Any additional notes..."></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-check me-2"></i>Record Payment
+                            </button>
+                            <a href="{{ url_for('customer_credit.customer_ledger', customer_id=due.customer_id) }}" class="btn btn-outline-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

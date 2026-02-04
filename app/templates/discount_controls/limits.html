@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Discount Limits - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-percentage text-primary me-2"></i>Discount Limits by Role</h2>
+            <p class="text-muted mb-0">Configure maximum discounts each role can apply</p>
+        </div>
+        <div>
+            <a href="{{ url_for('discount_controls.summary') }}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-chart-bar me-2"></i>Summary Report
+            </a>
+            <a href="{{ url_for('discount_controls.logs') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-history me-2"></i>Discount Logs
+            </a>
+        </div>
+    </div>
+
+    <!-- Existing Limits -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="fas fa-sliders-h me-2"></i>Configured Limits</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Role</th>
+                            <th class="text-center">Max %</th>
+                            <th class="text-center">Max Amount</th>
+                            <th class="text-center">Approval Required Above</th>
+                            <th class="text-center">Daily Limit</th>
+                            <th class="text-center">Requires Reason</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for limit in limits %}
+                        <tr>
+                            <td>
+                                <strong>{{ limit.role|title|replace('_', ' ') }}</strong>
+                            </td>
+                            <td class="text-center">
+                                {% if limit.max_percentage %}
+                                <span class="badge bg-primary">{{ limit.max_percentage }}%</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if limit.max_amount %}
+                                {{ format_currency(limit.max_amount) }}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if limit.requires_approval_above %}
+                                <span class="badge bg-warning text-dark">> {{ limit.requires_approval_above }}%</span>
+                                {% else %}
+                                <span class="text-muted">No</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if limit.max_daily_discount_amount or limit.max_daily_discount_count %}
+                                <small>
+                                    {% if limit.max_daily_discount_amount %}{{ format_currency(limit.max_daily_discount_amount) }}{% endif %}
+                                    {% if limit.max_daily_discount_count %}({{ limit.max_daily_discount_count }} times){% endif %}
+                                </small>
+                                {% else %}
+                                <span class="text-muted">No limit</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if limit.requires_reason %}
+                                <i class="fas fa-check text-success"></i>
+                                {% else %}
+                                <i class="fas fa-times text-muted"></i>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if limit.is_active %}
+                                <span class="badge bg-success">Active</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ url_for('discount_controls.edit_limit', role=limit.role) }}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <form method="POST" action="{{ url_for('discount_controls.delete_limit', role=limit.role) }}"
+                                      class="d-inline" onsubmit="return confirm('Delete limit for {{ limit.role }}?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not limits %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4 text-muted">
+                                No discount limits configured. Add limits for each role below.
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add New Role Limit -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-plus me-2"></i>Configure Role Discount Limit</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">Select a role to configure discount limits:</p>
+            <div class="row">
+                {% for role_key, role_data in default_roles.items() %}
+                {% set has_limit = limits|selectattr('role', 'equalto', role_key)|list %}
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100 {% if has_limit %}border-success{% endif %}">
+                        <div class="card-body">
+                            <h6 class="card-title">
+                                {{ role_data.display_name }}
+                                {% if has_limit %}
+                                <span class="badge bg-success float-end">Configured</span>
+                                {% endif %}
+                            </h6>
+                            <p class="card-text small text-muted">{{ role_data.description }}</p>
+                            <a href="{{ url_for('discount_controls.edit_limit', role=role_key) }}"
+                               class="btn btn-sm {% if has_limit %}btn-outline-primary{% else %}btn-primary{% endif %}">
+                                {% if has_limit %}Edit{% else %}Configure{% endif %}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

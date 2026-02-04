@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Customer Dues - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-file-invoice-dollar text-primary me-2"></i>Customer Dues</h2>
+            <p class="text-muted mb-0">All pending customer payments</p>
+        </div>
+        <a href="{{ url_for('customer_credit.index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="unpaid" {% if status_filter == 'unpaid' %}selected{% endif %}>All Unpaid</option>
+                        <option value="overdue" {% if status_filter == 'overdue' %}selected{% endif %}>Overdue</option>
+                        <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                        <option value="partial" {% if status_filter == 'partial' %}selected{% endif %}>Partial</option>
+                        <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>Paid</option>
+                        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Customer</label>
+                    <select name="customer_id" class="form-select">
+                        <option value="">All Customers</option>
+                        {% for c in customers %}
+                        <option value="{{ c.id }}" {% if c.id == customer_id %}selected{% endif %}>{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Search</label>
+                    <input type="text" name="search" class="form-control" placeholder="Name or phone..." value="{{ search }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Sort By</label>
+                    <select name="sort" class="form-select">
+                        <option value="due_date" {% if sort_by == 'due_date' %}selected{% endif %}>Due Date</option>
+                        <option value="amount" {% if sort_by == 'amount' %}selected{% endif %}>Amount</option>
+                        <option value="customer" {% if sort_by == 'customer' %}selected{% endif %}>Customer</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-2"></i>Apply
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card bg-primary bg-opacity-10 border-primary">
+                <div class="card-body text-center py-3">
+                    <h4 class="mb-0">{{ format_currency(total_due) }}</h4>
+                    <small class="text-muted">Total Due ({{ dues|length }} records)</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card bg-danger bg-opacity-10 border-danger">
+                <div class="card-body text-center py-3">
+                    <h4 class="mb-0 text-danger">{{ format_currency(total_overdue) }}</h4>
+                    <small class="text-muted">Overdue Amount</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dues Table -->
+    {% if dues %}
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Customer</th>
+                            <th>Sale #</th>
+                            <th class="text-end">Total</th>
+                            <th class="text-end">Paid</th>
+                            <th class="text-end">Due</th>
+                            <th class="text-center">Due Date</th>
+                            <th class="text-center">Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for due in dues %}
+                        <tr class="{% if due.is_overdue %}table-danger{% elif due.status == 'partial' %}table-warning{% endif %}">
+                            <td>
+                                <a href="{{ url_for('customer_credit.customer_ledger', customer_id=due.customer_id) }}">
+                                    <strong>{{ due.customer.name if due.customer else '-' }}</strong>
+                                </a>
+                                {% if due.customer and due.customer.phone %}
+                                <br><small class="text-muted">{{ due.customer.phone }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if due.sale %}
+                                <code>{{ due.sale.receipt_number or due.sale_id }}</code>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td class="text-end">{{ format_currency(due.total_amount) }}</td>
+                            <td class="text-end text-success">{{ format_currency(due.paid_amount) }}</td>
+                            <td class="text-end"><strong>{{ format_currency(due.due_amount) }}</strong></td>
+                            <td class="text-center">
+                                {{ due.due_date.strftime('%d/%m/%Y') if due.due_date else '-' }}
+                            </td>
+                            <td class="text-center">
+                                {% if due.status == 'paid' %}
+                                <span class="badge bg-success">Paid</span>
+                                {% elif due.is_overdue %}
+                                <span class="badge bg-danger">{{ due.days_overdue }}d overdue</span>
+                                {% elif due.status == 'partial' %}
+                                <span class="badge bg-warning text-dark">Partial</span>
+                                {% else %}
+                                <span class="badge bg-info">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if due.status != 'paid' %}
+                                <a href="{{ url_for('customer_credit.record_payment', due_id=due.id) }}" class="btn btn-sm btn-success">
+                                    <i class="fas fa-hand-holding-usd"></i> Pay
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+            <h4>No Dues Found</h4>
+            <p class="text-muted">No customer dues match your criteria.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Collection Reminders - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-bell text-danger me-2"></i>Collection Reminders</h2>
+            <p class="text-muted mb-0">Outstanding payments requiring attention</p>
+        </div>
+        <a href="{{ url_for('customer_credit.index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back
+        </a>
+    </div>
+
+    <!-- Summary -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card bg-danger bg-opacity-10 border-danger">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-circle fa-3x text-danger"></i>
+                        </div>
+                        <div class="col">
+                            <h3 class="mb-0 text-danger">{{ format_currency(overdue_total) }}</h3>
+                            <p class="mb-0 text-muted">Overdue ({{ overdue|length }} customers)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card bg-warning bg-opacity-10 border-warning">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-3x text-warning"></i>
+                        </div>
+                        <div class="col">
+                            <h3 class="mb-0 text-warning">{{ format_currency(upcoming_total) }}</h3>
+                            <p class="mb-0 text-muted">Due This Week ({{ upcoming|length }} customers)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overdue Payments -->
+    <div class="card shadow-sm mb-4 border-danger">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Overdue Payments</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if overdue %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Customer</th>
+                            <th>Phone</th>
+                            <th class="text-end">Amount Due</th>
+                            <th class="text-center">Due Date</th>
+                            <th class="text-center">Days Overdue</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for due in overdue %}
+                        <tr class="{% if due.days_overdue > 30 %}table-danger{% endif %}">
+                            <td>
+                                <strong>{{ due.customer.name if due.customer else '-' }}</strong>
+                            </td>
+                            <td>
+                                {% if due.customer and due.customer.phone %}
+                                <a href="tel:{{ due.customer.phone }}">{{ due.customer.phone }}</a>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td class="text-end"><strong>{{ format_currency(due.due_amount) }}</strong></td>
+                            <td class="text-center">{{ due.due_date.strftime('%d/%m/%Y') if due.due_date else '-' }}</td>
+                            <td class="text-center">
+                                <span class="badge bg-{% if due.days_overdue > 30 %}danger{% else %}warning text-dark{% endif %}">
+                                    {{ due.days_overdue }} days
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('customer_credit.record_payment', due_id=due.id) }}" class="btn btn-success" title="Record Payment">
+                                        <i class="fas fa-hand-holding-usd"></i>
+                                    </a>
+                                    <a href="{{ url_for('customer_credit.customer_ledger', customer_id=due.customer_id) }}" class="btn btn-outline-primary" title="View Ledger">
+                                        <i class="fas fa-file-invoice"></i>
+                                    </a>
+                                    {% if due.customer and due.customer.phone %}
+                                    <a href="https://wa.me/92{{ due.customer.phone[1:] }}?text=Reminder: Your payment of Rs. {{ due.due_amount|int }} is overdue." class="btn btn-outline-success" target="_blank" title="WhatsApp">
+                                        <i class="fab fa-whatsapp"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                <h5>No Overdue Payments</h5>
+                <p>All customers are up to date!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Upcoming Dues -->
+    <div class="card shadow-sm border-warning">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Due This Week</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if upcoming %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Customer</th>
+                            <th>Phone</th>
+                            <th class="text-end">Amount Due</th>
+                            <th class="text-center">Due Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for due in upcoming %}
+                        <tr>
+                            <td><strong>{{ due.customer.name if due.customer else '-' }}</strong></td>
+                            <td>
+                                {% if due.customer and due.customer.phone %}
+                                <a href="tel:{{ due.customer.phone }}">{{ due.customer.phone }}</a>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td class="text-end"><strong>{{ format_currency(due.due_amount) }}</strong></td>
+                            <td class="text-center">
+                                {{ due.due_date.strftime('%d/%m/%Y') if due.due_date else '-' }}
+                                {% set days_until = (due.due_date - today).days if due.due_date else 0 %}
+                                {% if days_until == 0 %}
+                                <span class="badge bg-danger ms-1">Today</span>
+                                {% elif days_until == 1 %}
+                                <span class="badge bg-warning text-dark ms-1">Tomorrow</span>
+                                {% else %}
+                                <span class="badge bg-info ms-1">{{ days_until }} days</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('customer_credit.record_payment', due_id=due.id) }}" class="btn btn-sm btn-success">
+                                    <i class="fas fa-hand-holding-usd"></i> Pay
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted">
+                <i class="fas fa-calendar-check fa-2x mb-2"></i>
+                <p>No payments due this week</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

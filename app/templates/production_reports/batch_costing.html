@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Batch Costing Report - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-calculator text-primary me-2"></i>Batch Costing Report</h2>
+            <p class="text-muted mb-0">Detailed cost analysis per production batch</p>
+        </div>
+        <a href="{{ url_for('production.index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Production
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Recipe</label>
+                    <select name="recipe_id" class="form-select">
+                        <option value="">All Recipes</option>
+                        {% for recipe in recipes %}
+                        <option value="{{ recipe.id }}" {% if recipe.id == recipe_id %}selected{% endif %}>{{ recipe.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-2"></i>Apply
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card bg-primary bg-opacity-10 border-primary">
+                <div class="card-body text-center py-3">
+                    <h5 class="mb-1">{{ batch_costs|length }}</h5>
+                    <small class="text-muted">Batches</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-info bg-opacity-10 border-info">
+                <div class="card-body text-center py-3">
+                    <h5 class="mb-1">{{ total_units|int }}</h5>
+                    <small class="text-muted">Units</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-warning bg-opacity-10 border-warning">
+                <div class="card-body text-center py-3">
+                    <h5 class="mb-1">{{ format_currency(total_material_cost) }}</h5>
+                    <small class="text-muted">Materials</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-secondary bg-opacity-10 border-secondary">
+                <div class="card-body text-center py-3">
+                    <h5 class="mb-1">{{ format_currency(total_labor_cost) }}</h5>
+                    <small class="text-muted">Labor</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-danger bg-opacity-10 border-danger">
+                <div class="card-body text-center py-3">
+                    <h5 class="mb-1">{{ format_currency(total_cost) }}</h5>
+                    <small class="text-muted">Total Cost</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-success bg-opacity-10 border-success">
+                <div class="card-body text-center py-3">
+                    <h5 class="mb-1">{{ format_currency(avg_unit_cost) }}</h5>
+                    <small class="text-muted">Avg Unit Cost</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cost Trend Chart -->
+    {% if cost_trend %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Cost Trend</h5>
+        </div>
+        <div class="card-body">
+            <canvas id="costTrendChart" height="100"></canvas>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Batch Details -->
+    {% if batch_costs %}
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-list me-2"></i>Batch Cost Details</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Order #</th>
+                            <th>Recipe</th>
+                            <th>Date</th>
+                            <th class="text-end">Units</th>
+                            <th class="text-end">Material Cost</th>
+                            <th class="text-end">Labor</th>
+                            <th class="text-end">Overhead</th>
+                            <th class="text-end">Total Cost</th>
+                            <th class="text-end">Unit Cost</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in batch_costs %}
+                        <tr>
+                            <td><code>{{ item.order.order_number }}</code></td>
+                            <td>{{ item.order.recipe.name if item.order.recipe else '-' }}</td>
+                            <td>{{ item.order.completed_at.strftime('%d/%m/%Y') if item.order.completed_at else '-' }}</td>
+                            <td class="text-end">{{ (item.order.actual_quantity or item.order.planned_quantity)|int }}</td>
+                            <td class="text-end">{{ format_currency(item.cost_breakdown.material_cost) }}</td>
+                            <td class="text-end">{{ format_currency(item.cost_breakdown.labor_cost) }}</td>
+                            <td class="text-end">{{ format_currency(item.cost_breakdown.overhead_cost) }}</td>
+                            <td class="text-end"><strong>{{ format_currency(item.cost_breakdown.total_cost) }}</strong></td>
+                            <td class="text-end">
+                                <span class="badge bg-primary">{{ format_currency(item.cost_breakdown.unit_cost) }}</span>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('production_reports.batch_detail', order_id=item.order.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <th colspan="3">TOTALS</th>
+                            <th class="text-end">{{ total_units|int }}</th>
+                            <th class="text-end">{{ format_currency(total_material_cost) }}</th>
+                            <th class="text-end">{{ format_currency(total_labor_cost) }}</th>
+                            <th class="text-end">{{ format_currency(total_overhead) }}</th>
+                            <th class="text-end"><strong>{{ format_currency(total_cost) }}</strong></th>
+                            <th class="text-end"><span class="badge bg-success">{{ format_currency(avg_unit_cost) }}</span></th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+            <h4>No Production Data</h4>
+            <p class="text-muted">No completed production orders found for the selected period.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% if cost_trend %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const trendData = {{ cost_trend|tojson|safe }};
+const labels = trendData.map(d => d.date);
+const costs = trendData.map(d => d.total_cost);
+const avgCosts = trendData.map(d => d.avg_cost);
+
+new Chart(document.getElementById('costTrendChart'), {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [
+            {
+                label: 'Total Cost',
+                data: costs,
+                borderColor: '#dc3545',
+                backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                fill: true,
+                tension: 0.3,
+                yAxisID: 'y'
+            },
+            {
+                label: 'Avg Unit Cost',
+                data: avgCosts,
+                borderColor: '#198754',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.3,
+                yAxisID: 'y1'
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+            y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: { display: true, text: 'Total Cost (Rs.)' }
+            },
+            y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                title: { display: true, text: 'Avg Unit Cost (Rs.)' },
+                grid: { drawOnChartArea: false }
+            }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}
