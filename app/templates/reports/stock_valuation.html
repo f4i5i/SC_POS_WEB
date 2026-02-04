@@ -103,9 +103,14 @@
                 <small class="d-block text-muted">Container cost</small>
             </div>
             <div class="col">
+                <i class="fas fa-store text-danger me-1"></i>
+                <strong>Kiosk</strong>
+                <small class="d-block text-muted">Store margin</small>
+            </div>
+            <div class="col">
                 <i class="fas fa-calculator text-success me-1"></i>
                 <strong>Total Cost</strong>
-                <small class="d-block text-muted">All costs combined</small>
+                <small class="d-block text-muted">All combined</small>
             </div>
         </div>
     </div>
@@ -217,13 +222,14 @@
                                     <th class="text-end bg-light">Packaging</th>
                                     <th class="text-end bg-light">Delivery</th>
                                     <th class="text-end bg-light">Bottle</th>
+                                    <th class="text-end bg-light">Kiosk</th>
                                     <th class="text-end fw-bold">Total Cost</th>
                                     <th class="text-end">Sell Price</th>
                                     <th class="text-end text-info">Profit</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% set totals = {'base': 0, 'packaging': 0, 'delivery': 0, 'bottle': 0, 'cost': 0, 'sell': 0, 'profit': 0, 'qty': 0} %}
+                                {% set totals = {'base': 0, 'packaging': 0, 'delivery': 0, 'bottle': 0, 'kiosk': 0, 'cost': 0, 'sell': 0, 'profit': 0, 'qty': 0} %}
                                 {% for item in location_stock_details %}
                                 <tr>
                                     <td>
@@ -253,11 +259,17 @@
                                         {{ format_currency(item.bottle_value) }}
                                         {% else %}-{% endif %}
                                     </td>
+                                    <td class="text-end bg-light">
+                                        {% if item.kiosk_value > 0 %}
+                                        <small class="text-muted d-block">{{ format_currency(item.kiosk_cost) }}/u</small>
+                                        {{ format_currency(item.kiosk_value) }}
+                                        {% else %}-{% endif %}
+                                    </td>
                                     <td class="text-end fw-bold">{{ format_currency(item.cost_value) }}</td>
                                     <td class="text-end text-success fw-bold">{{ format_currency(item.selling_value) }}</td>
                                     <td class="text-end text-info">{{ format_currency(item.profit) }}</td>
                                 </tr>
-                                {% set _ = totals.update({'base': totals.base + item.base_value, 'packaging': totals.packaging + item.packaging_value, 'delivery': totals.delivery + item.delivery_value, 'bottle': totals.bottle + item.bottle_value, 'cost': totals.cost + item.cost_value, 'sell': totals.sell + item.selling_value, 'profit': totals.profit + item.profit, 'qty': totals.qty + item.quantity}) %}
+                                {% set _ = totals.update({'base': totals.base + item.base_value, 'packaging': totals.packaging + item.packaging_value, 'delivery': totals.delivery + item.delivery_value, 'bottle': totals.bottle + item.bottle_value, 'kiosk': totals.kiosk + item.kiosk_value, 'cost': totals.cost + item.cost_value, 'sell': totals.sell + item.selling_value, 'profit': totals.profit + item.profit, 'qty': totals.qty + item.quantity}) %}
                                 {% endfor %}
                             </tbody>
                             <tfoot class="table-light fw-bold">
@@ -268,6 +280,7 @@
                                     <td class="text-end">{{ format_currency(totals.packaging) }}</td>
                                     <td class="text-end">{{ format_currency(totals.delivery) }}</td>
                                     <td class="text-end">{{ format_currency(totals.bottle) }}</td>
+                                    <td class="text-end">{{ format_currency(totals.kiosk) }}</td>
                                     <td class="text-end">{{ format_currency(totals.cost) }}</td>
                                     <td class="text-end text-success">{{ format_currency(totals.sell) }}</td>
                                     <td class="text-end text-info">{{ format_currency(totals.profit) }}</td>
@@ -295,11 +308,15 @@
                                 <strong>{{ format_currency(totals.bottle) }}</strong>
                             </div>
                             <div class="col">
+                                <small class="text-muted d-block">Kiosk</small>
+                                <strong>{{ format_currency(totals.kiosk) }}</strong>
+                            </div>
+                            <div class="col">
                                 <small class="text-muted d-block">Total Cost</small>
                                 <strong class="text-primary">{{ format_currency(totals.cost) }}</strong>
                             </div>
                             <div class="col">
-                                <small class="text-muted d-block">Selling Value</small>
+                                <small class="text-muted d-block">Selling</small>
                                 <strong class="text-success">{{ format_currency(totals.sell) }}</strong>
                             </div>
                         </div>

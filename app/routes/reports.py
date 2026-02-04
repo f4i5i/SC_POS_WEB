@@ -422,15 +422,79 @@ def custom_report():
 @login_required
 @permission_required(Permissions.REPORT_VIEW_INVENTORY)
 def inventory_valuation():
-    """Stock valuation report"""
+    """Stock valuation report with cost breakdown"""
     products = Product.query.filter_by(is_active=True).all()
 
-    total_cost_value = sum(float(p.cost_price) * p.quantity for p in products)
-    total_selling_value = sum(float(p.selling_price) * p.quantity for p in products)
+    # Build product data with cost breakdown
+    product_data = []
+    total_base_value = 0
+    total_packaging_value = 0
+    total_delivery_value = 0
+    total_bottle_value = 0
+    total_kiosk_value = 0
+    total_cost_value = 0
+    total_selling_value = 0
+
+    for p in products:
+        qty = float(p.quantity or 0)
+        base_cost = float(p.base_cost or 0)
+        packaging_cost = float(p.packaging_cost or 0)
+        delivery_cost = float(p.delivery_cost or 0)
+        bottle_cost = float(p.bottle_cost or 0)
+        kiosk_cost = float(p.kiosk_cost or 0)
+        total_cost = base_cost + packaging_cost + delivery_cost + bottle_cost + kiosk_cost
+        selling_price = float(p.selling_price or 0)
+
+        # Calculate values
+        base_value = qty * base_cost
+        packaging_value = qty * packaging_cost
+        delivery_value = qty * delivery_cost
+        bottle_value = qty * bottle_cost
+        kiosk_value = qty * kiosk_cost
+        cost_value = qty * total_cost
+        sell_value = qty * selling_price
+
+        product_data.append({
+            'product': p,
+            'quantity': p.quantity,
+            # Per unit costs
+            'base_cost': base_cost,
+            'packaging_cost': packaging_cost,
+            'delivery_cost': delivery_cost,
+            'bottle_cost': bottle_cost,
+            'kiosk_cost': kiosk_cost,
+            'total_cost': total_cost,
+            'selling_price': selling_price,
+            # Total values
+            'base_value': base_value,
+            'packaging_value': packaging_value,
+            'delivery_value': delivery_value,
+            'bottle_value': bottle_value,
+            'kiosk_value': kiosk_value,
+            'cost_value': cost_value,
+            'selling_value': sell_value,
+            'profit': sell_value - cost_value
+        })
+
+        # Accumulate totals
+        total_base_value += base_value
+        total_packaging_value += packaging_value
+        total_delivery_value += delivery_value
+        total_bottle_value += bottle_value
+        total_kiosk_value += kiosk_value
+        total_cost_value += cost_value
+        total_selling_value += sell_value
+
     potential_profit = total_selling_value - total_cost_value
 
     return render_template('reports/inventory_valuation.html',
                          products=products,
+                         product_data=product_data,
+                         total_base_value=total_base_value,
+                         total_packaging_value=total_packaging_value,
+                         total_delivery_value=total_delivery_value,
+                         total_bottle_value=total_bottle_value,
+                         total_kiosk_value=total_kiosk_value,
                          total_cost_value=total_cost_value,
                          total_selling_value=total_selling_value,
                          potential_profit=potential_profit)
@@ -1812,11 +1876,11 @@ def raw_material_stock():
     for item in raw_material_data:
         cat = item['category']
         if cat not in category_summary:
-            category_summary[cat] = {'stock_value': 0, 'purchased_value': 0, 'consumed_value': 0, 'items': 0}
+            category_summary[cat] = {'stock_value': 0, 'purchased_value': 0, 'consumed_value': 0, 'item_count': 0}
         category_summary[cat]['stock_value'] += item['stock_value']
         category_summary[cat]['purchased_value'] += item['purchased_value']
         category_summary[cat]['consumed_value'] += item['consumed_value']
-        category_summary[cat]['items'] += 1
+        category_summary[cat]['item_count'] += 1
 
     # Get production orders summary
     production_query = ProductionOrder.query.filter(

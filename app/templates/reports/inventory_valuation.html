@@ -121,13 +121,88 @@
         </div>
     </div>
 
+    <!-- Cost Breakdown Legend -->
+    <div class="alert alert-light border mb-4 no-print">
+        <div class="row text-center">
+            <div class="col">
+                <i class="fas fa-tag text-primary me-1"></i>
+                <strong>Base Cost</strong>
+                <small class="d-block text-muted">Supplier price</small>
+            </div>
+            <div class="col">
+                <i class="fas fa-box text-secondary me-1"></i>
+                <strong>Packaging</strong>
+                <small class="d-block text-muted">Box/wrapper</small>
+            </div>
+            <div class="col">
+                <i class="fas fa-truck text-info me-1"></i>
+                <strong>Delivery</strong>
+                <small class="d-block text-muted">Freight cost</small>
+            </div>
+            <div class="col">
+                <i class="fas fa-wine-bottle text-warning me-1"></i>
+                <strong>Bottle</strong>
+                <small class="d-block text-muted">Container</small>
+            </div>
+            <div class="col">
+                <i class="fas fa-store text-danger me-1"></i>
+                <strong>Kiosk</strong>
+                <small class="d-block text-muted">Store margin</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cost Breakdown Summary Cards -->
+    <div class="row g-3 mb-4 no-print">
+        <div class="col">
+            <div class="card border-primary">
+                <div class="card-body text-center py-2">
+                    <small class="text-muted">Base Cost</small>
+                    <h5 class="mb-0 text-primary">Rs. {{ "{:,.2f}".format(total_base_value) }}</h5>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card border-secondary">
+                <div class="card-body text-center py-2">
+                    <small class="text-muted">Packaging</small>
+                    <h5 class="mb-0 text-secondary">Rs. {{ "{:,.2f}".format(total_packaging_value) }}</h5>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card border-info">
+                <div class="card-body text-center py-2">
+                    <small class="text-muted">Delivery</small>
+                    <h5 class="mb-0 text-info">Rs. {{ "{:,.2f}".format(total_delivery_value) }}</h5>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card border-warning">
+                <div class="card-body text-center py-2">
+                    <small class="text-muted">Bottle</small>
+                    <h5 class="mb-0 text-warning">Rs. {{ "{:,.2f}".format(total_bottle_value) }}</h5>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card border-danger">
+                <div class="card-body text-center py-2">
+                    <small class="text-muted">Kiosk</small>
+                    <h5 class="mb-0 text-danger">Rs. {{ "{:,.2f}".format(total_kiosk_value) }}</h5>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Inventory Details -->
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white py-3">
             <div class="d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
                     <i class="fas fa-list text-primary no-print"></i>
-                    Stock Details
+                    Stock Details with Cost Breakdown
                 </h5>
                 <div class="input-group no-print" style="max-width: 300px;">
                     <span class="input-group-text"><i class="fas fa-search"></i></span>
@@ -137,61 +212,96 @@
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover mb-0" id="inventoryTable">
+                <table class="table table-hover table-sm mb-0" id="inventoryTable">
                     <thead class="table-light">
                         <tr>
-                            <th>Code</th>
-                            <th>Product Name</th>
-                            <th class="text-end">Quantity</th>
-                            <th class="text-end">Cost Price</th>
-                            <th class="text-end">Selling Price</th>
-                            <th class="text-end">Cost Value</th>
-                            <th class="text-end">Selling Value</th>
-                            <th class="text-end">Profit Margin</th>
+                            <th>Product</th>
+                            <th class="text-center">Qty</th>
+                            <th class="text-end bg-light">Base Cost</th>
+                            <th class="text-end bg-light">Packaging</th>
+                            <th class="text-end bg-light">Delivery</th>
+                            <th class="text-end bg-light">Bottle</th>
+                            <th class="text-end bg-light">Kiosk</th>
+                            <th class="text-end fw-bold">Total Cost</th>
+                            <th class="text-end">Sell Price</th>
+                            <th class="text-end text-success">Profit</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for product in products %}
+                        {% for item in product_data %}
                         <tr>
-                            <td><code>{{ product.code }}</code></td>
-                            <td>{{ product.name }}</td>
-                            <td class="text-end">
-                                {% if product.quantity <= product.reorder_level %}
-                                <span class="badge bg-warning">{{ product.quantity }}</span>
+                            <td>
+                                <strong>{{ item.product.name }}</strong>
+                                <div class="small text-muted">{{ item.product.code }}</div>
+                            </td>
+                            <td class="text-center">
+                                {% if item.quantity <= item.product.reorder_level %}
+                                <span class="badge bg-warning">{{ item.quantity }}</span>
                                 {% else %}
-                                {{ product.quantity }}
+                                {{ item.quantity }}
                                 {% endif %}
                             </td>
-                            <td class="text-end">Rs. {{ "{:,.2f}".format(product.cost_price) }}</td>
-                            <td class="text-end">Rs. {{ "{:,.2f}".format(product.selling_price) }}</td>
-                            <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(product.cost_price * product.quantity) }}</td>
-                            <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(product.selling_price * product.quantity) }}</td>
+                            <td class="text-end bg-light">
+                                <small class="text-muted d-block">{{ "{:,.0f}".format(item.base_cost) }}/u</small>
+                                <strong>{{ "{:,.0f}".format(item.base_value) }}</strong>
+                            </td>
+                            <td class="text-end bg-light">
+                                {% if item.packaging_value > 0 %}
+                                <small class="text-muted d-block">{{ "{:,.0f}".format(item.packaging_cost) }}/u</small>
+                                {{ "{:,.0f}".format(item.packaging_value) }}
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-end bg-light">
+                                {% if item.delivery_value > 0 %}
+                                <small class="text-muted d-block">{{ "{:,.0f}".format(item.delivery_cost) }}/u</small>
+                                {{ "{:,.0f}".format(item.delivery_value) }}
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-end bg-light">
+                                {% if item.bottle_value > 0 %}
+                                <small class="text-muted d-block">{{ "{:,.0f}".format(item.bottle_cost) }}/u</small>
+                                {{ "{:,.0f}".format(item.bottle_value) }}
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-end bg-light">
+                                {% if item.kiosk_value > 0 %}
+                                <small class="text-muted d-block">{{ "{:,.0f}".format(item.kiosk_cost) }}/u</small>
+                                {{ "{:,.0f}".format(item.kiosk_value) }}
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-end fw-bold">Rs. {{ "{:,.2f}".format(item.cost_value) }}</td>
+                            <td class="text-end text-success fw-bold">Rs. {{ "{:,.2f}".format(item.selling_value) }}</td>
                             <td class="text-end">
-                                {% set margin = ((product.selling_price - product.cost_price) / product.cost_price * 100) if product.cost_price > 0 else 0 %}
+                                {% set margin = ((item.selling_price - item.total_cost) / item.total_cost * 100) if item.total_cost > 0 else 0 %}
                                 <span class="badge bg-{{ 'success' if margin >= 50 else 'primary' if margin >= 25 else 'secondary' }}">
                                     {{ "{:.1f}".format(margin) }}%
                                 </span>
+                                <div class="small">Rs. {{ "{:,.0f}".format(item.profit) }}</div>
                             </td>
                         </tr>
                         {% endfor %}
-                        {% if not products %}
+                        {% if not product_data %}
                         <tr>
-                            <td colspan="8" class="text-center text-muted py-4">
+                            <td colspan="10" class="text-center text-muted py-4">
                                 <i class="fas fa-inbox fa-2x mb-2"></i>
                                 <p class="mb-0">No products in inventory</p>
                             </td>
                         </tr>
                         {% endif %}
                     </tbody>
-                    {% if products %}
-                    <tfoot>
-                        <tr class="table-light fw-bold">
-                            <td colspan="2">Total</td>
-                            <td class="text-end">{{ products|sum(attribute='quantity') }}</td>
-                            <td colspan="2"></td>
+                    {% if product_data %}
+                    <tfoot class="table-light">
+                        <tr class="fw-bold">
+                            <td>TOTAL</td>
+                            <td class="text-center">{{ products|sum(attribute='quantity') }}</td>
+                            <td class="text-end">Rs. {{ "{:,.0f}".format(total_base_value) }}</td>
+                            <td class="text-end">Rs. {{ "{:,.0f}".format(total_packaging_value) }}</td>
+                            <td class="text-end">Rs. {{ "{:,.0f}".format(total_delivery_value) }}</td>
+                            <td class="text-end">Rs. {{ "{:,.0f}".format(total_bottle_value) }}</td>
+                            <td class="text-end">Rs. {{ "{:,.0f}".format(total_kiosk_value) }}</td>
                             <td class="text-end">Rs. {{ "{:,.2f}".format(total_cost_value) }}</td>
-                            <td class="text-end">Rs. {{ "{:,.2f}".format(total_selling_value) }}</td>
-                            <td class="text-end text-success">Rs. {{ "{:,.2f}".format(potential_profit) }}</td>
+                            <td class="text-end text-success">Rs. {{ "{:,.2f}".format(total_selling_value) }}</td>
+                            <td class="text-end text-primary">Rs. {{ "{:,.2f}".format(potential_profit) }}</td>
                         </tr>
                     </tfoot>
                     {% endif %}
