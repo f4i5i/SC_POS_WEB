@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Valuation Report - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-warehouse text-primary me-2"></i>Stock Valuation Report</h2>
+            <p class="text-muted mb-0">Current stock worth across all locations</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="window.print()" class="btn btn-outline-secondary">
+                <i class="fas fa-print me-2"></i>Print
+            </button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Reports
+            </a>
+        </div>
+    </div>
+
+    <!-- Grand Summary Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50 mb-1">Total Cost Value</h6>
+                            <h3 class="mb-0">{{ format_currency(grand_total_cost) }}</h3>
+                            <small>Investment in stock</small>
+                        </div>
+                        <i class="fas fa-coins fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50 mb-1">Total Selling Value</h6>
+                            <h3 class="mb-0">{{ format_currency(grand_total_selling) }}</h3>
+                            <small>If all stock sold</small>
+                        </div>
+                        <i class="fas fa-money-bill-wave fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50 mb-1">Potential Profit</h6>
+                            <h3 class="mb-0">{{ format_currency(grand_total_profit) }}</h3>
+                            <small>{% if grand_total_cost > 0 %}{{ "%.1f"|format((grand_total_profit / grand_total_cost) * 100) }}% margin{% endif %}</small>
+                        </div>
+                        <i class="fas fa-chart-line fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-warning text-dark">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-dark-50 mb-1">Raw Material Value</h6>
+                            <h3 class="mb-0">{{ format_currency(raw_material_value) }}</h3>
+                            <small>Production materials</small>
+                        </div>
+                        <i class="fas fa-flask fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Production Orders Summary -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="fas fa-industry me-2"></i>Production Orders Summary (Till Date)</h5>
+        </div>
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col-md-3">
+                    <div class="border-end">
+                        <h2 class="text-primary mb-0">{{ production_stats.total_orders }}</h2>
+                        <small class="text-muted">Total Orders</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="border-end">
+                        <h2 class="text-success mb-0">{{ production_stats.completed_orders }}</h2>
+                        <small class="text-muted">Completed</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="border-end">
+                        <h2 class="text-warning mb-0">{{ production_stats.pending_orders }}</h2>
+                        <small class="text-muted">Pending/In Progress</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <h2 class="text-info mb-0">{{ "{:,}".format(production_stats.total_produced) }}</h2>
+                    <small class="text-muted">Units Produced</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Location Filter & Summary -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Stock by Location</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        <a href="{{ url_for('reports.stock_valuation') }}"
+                           class="list-group-item list-group-item-action {% if not selected_location_id %}active{% endif %}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>All Locations</strong>
+                                    <div class="small text-muted">{{ grand_total_quantity }} units</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold">{{ format_currency(grand_total_selling) }}</div>
+                                    <small class="text-muted">selling value</small>
+                                </div>
+                            </div>
+                        </a>
+                        {% for summary in location_summaries %}
+                        <a href="{{ url_for('reports.stock_valuation', location_id=summary.location.id) }}"
+                           class="list-group-item list-group-item-action {% if selected_location_id == summary.location.id %}active{% endif %}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ summary.location.name }}</strong>
+                                    <div class="small">
+                                        <span class="badge {% if summary.location.location_type == 'warehouse' %}bg-primary{% else %}bg-secondary{% endif %}">
+                                            {{ summary.location.location_type }}
+                                        </span>
+                                        {{ summary.total_quantity }} units
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold {% if selected_location_id == summary.location.id %}text-white{% else %}text-success{% endif %}">
+                                        {{ format_currency(summary.selling_value) }}
+                                    </div>
+                                    <small class="{% if selected_location_id == summary.location.id %}text-white-50{% else %}text-muted{% endif %}">
+                                        Cost: {{ format_currency(summary.cost_value) }}
+                                    </small>
+                                </div>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stock Details -->
+        <div class="col-lg-8">
+            {% if selected_location %}
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-boxes me-2"></i>
+                        Stock Details: {{ selected_location.name }}
+                    </h5>
+                    <span class="badge bg-primary">{{ location_stock_details|length }} Products</span>
+                </div>
+                <div class="card-body p-0">
+                    {% if location_stock_details %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Product</th>
+                                    <th class="text-center">Qty</th>
+                                    <th class="text-end">Cost/Unit</th>
+                                    <th class="text-end">Sell/Unit</th>
+                                    <th class="text-end">Cost Value</th>
+                                    <th class="text-end">Sell Value</th>
+                                    <th class="text-end">Profit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% set totals = {'cost': 0, 'sell': 0, 'profit': 0, 'qty': 0} %}
+                                {% for item in location_stock_details %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ item.product.name }}</strong>
+                                        <div class="small text-muted">{{ item.product.sku }}</div>
+                                    </td>
+                                    <td class="text-center">{{ item.quantity }}</td>
+                                    <td class="text-end">{{ format_currency(item.cost_price) }}</td>
+                                    <td class="text-end">{{ format_currency(item.selling_price) }}</td>
+                                    <td class="text-end">{{ format_currency(item.cost_value) }}</td>
+                                    <td class="text-end text-success fw-bold">{{ format_currency(item.selling_value) }}</td>
+                                    <td class="text-end text-info">{{ format_currency(item.profit) }}</td>
+                                </tr>
+                                {% set _ = totals.update({'cost': totals.cost + item.cost_value, 'sell': totals.sell + item.selling_value, 'profit': totals.profit + item.profit, 'qty': totals.qty + item.quantity}) %}
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-light fw-bold">
+                                <tr>
+                                    <td>Total</td>
+                                    <td class="text-center">{{ totals.qty }}</td>
+                                    <td></td>
+                                    <td></td>
+                                    <td class="text-end">{{ format_currency(totals.cost) }}</td>
+                                    <td class="text-end text-success">{{ format_currency(totals.sell) }}</td>
+                                    <td class="text-end text-info">{{ format_currency(totals.profit) }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-box-open fa-3x mb-3"></i>
+                        <p>No stock found at this location</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <!-- Show all locations summary table -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>All Locations Summary</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Location</th>
+                                    <th>Type</th>
+                                    <th class="text-center">Products</th>
+                                    <th class="text-center">Total Qty</th>
+                                    <th class="text-end">Cost Value</th>
+                                    <th class="text-end">Selling Value</th>
+                                    <th class="text-end">Potential Profit</th>
+                                    <th class="text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for summary in location_summaries %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ summary.location.name }}</strong>
+                                        <div class="small text-muted">{{ summary.location.code }}</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if summary.location.location_type == 'warehouse' %}bg-primary{% else %}bg-secondary{% endif %}">
+                                            {{ summary.location.location_type }}
+                                        </span>
+                                    </td>
+                                    <td class="text-center">{{ summary.item_count }}</td>
+                                    <td class="text-center">{{ summary.total_quantity }}</td>
+                                    <td class="text-end">{{ format_currency(summary.cost_value) }}</td>
+                                    <td class="text-end text-success fw-bold">{{ format_currency(summary.selling_value) }}</td>
+                                    <td class="text-end text-info">
+                                        {{ format_currency(summary.potential_profit) }}
+                                        {% if summary.cost_value > 0 %}
+                                        <div class="small text-muted">{{ "%.1f"|format((summary.potential_profit / summary.cost_value) * 100) }}%</div>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <a href="{{ url_for('reports.stock_valuation', location_id=summary.location.id) }}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-light fw-bold">
+                                <tr>
+                                    <td colspan="2">Grand Total</td>
+                                    <td class="text-center">{{ grand_total_items }}</td>
+                                    <td class="text-center">{{ grand_total_quantity }}</td>
+                                    <td class="text-end">{{ format_currency(grand_total_cost) }}</td>
+                                    <td class="text-end text-success">{{ format_currency(grand_total_selling) }}</td>
+                                    <td class="text-end text-info">
+                                        {{ format_currency(grand_total_profit) }}
+                                        {% if grand_total_cost > 0 %}
+                                        <div class="small">{{ "%.1f"|format((grand_total_profit / grand_total_cost) * 100) }}%</div>
+                                        {% endif %}
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .btn, .no-print { display: none !important; }
+    .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+    .sidebar, .navbar { display: none !important; }
+    .main-content { margin-left: 0 !important; padding: 0 !important; }
+}
+</style>
+{% endblock %}
