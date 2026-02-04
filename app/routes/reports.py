@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, send_file, curre
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_, or_, extract, case
-from app.models import db, Sale, SaleItem, Product, Customer, StockMovement, Location, LocationStock, ProductionOrder, RawMaterialStock, RawMaterial, RawMaterialMovement, RawMaterialCategory, PurchaseOrder, PurchaseOrderItem, StockTransfer, StockTransferItem, DayClose
+from app.models import db, Sale, SaleItem, Product, Customer, StockMovement, Location, LocationStock, ProductionOrder, RawMaterialStock, RawMaterial, RawMaterialMovement, RawMaterialCategory, PurchaseOrder, PurchaseOrderItem, StockTransfer, StockTransferItem, DayClose, Recipe
 from app.utils.helpers import has_permission
 from app.utils.permissions import permission_required, Permissions
 from app.utils.pdf_utils import generate_daily_report, generate_sales_report
@@ -1233,13 +1233,14 @@ def stock_valuation():
 @login_required
 @permission_required(Permissions.REPORT_VIEW_INVENTORY)
 def stock_reconciliation():
-    """Stock Reconciliation Report - Compare expected vs actual stock"""
+    """Stock Reconciliation Report - Raw materials and purchased products (excludes recipe outputs)"""
     from datetime import date
 
     # Get filters
     selected_location_id = request.args.get('location_id', type=int)
     from_date_str = request.args.get('from_date')
     to_date_str = request.args.get('to_date')
+    show_type = request.args.get('show_type', 'all')  # 'all', 'raw_materials', 'products'
 
     # Default to current month
     today = date.today()
@@ -1256,89 +1257,172 @@ def stock_reconciliation():
     # Get all locations
     locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
 
-    # Build reconciliation data
-    reconciliation_data = []
-    total_expected = 0
-    total_actual = 0
-    total_variance = 0
-    total_variance_value = 0
+    # Get product IDs that are recipe outputs (produced items) - exclude these
+    recipe_output_product_ids = [r.product_id for r in Recipe.query.filter(Recipe.product_id.isnot(None)).all()]
 
-    # Get products with stock
-    products_query = Product.query.filter_by(is_active=True)
-    products = products_query.order_by(Product.name).all()
+    # ============================================================
+    # RAW MATERIALS RECONCILIATION
+    # ============================================================
+    raw_material_data = []
+    total_raw_material_value = 0
 
-    for product in products:
-        # Get current stock at location(s)
-        if selected_location_id:
-            stock = LocationStock.query.filter_by(
-                product_id=product.id,
-                location_id=selected_location_id
-            ).first()
-            current_qty = stock.quantity if stock else 0
-        else:
-            # Sum across all locations
-            current_qty = db.session.query(func.sum(LocationStock.quantity)).filter_by(
-                product_id=product.id
-            ).scalar() or 0
+    if show_type in ['all', 'raw_materials']:
+        raw_materials = RawMaterial.query.filter_by(is_active=True).order_by(RawMaterial.name).all()
 
-        # Calculate expected stock from movements in date range
-        movements_query = StockMovement.query.filter(
-            StockMovement.product_id == product.id,
-            StockMovement.timestamp >= datetime.combine(from_date, datetime.min.time()),
-            StockMovement.timestamp <= datetime.combine(to_date, datetime.max.time())
-        )
-        if selected_location_id:
-            movements_query = movements_query.filter_by(location_id=selected_location_id)
+        for material in raw_materials:
+            # Get current stock at location(s)
+            if selected_location_id:
+                stock = RawMaterialStock.query.filter_by(
+                    raw_material_id=material.id,
+                    location_id=selected_location_id
+                ).first()
+                current_qty = float(stock.quantity) if stock else 0
+            else:
+                current_qty = db.session.query(func.sum(RawMaterialStock.quantity)).filter_by(
+                    raw_material_id=material.id
+                ).scalar() or 0
+                current_qty = float(current_qty)
 
-        movements = movements_query.all()
+            # Get movements in date range
+            movements_query = RawMaterialMovement.query.filter(
+                RawMaterialMovement.raw_material_id == material.id,
+                RawMaterialMovement.timestamp >= datetime.combine(from_date, datetime.min.time()),
+                RawMaterialMovement.timestamp <= datetime.combine(to_date, datetime.max.time())
+            )
+            if selected_location_id:
+                movements_query = movements_query.filter_by(location_id=selected_location_id)
 
-        # Categorize movements
-        purchases_in = sum(m.quantity for m in movements if m.movement_type == 'purchase' and m.quantity > 0)
-        sales_out = abs(sum(m.quantity for m in movements if m.movement_type == 'sale' and m.quantity < 0))
-        adjustments = sum(m.quantity for m in movements if m.movement_type == 'adjustment')
-        transfers_in = sum(m.quantity for m in movements if m.movement_type == 'transfer_in' and m.quantity > 0)
-        transfers_out = abs(sum(m.quantity for m in movements if m.movement_type == 'transfer_out' and m.quantity < 0))
-        production_in = sum(m.quantity for m in movements if m.movement_type == 'production' and m.quantity > 0)
-        returns_in = sum(m.quantity for m in movements if m.movement_type == 'return' and m.quantity > 0)
-        damage_out = abs(sum(m.quantity for m in movements if m.movement_type == 'damage' and m.quantity < 0))
+            movements = movements_query.all()
 
-        # Calculate net movement
-        net_in = purchases_in + transfers_in + production_in + returns_in + (adjustments if adjustments > 0 else 0)
-        net_out = sales_out + transfers_out + damage_out + (abs(adjustments) if adjustments < 0 else 0)
+            # Categorize movements
+            purchases_in = sum(float(m.quantity) for m in movements if m.movement_type == 'purchase' and float(m.quantity) > 0)
+            production_out = abs(sum(float(m.quantity) for m in movements if m.movement_type == 'production_consumption' and float(m.quantity) < 0))
+            adjustments = sum(float(m.quantity) for m in movements if m.movement_type == 'adjustment')
+            transfers_in = sum(float(m.quantity) for m in movements if m.movement_type == 'transfer_in' and float(m.quantity) > 0)
+            transfers_out = abs(sum(float(m.quantity) for m in movements if m.movement_type == 'transfer_out' and float(m.quantity) < 0))
+            damage_out = abs(sum(float(m.quantity) for m in movements if m.movement_type == 'damage' and float(m.quantity) < 0))
 
-        # Only include products with activity or stock
-        if current_qty > 0 or net_in > 0 or net_out > 0:
-            # Variance (positive = excess, negative = shortage)
-            # Note: Without opening balance tracking, we show movement summary
-            variance = 0  # Would need opening balance to calculate true variance
-            variance_value = variance * float(product.cost_price or 0)
+            # Only include materials with activity or stock
+            if current_qty > 0 or purchases_in > 0 or production_out > 0:
+                cost_per_unit = float(material.cost_per_unit or 0)
+                stock_value = current_qty * cost_per_unit
 
-            reconciliation_data.append({
-                'product': product,
-                'current_stock': current_qty,
-                'purchases_in': purchases_in,
-                'sales_out': sales_out,
-                'adjustments': adjustments,
-                'transfers_in': transfers_in,
-                'transfers_out': transfers_out,
-                'production_in': production_in,
-                'returns_in': returns_in,
-                'damage_out': damage_out,
-                'net_in': net_in,
-                'net_out': net_out,
-                'stock_value': float(current_qty) * float(product.cost_price or 0)
-            })
+                raw_material_data.append({
+                    'material': material,
+                    'category': material.category.name if material.category else 'Unknown',
+                    'unit': material.unit,
+                    'current_stock': current_qty,
+                    'purchases_in': purchases_in,
+                    'production_out': production_out,
+                    'adjustments': adjustments,
+                    'transfers_in': transfers_in,
+                    'transfers_out': transfers_out,
+                    'damage_out': damage_out,
+                    'cost_per_unit': cost_per_unit,
+                    'stock_value': stock_value
+                })
 
-            total_actual += current_qty
+                total_raw_material_value += stock_value
+
+    # ============================================================
+    # PURCHASED PRODUCTS (Exclude recipe outputs)
+    # ============================================================
+    product_data = []
+    total_product_value = 0
+
+    if show_type in ['all', 'products']:
+        # Only get products that are NOT recipe outputs (directly purchased products)
+        products_query = Product.query.filter_by(is_active=True)
+        if recipe_output_product_ids:
+            products_query = products_query.filter(~Product.id.in_(recipe_output_product_ids))
+        products = products_query.order_by(Product.name).all()
+
+        for product in products:
+            # Get current stock at location(s)
+            if selected_location_id:
+                stock = LocationStock.query.filter_by(
+                    product_id=product.id,
+                    location_id=selected_location_id
+                ).first()
+                current_qty = stock.quantity if stock else 0
+            else:
+                current_qty = db.session.query(func.sum(LocationStock.quantity)).filter_by(
+                    product_id=product.id
+                ).scalar() or 0
+
+            # Get movements in date range
+            movements_query = StockMovement.query.filter(
+                StockMovement.product_id == product.id,
+                StockMovement.timestamp >= datetime.combine(from_date, datetime.min.time()),
+                StockMovement.timestamp <= datetime.combine(to_date, datetime.max.time())
+            )
+            if selected_location_id:
+                movements_query = movements_query.filter_by(location_id=selected_location_id)
+
+            movements = movements_query.all()
+
+            # Categorize movements
+            purchases_in = sum(m.quantity for m in movements if m.movement_type == 'purchase' and m.quantity > 0)
+            sales_out = abs(sum(m.quantity for m in movements if m.movement_type == 'sale' and m.quantity < 0))
+            adjustments = sum(m.quantity for m in movements if m.movement_type == 'adjustment')
+            transfers_in = sum(m.quantity for m in movements if m.movement_type == 'transfer_in' and m.quantity > 0)
+            transfers_out = abs(sum(m.quantity for m in movements if m.movement_type == 'transfer_out' and m.quantity < 0))
+            returns_in = sum(m.quantity for m in movements if m.movement_type == 'return' and m.quantity > 0)
+            damage_out = abs(sum(m.quantity for m in movements if m.movement_type == 'damage' and m.quantity < 0))
+
+            # Only include products with activity or stock
+            if current_qty > 0 or purchases_in > 0 or sales_out > 0:
+                # Get individual cost components
+                base_cost = float(product.base_cost or 0)
+                packaging_cost = float(product.packaging_cost or 0)
+                delivery_cost = float(product.delivery_cost or 0)
+                bottle_cost = float(product.bottle_cost or 0)
+                kiosk_cost = float(product.kiosk_cost or 0)
+                total_cost = base_cost + packaging_cost + delivery_cost + bottle_cost + kiosk_cost
+
+                # Calculate values based on current stock
+                base_value = float(current_qty) * base_cost
+                packaging_value = float(current_qty) * packaging_cost
+                delivery_value = float(current_qty) * delivery_cost
+                bottle_value = float(current_qty) * bottle_cost
+                kiosk_value = float(current_qty) * kiosk_cost
+                stock_value = float(current_qty) * total_cost
+
+                product_data.append({
+                    'product': product,
+                    'current_stock': current_qty,
+                    'purchases_in': purchases_in,
+                    'sales_out': sales_out,
+                    'adjustments': adjustments,
+                    'transfers_in': transfers_in,
+                    'transfers_out': transfers_out,
+                    'returns_in': returns_in,
+                    'damage_out': damage_out,
+                    # Cost breakdown per unit
+                    'base_cost': base_cost,
+                    'packaging_cost': packaging_cost,
+                    'delivery_cost': delivery_cost,
+                    'bottle_cost': bottle_cost,
+                    'kiosk_cost': kiosk_cost,
+                    'total_cost': total_cost,
+                    # Value breakdown (quantity * cost)
+                    'base_value': base_value,
+                    'packaging_value': packaging_value,
+                    'delivery_value': delivery_value,
+                    'bottle_value': bottle_value,
+                    'kiosk_value': kiosk_value,
+                    'stock_value': stock_value
+                })
+
+                total_product_value += stock_value
 
     # Get purchase summary for the period
-    purchase_query = PurchaseOrder.query.filter(
-        PurchaseOrder.order_date >= from_date,
-        PurchaseOrder.order_date <= to_date,
-        PurchaseOrder.status.in_(['received', 'partial'])
-    )
     purchase_summary = {
-        'total_orders': purchase_query.count(),
+        'total_orders': PurchaseOrder.query.filter(
+            PurchaseOrder.order_date >= from_date,
+            PurchaseOrder.order_date <= to_date,
+            PurchaseOrder.status.in_(['received', 'partial'])
+        ).count(),
         'total_value': db.session.query(func.sum(PurchaseOrder.grand_total_landed)).filter(
             PurchaseOrder.order_date >= from_date,
             PurchaseOrder.order_date <= to_date,
@@ -1354,21 +1438,21 @@ def stock_reconciliation():
         ).scalar() or 0
     }
 
-    # Get sales summary for the period
-    sales_query = Sale.query.filter(
-        Sale.sale_date >= datetime.combine(from_date, datetime.min.time()),
-        Sale.sale_date <= datetime.combine(to_date, datetime.max.time()),
-        Sale.status == 'completed'
-    )
-    if selected_location_id:
-        sales_query = sales_query.filter_by(location_id=selected_location_id)
-
-    sales_summary = {
-        'total_transactions': sales_query.count(),
-        'total_revenue': db.session.query(func.sum(Sale.total)).filter(
-            Sale.sale_date >= datetime.combine(from_date, datetime.min.time()),
-            Sale.sale_date <= datetime.combine(to_date, datetime.max.time()),
-            Sale.status == 'completed'
+    # Get production summary
+    production_summary = {
+        'total_orders': ProductionOrder.query.filter(
+            ProductionOrder.created_at >= datetime.combine(from_date, datetime.min.time()),
+            ProductionOrder.created_at <= datetime.combine(to_date, datetime.max.time())
+        ).count(),
+        'completed_orders': ProductionOrder.query.filter(
+            ProductionOrder.created_at >= datetime.combine(from_date, datetime.min.time()),
+            ProductionOrder.created_at <= datetime.combine(to_date, datetime.max.time()),
+            ProductionOrder.status == 'completed'
+        ).count(),
+        'total_produced': db.session.query(func.sum(ProductionOrder.quantity_produced)).filter(
+            ProductionOrder.created_at >= datetime.combine(from_date, datetime.min.time()),
+            ProductionOrder.created_at <= datetime.combine(to_date, datetime.max.time()),
+            ProductionOrder.status == 'completed'
         ).scalar() or 0
     }
 
@@ -1380,10 +1464,13 @@ def stock_reconciliation():
                          selected_location_id=selected_location_id,
                          from_date=from_date,
                          to_date=to_date,
-                         reconciliation_data=reconciliation_data,
-                         total_actual=total_actual,
+                         show_type=show_type,
+                         raw_material_data=raw_material_data,
+                         product_data=product_data,
+                         total_raw_material_value=total_raw_material_value,
+                         total_product_value=total_product_value,
                          purchase_summary=purchase_summary,
-                         sales_summary=sales_summary)
+                         production_summary=production_summary)
 
 
 @bp.route('/purchase-register')
