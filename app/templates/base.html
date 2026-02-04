@@ -1847,6 +1847,11 @@
                             </li>
                             {% if current_user.role in ['admin', 'warehouse_manager'] or current_user.is_global_admin %}
                             <li class="nav-item">
+                                <a class="nav-link" href="/inventory/opening-balance">
+                                    <i class="fas fa-history"></i> Opening Balance
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link" href="/warehouse">
                                     <i class="fas fa-warehouse"></i> Warehouse
                                 </a>

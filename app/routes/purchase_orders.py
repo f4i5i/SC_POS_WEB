@@ -103,10 +103,19 @@ def create():
             supplier_id = request.form.get('supplier_id', type=int)
             notes = request.form.get('notes', '').strip()
             expected_date_str = request.form.get('expected_date', '')
+            order_date_str = request.form.get('order_date', '')  # Allow backdating
 
             if not supplier_id:
                 flash('Please select a supplier', 'danger')
                 return redirect(url_for('purchase_orders.create'))
+
+            # Parse order date (allow backdating for historical entries)
+            order_date = datetime.utcnow()
+            if order_date_str:
+                try:
+                    order_date = datetime.strptime(order_date_str, '%Y-%m-%d')
+                except:
+                    pass
 
             # Create PO
             po = PurchaseOrder(
@@ -117,7 +126,7 @@ def create():
                 is_auto_generated=False,
                 source_type='manual',
                 notes=notes,
-                order_date=datetime.utcnow()
+                order_date=order_date
             )
 
             if expected_date_str:

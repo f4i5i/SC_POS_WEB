@@ -24,9 +24,20 @@
                             </select>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Expected Delivery Date</label>
-                            <input type="date" name="expected_date" class="form-control">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Order Date</label>
+                                    <input type="date" name="order_date" class="form-control" value="{{ today }}">
+                                    <small class="text-muted">Leave empty for today. Use past date for historical bills.</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Expected Delivery Date</label>
+                                    <input type="date" name="expected_date" class="form-control">
+                                </div>
+                            </div>
                         </div>
 
                         <div class="mb-3">

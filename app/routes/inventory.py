@@ -11,7 +11,7 @@ from decimal import Decimal
 import os
 import csv
 import io
-from app.models import db, Product, Category, Supplier, StockMovement, SyncQueue, Location, LocationStock
+from app.models import db, Product, Category, Supplier, StockMovement, SyncQueue, Location, LocationStock, RawMaterial, RawMaterialStock, RawMaterialMovement
 from app.utils.helpers import has_permission, allowed_file
 from app.utils.permissions import permission_required, Permissions
 import json
@@ -1090,3 +1090,144 @@ def print_stock_report():
                            low_stock_count=low_stock_count,
                            can_see_cost=can_see_cost,
                            print_date=datetime.now())
+
+
+# ============================================================
+# Opening Balance Entry - For Historical Data
+# ============================================================
+
+@bp.route('/opening-balance', methods=['GET', 'POST'])
+@login_required
+@permission_required(Permissions.INVENTORY_ADJUST)
+def opening_balance():
+    """Enter opening balances for products and raw materials (historical data)"""
+
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    products = Product.query.filter_by(is_active=True).order_by(Product.name).all()
+    raw_materials = RawMaterial.query.filter_by(is_active=True).order_by(RawMaterial.name).all()
+
+    if request.method == 'POST':
+        try:
+            entry_type = request.form.get('entry_type')  # 'product' or 'raw_material'
+            location_id = request.form.get('location_id', type=int)
+            item_id = request.form.get('item_id', type=int)
+            quantity = request.form.get('quantity', type=float)
+            entry_date_str = request.form.get('entry_date', '')
+            notes = request.form.get('notes', '').strip()
+
+            if not location_id or not item_id or quantity is None:
+                flash('Please fill all required fields', 'danger')
+                return redirect(url_for('inventory.opening_balance'))
+
+            # Parse entry date
+            if entry_date_str:
+                entry_date = datetime.strptime(entry_date_str, '%Y-%m-%d')
+            else:
+                entry_date = datetime.utcnow()
+
+            location = Location.query.get(location_id)
+            if not location:
+                flash('Invalid location', 'danger')
+                return redirect(url_for('inventory.opening_balance'))
+
+            if entry_type == 'product':
+                # Add opening balance for finished product
+                product = Product.query.get(item_id)
+                if not product:
+                    flash('Invalid product', 'danger')
+                    return redirect(url_for('inventory.opening_balance'))
+
+                # Get or create location stock
+                stock = LocationStock.query.filter_by(
+                    product_id=item_id,
+                    location_id=location_id
+                ).first()
+
+                if not stock:
+                    stock = LocationStock(
+                        product_id=item_id,
+                        location_id=location_id,
+                        quantity=0
+                    )
+                    db.session.add(stock)
+
+                # Update stock
+                stock.quantity += int(quantity)
+                stock.last_movement_at = entry_date
+
+                # Create stock movement record
+                movement = StockMovement(
+                    product_id=item_id,
+                    location_id=location_id,
+                    user_id=current_user.id,
+                    movement_type='adjustment',
+                    quantity=int(quantity),
+                    reference='OPENING_BALANCE',
+                    notes=notes or f'Opening balance entry - {entry_date.strftime("%d %b %Y")}',
+                    timestamp=entry_date
+                )
+                db.session.add(movement)
+
+                # Also update global product quantity
+                product.quantity += int(quantity)
+
+                db.session.commit()
+                flash(f'Opening balance of {int(quantity)} units added for {product.name} at {location.name}', 'success')
+
+            elif entry_type == 'raw_material':
+                # Add opening balance for raw material
+                material = RawMaterial.query.get(item_id)
+                if not material:
+                    flash('Invalid raw material', 'danger')
+                    return redirect(url_for('inventory.opening_balance'))
+
+                # Get or create raw material stock
+                stock = RawMaterialStock.query.filter_by(
+                    raw_material_id=item_id,
+                    location_id=location_id
+                ).first()
+
+                if not stock:
+                    stock = RawMaterialStock(
+                        raw_material_id=item_id,
+                        location_id=location_id,
+                        quantity=0
+                    )
+                    db.session.add(stock)
+
+                # Update stock
+                stock.quantity = Decimal(str(stock.quantity or 0)) + Decimal(str(quantity))
+                stock.last_movement_at = entry_date
+
+                # Create movement record
+                movement = RawMaterialMovement(
+                    raw_material_id=item_id,
+                    location_id=location_id,
+                    user_id=current_user.id,
+                    movement_type='adjustment',
+                    quantity=Decimal(str(quantity)),
+                    reference='OPENING_BALANCE',
+                    notes=notes or f'Opening balance entry - {entry_date.strftime("%d %b %Y")}',
+                    timestamp=entry_date
+                )
+                db.session.add(movement)
+
+                # Also update global material quantity
+                material.quantity = Decimal(str(material.quantity or 0)) + Decimal(str(quantity))
+
+                db.session.commit()
+                flash(f'Opening balance of {quantity} {material.unit} added for {material.name} at {location.name}', 'success')
+
+            else:
+                flash('Invalid entry type', 'danger')
+
+            return redirect(url_for('inventory.opening_balance'))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error: {str(e)}', 'danger')
+
+    return render_template('inventory/opening_balance.html',
+                         locations=locations,
+                         products=products,
+                         raw_materials=raw_materials)
