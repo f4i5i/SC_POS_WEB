@@ -2165,6 +2165,42 @@
         };
     </script>
 
+    <!-- Modal Cleanup Fix - Ensure backdrop is removed on modal close -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Fix for modal backdrop hanging when modal is closed
+            document.querySelectorAll('.modal').forEach(function(modal) {
+                modal.addEventListener('hidden.bs.modal', function() {
+                    // Remove any remaining backdrops
+                    document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
+                        backdrop.remove();
+                    });
+                    // Remove modal-open class from body
+                    document.body.classList.remove('modal-open');
+                    // Remove inline styles added by Bootstrap
+                    document.body.style.removeProperty('overflow');
+                    document.body.style.removeProperty('padding-right');
+                });
+            });
+
+            // Also handle dynamically created modals
+            document.body.addEventListener('hidden.bs.modal', function(event) {
+                if (event.target.classList.contains('modal')) {
+                    setTimeout(function() {
+                        if (!document.querySelector('.modal.show')) {
+                            document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
+                                backdrop.remove();
+                            });
+                            document.body.classList.remove('modal-open');
+                            document.body.style.removeProperty('overflow');
+                            document.body.style.removeProperty('padding-right');
+                        }
+                    }, 100);
+                }
+            });
+        });
+    </script>
+
     <!-- Theme Switching Script -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
