@@ -400,7 +400,7 @@ def add_recipe():
                 output_size_ml=output_size_ml,
                 oil_percentage=oil_percentage,
                 can_produce_at_warehouse=True,
-                can_produce_at_kiosk=can_produce_at_kiosk if recipe_type != 'perfume' else False,
+                can_produce_at_kiosk=can_produce_at_kiosk,
                 description=description,
                 created_by=current_user.id
             )
