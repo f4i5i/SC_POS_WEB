@@ -261,9 +261,11 @@ class ProductionService:
             if not location:
                 return None, 'Location not found'
 
-            # Check production constraints
-            if recipe.recipe_type == 'perfume' and location.location_type != 'warehouse':
-                return None, 'Perfumes can only be produced at warehouse'
+            # Check production constraints based on recipe flags
+            if location.location_type == 'kiosk' and not recipe.can_produce_at_kiosk:
+                return None, 'This recipe cannot be produced at kiosk'
+            if location.location_type == 'warehouse' and not recipe.can_produce_at_warehouse:
+                return None, 'This recipe cannot be produced at warehouse'
 
             # Create order
             order = ProductionOrder(

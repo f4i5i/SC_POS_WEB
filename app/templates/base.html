@@ -1661,12 +1661,15 @@
         .modal.show button {
             pointer-events: auto !important;
         }
-        /* Fix for modal appearing behind sidebar */
+        /* Fix for modal appearing behind sidebar / trapped in stacking context */
         body.modal-open .sidebar {
             z-index: 999 !important;
         }
         body.modal-open .navbar {
             z-index: 999 !important;
+        }
+        body.modal-open .main-wrapper {
+            z-index: auto !important;
         }
 
         /* ========== GLOBAL PRINT STYLES ========== */

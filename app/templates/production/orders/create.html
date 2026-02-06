@@ -38,7 +38,7 @@
         <i class="fas fa-map-marker-alt me-2"></i>
         Production Location: <strong>{{ current_location.name }}</strong>
         {% if current_location.location_type == 'kiosk' %}
-        <br><small>Note: Only attar recipes can be produced at kiosks</small>
+        <br><small>Note: Only recipes marked for kiosk production are shown</small>
         {% endif %}
         {% if is_global_admin and available_locations %}
         <div class="mt-2">

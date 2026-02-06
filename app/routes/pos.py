@@ -112,8 +112,8 @@ def get_attar_oil_availability(product, location_id):
     if not recipe:
         return None
 
-    # Only handle single_oil and blended attars (not perfumes at kiosks)
-    if recipe.recipe_type not in ('single_oil', 'blended'):
+    # Check if recipe can be produced at kiosk
+    if not recipe.can_produce_at_kiosk:
         return None
 
     # Get oil ingredients (non-packaging)
@@ -123,8 +123,9 @@ def get_attar_oil_availability(product, location_id):
 
     # Calculate oil requirement per unit
     output_ml = float(recipe.output_size_ml or 0)
-    # For attars, oil_percentage is 100%
-    oil_required_per_unit = output_ml
+    # For attars oil_percentage is 100%, for perfumes it's a fraction (e.g. 35%)
+    oil_percentage = float(recipe.oil_percentage or 100) / 100
+    oil_required_per_unit = output_ml * oil_percentage
 
     # Check oil availability at location
     oil_info = []
@@ -145,8 +146,9 @@ def get_attar_oil_availability(product, location_id):
 
         # For single oil: full output_ml per unit
         # For blended: percentage of output_ml
+        # For perfume: percentage of (output_ml * oil_percentage)
         percentage = float(ingredient.percentage or 100) / 100
-        required_per_unit = output_ml * percentage
+        required_per_unit = output_ml * oil_percentage * percentage
 
         # How many units can be made with this oil
         can_produce = int(available_ml / required_per_unit) if required_per_unit > 0 else 0

@@ -379,7 +379,7 @@
                 <input type="hidden" name="action" value="reject">
                 <div class="modal-header bg-danger text-white">
                     <h5 class="modal-title" id="rejectModalLabel"><i class="fas fa-times-circle me-2"></i>Reject Order</h5>
-                    <button type="button" class="btn-close btn-close-white" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <p>Are you sure you want to reject this production order?</p>
@@ -390,7 +390,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-danger">
                         <i class="fas fa-times me-1"></i>Reject
                     </button>
@@ -419,7 +419,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="cancelModalClose">Keep Order</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep Order</button>
                     <button type="submit" class="btn btn-warning">
                         <i class="fas fa-ban me-1"></i>Cancel Order
                     </button>
@@ -429,76 +429,4 @@
     </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Function to properly close modal and clean up
-    function closeModal(modalId) {
-        var modalEl = document.getElementById(modalId);
-        var modal = bootstrap.Modal.getInstance(modalEl);
-        if (modal) {
-            modal.hide();
-        }
-        // Force cleanup after a short delay
-        setTimeout(function() {
-            document.querySelectorAll('.modal-backdrop').forEach(function(el) {
-                el.remove();
-            });
-            document.body.classList.remove('modal-open');
-            document.body.style.overflow = '';
-            document.body.style.paddingRight = '';
-            modalEl.classList.remove('show');
-            modalEl.style.display = 'none';
-            modalEl.setAttribute('aria-hidden', 'true');
-        }, 150);
-    }
-
-    // Reject Modal - Cancel button
-    var rejectModalCloseBtn = document.querySelector('#rejectModal .btn-secondary');
-    if (rejectModalCloseBtn) {
-        rejectModalCloseBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            closeModal('rejectModal');
-        });
-    }
-
-    // Reject Modal - X button
-    var rejectModalXBtn = document.querySelector('#rejectModal .btn-close');
-    if (rejectModalXBtn) {
-        rejectModalXBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            closeModal('rejectModal');
-        });
-    }
-
-    // Cancel Modal - Keep Order button
-    var cancelModalCloseBtn = document.getElementById('cancelModalClose');
-    if (cancelModalCloseBtn) {
-        cancelModalCloseBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            closeModal('cancelModal');
-        });
-    }
-
-    // Cancel Modal - X button
-    var cancelModalXBtn = document.querySelector('#cancelModal .btn-close');
-    if (cancelModalXBtn) {
-        cancelModalXBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            closeModal('cancelModal');
-        });
-    }
-
-    // Also handle clicking outside the modal (backdrop click)
-    ['rejectModal', 'cancelModal'].forEach(function(modalId) {
-        var modalEl = document.getElementById(modalId);
-        if (modalEl) {
-            modalEl.addEventListener('click', function(e) {
-                if (e.target === modalEl) {
-                    closeModal(modalId);
-                }
-            });
-        }
-    });
-});
-</script>
 {% endblock %}

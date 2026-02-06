@@ -81,7 +81,7 @@
                                 <div class="form-check">
                                     <input type="checkbox" name="can_produce_at_kiosk" class="form-check-input" id="kiosk-check"
                                            {% if recipe.can_produce_at_kiosk %}checked{% endif %}
-                                           {% if recipe.recipe_type == 'perfume' %}disabled{% endif %}>
+                                           >
                                     <label class="form-check-label" for="kiosk-check">
                                         Kiosk locations
                                     </label>
@@ -352,11 +352,8 @@ document.getElementById('recipe-type').addEventListener('change', function() {
 
     if (type === 'perfume') {
         oilField.style.display = 'block';
-        kioskCheck.checked = false;
-        kioskCheck.disabled = true;
     } else {
         oilField.style.display = 'none';
-        kioskCheck.disabled = false;
     }
     updateSummary();
 });

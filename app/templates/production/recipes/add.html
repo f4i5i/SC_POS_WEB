@@ -93,7 +93,7 @@
                                     <input type="checkbox" name="can_produce_at_kiosk" class="form-check-input" id="kiosk-check" checked>
                                     <label class="form-check-label" for="kiosk-check">
                                         Kiosk locations
-                                        <small class="text-muted">(Not available for perfumes)</small>
+                                        <small class="text-muted">(Enable to allow production at kiosk locations)</small>
                                     </label>
                                 </div>
                             </div>
@@ -358,11 +358,8 @@ document.getElementById('recipe-type').addEventListener('change', function() {
 
     if (type === 'perfume') {
         oilField.style.display = 'block';
-        kioskCheck.checked = false;
-        kioskCheck.disabled = true;
     } else {
         oilField.style.display = 'none';
-        kioskCheck.disabled = false;
         if (type === 'single_oil') {
             kioskCheck.checked = true;
         }

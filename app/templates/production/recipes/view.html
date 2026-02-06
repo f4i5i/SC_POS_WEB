@@ -246,7 +246,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for order in recipe.production_orders.order_by(db.desc('created_at')).limit(5).all() %}
+                                {% for order in (recipe.production_orders|sort(attribute='created_at', reverse=true))[:5] %}
                                 <tr>
                                     <td>
                                         <a href="{{ url_for('production.view_order', id=order.id) }}">
