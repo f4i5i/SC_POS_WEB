@@ -372,7 +372,22 @@ document.addEventListener('change', function(e) {
         }
         updateSummary();
     }
+    // Auto-detect packaging based on material type selection
     if (e.target.classList.contains('ingredient-select')) {
+        const row = e.target.closest('.ingredient-row');
+        const packagingCheck = row.querySelector('.packaging-check');
+        const percentInput = row.querySelector('.percentage-input');
+        const selected = e.target.options[e.target.selectedIndex];
+        const type = selected ? selected.getAttribute('data-type') : '';
+
+        if (type === 'bottle') {
+            packagingCheck.checked = true;
+            percentInput.value = '';
+            percentInput.disabled = true;
+        } else if (type === 'oil') {
+            packagingCheck.checked = false;
+            percentInput.disabled = false;
+        }
         updateSummary();
     }
 });

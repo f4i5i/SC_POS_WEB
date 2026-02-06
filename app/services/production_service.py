@@ -103,11 +103,14 @@ class ProductionService:
             if not material:
                 continue
 
-            if ingredient.is_packaging:
-                # Bottles - one per unit produced
+            # Determine type by material category (more reliable than is_packaging flag)
+            mat_category = material.category.code if material.category else None
+
+            if mat_category == 'BOTTLE' or (ingredient.is_packaging and mat_category != 'OIL'):
+                # Bottles/packaging - one per unit produced
                 required_qty = quantity
                 unit = 'pcs'
-            elif material.category and material.category.code == 'ETHANOL':
+            elif mat_category == 'ETHANOL':
                 # Ethanol for perfumes
                 required_qty = ethanol_amount_ml
                 unit = 'ml'
@@ -122,14 +125,15 @@ class ProductionService:
                     required_qty = oil_amount_ml * ing_percentage
                 unit = 'ml'
 
-            # Determine unit: packaging = pcs, liquids = ml
-            if ingredient.is_packaging:
+            # Determine display unit
+            if mat_category == 'BOTTLE' or (ingredient.is_packaging and mat_category != 'OIL'):
                 display_unit = 'pcs'
-            elif material.category and material.category.code in ['OIL', 'ETHANOL']:
+            elif mat_category in ('OIL', 'ETHANOL'):
                 display_unit = 'ml'
             else:
                 display_unit = material.unit or 'ml'
 
+            is_pack = mat_category == 'BOTTLE' or (ingredient.is_packaging and mat_category != 'OIL')
             materials.append({
                 'raw_material_id': material.id,
                 'raw_material': material,
@@ -137,8 +141,8 @@ class ProductionService:
                 'name': material.name,
                 'unit': display_unit,
                 'quantity_required': round(required_qty, 4),
-                'is_packaging': ingredient.is_packaging,
-                'percentage': float(ingredient.percentage or 0) if not ingredient.is_packaging else None
+                'is_packaging': is_pack,
+                'percentage': float(ingredient.percentage or 0) if not is_pack else None
             })
 
         # Add ethanol if perfume and not already in ingredients

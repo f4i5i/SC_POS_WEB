@@ -414,7 +414,10 @@ def add_recipe():
 
             for i, mat_id in enumerate(ingredient_ids):
                 if mat_id:
-                    is_pack = str(i) in is_packaging_list
+                    # Auto-detect packaging from material category
+                    material = RawMaterial.query.get(int(mat_id))
+                    mat_cat = material.category.code if material and material.category else None
+                    is_pack = mat_cat == 'BOTTLE'
                     pct = float(percentages[i]) if i < len(percentages) and percentages[i] else None
 
                     ingredient = RecipeIngredient(
@@ -506,7 +509,10 @@ def edit_recipe(id):
 
             for i, mat_id in enumerate(ingredient_ids):
                 if mat_id:
-                    is_pack = str(i) in is_packaging_list
+                    # Auto-detect packaging from material category
+                    material = RawMaterial.query.get(int(mat_id))
+                    mat_cat = material.category.code if material and material.category else None
+                    is_pack = mat_cat == 'BOTTLE'
                     pct = float(percentages[i]) if i < len(percentages) and percentages[i] else None
 
                     ingredient = RecipeIngredient(
