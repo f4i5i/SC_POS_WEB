@@ -473,9 +473,9 @@ class ProductionService:
                 if not stock:
                     return False, f"No stock record for {material['name']} at this location"
 
-                # Check available quantity
-                if stock.available_quantity < float(qty_required):
-                    return False, f"Insufficient {material['name']}: need {qty_required}, have {stock.available_quantity}"
+                # Check total quantity (includes reserved for this order)
+                if float(stock.quantity or 0) < float(qty_required):
+                    return False, f"Insufficient {material['name']}: need {qty_required}, have {stock.quantity}"
 
                 # Deduct from stock
                 stock.quantity = Decimal(str(stock.quantity)) - qty_required
