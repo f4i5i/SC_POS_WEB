@@ -1743,7 +1743,7 @@ class Recipe(db.Model):
 
     # Production constraints
     can_produce_at_warehouse = db.Column(db.Boolean, default=True)
-    can_produce_at_kiosk = db.Column(db.Boolean, default=True)  # False for perfumes
+    can_produce_at_kiosk = db.Column(db.Boolean, default=True)
 
     # Status
     is_active = db.Column(db.Boolean, default=True)
