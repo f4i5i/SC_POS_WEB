@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}DB Browser - Developer{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-database text-primary me-2"></i>Database Browser</h2>
+            <p class="text-muted mb-0">{{ total_models }} models, {{ total_records }} total records</p>
+        </div>
+        <a href="{{ url_for('developer.error_list') }}" class="btn btn-outline-danger">
+            <i class="fas fa-bug me-2"></i>Error Logs
+        </a>
+    </div>
+
+    <div class="row g-4">
+        {% for category, models in categories.items() %}
+        <div class="col-lg-4 col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        {% if category == 'Auth & Users' %}<i class="fas fa-users-cog text-primary me-2"></i>
+                        {% elif category == 'Products & Inventory' %}<i class="fas fa-boxes text-success me-2"></i>
+                        {% elif category == 'Sales & POS' %}<i class="fas fa-cash-register text-warning me-2"></i>
+                        {% elif category == 'Customers' %}<i class="fas fa-user-friends text-info me-2"></i>
+                        {% elif category == 'Suppliers & Purchasing' %}<i class="fas fa-truck text-secondary me-2"></i>
+                        {% elif category == 'Locations & Transfers' %}<i class="fas fa-exchange-alt text-danger me-2"></i>
+                        {% elif category == 'Production' %}<i class="fas fa-industry text-dark me-2"></i>
+                        {% elif category == 'Finance' %}<i class="fas fa-chart-line text-success me-2"></i>
+                        {% elif category == 'Marketing & Loyalty' %}<i class="fas fa-bullhorn text-warning me-2"></i>
+                        {% elif category == 'Notifications & Messaging' %}<i class="fas fa-envelope text-info me-2"></i>
+                        {% elif category == 'System' %}<i class="fas fa-cogs text-secondary me-2"></i>
+                        {% elif category == 'Controls & Approvals' %}<i class="fas fa-shield-alt text-danger me-2"></i>
+                        {% else %}<i class="fas fa-folder text-muted me-2"></i>{% endif %}
+                        {{ category }}
+                        <span class="badge bg-secondary ms-2">{{ models|length }}</span>
+                    </h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for model in models %}
+                    <a href="{{ url_for('developer.db_table', tablename=model.tablename) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2">
+                        <div>
+                            <strong class="small">{{ model.name }}</strong>
+                            <div class="text-muted" style="font-size: 0.7rem;">{{ model.tablename }}</div>
+                        </div>
+                        <span class="badge bg-primary rounded-pill">{{ model.record_count }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

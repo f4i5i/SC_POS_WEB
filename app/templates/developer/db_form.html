@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if action == 'edit' else 'Create' }} {{ model.__name__ }} - DB Browser{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                <i class="fas fa-{{ 'edit' if action == 'edit' else 'plus' }} text-{{ 'warning' if action == 'edit' else 'success' }} me-2"></i>
+                {{ 'Edit' if action == 'edit' else 'Create' }} {{ model.__name__ }}
+                {% if record %} #{{ record.id }}{% endif %}
+            </h2>
+            <p class="text-muted mb-0">Table: <code>{{ tablename }}</code></p>
+        </div>
+        <div class="d-flex gap-2">
+            {% if action == 'edit' %}
+            <a href="{{ url_for('developer.db_record', tablename=tablename, record_id=record.id) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+            {% else %}
+            <a href="{{ url_for('developer.db_table', tablename=tablename) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                {% for col in columns %}
+                {% if col.is_hidden %}
+                    {# Skip hidden columns like password_hash #}
+                {% elif col.name == 'id' %}
+                    {% if action == 'edit' %}
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">id <span class="badge bg-warning text-dark">PK</span></label>
+                        <input type="text" class="form-control" value="{{ record.id }}" disabled>
+                    </div>
+                    {% endif %}
+                {% else %}
+                    {% set val = record.__dict__.get(col.name, '') if record else '' %}
+                    {% set is_readonly = col.is_readonly and action == 'edit' %}
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            {{ col.name }}
+                            {% if col.foreign_key %}<span class="badge bg-info">FK: {{ col.foreign_key }}</span>{% endif %}
+                            {% if not col.nullable %}<span class="text-danger">*</span>{% endif %}
+                            <span class="text-muted fw-normal small ms-2">{{ col.type }}</span>
+                        </label>
+
+                        {% if col.input_type == 'checkbox' %}
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="{{ col.name }}" id="{{ col.name }}"
+                                {{ 'checked' if val }} {{ 'disabled' if is_readonly }}>
+                            <label class="form-check-label" for="{{ col.name }}">{{ col.name }}</label>
+                        </div>
+
+                        {% elif col.input_type == 'textarea' %}
+                        <textarea class="form-control" name="{{ col.name }}" rows="3"
+                            {{ 'readonly' if is_readonly }}
+                            {{ 'required' if not col.nullable and not col.default }}>{{ val if val is not none else '' }}</textarea>
+
+                        {% elif col.input_type == 'datetime-local' %}
+                        <input type="datetime-local" class="form-control" name="{{ col.name }}"
+                            value="{{ val.strftime('%Y-%m-%dT%H:%M') if val else '' }}"
+                            {{ 'readonly' if is_readonly }}
+                            {{ 'required' if not col.nullable and not col.default }}>
+
+                        {% elif col.input_type == 'date' %}
+                        <input type="date" class="form-control" name="{{ col.name }}"
+                            value="{{ val.strftime('%Y-%m-%d') if val else '' }}"
+                            {{ 'readonly' if is_readonly }}
+                            {{ 'required' if not col.nullable and not col.default }}>
+
+                        {% elif col.input_type == 'number' %}
+                        <input type="number" class="form-control" name="{{ col.name }}"
+                            value="{{ val if val is not none else '' }}"
+                            step="{{ 'any' if col.python_type in ('Numeric', 'Float') else '1' }}"
+                            {{ 'readonly' if is_readonly }}
+                            {{ 'required' if not col.nullable and not col.default }}>
+
+                        {% else %}
+                        <input type="text" class="form-control" name="{{ col.name }}"
+                            value="{{ val if val is not none else '' }}"
+                            {{ 'readonly' if is_readonly }}
+                            {{ 'required' if not col.nullable and not col.default }}>
+                        {% endif %}
+                    </div>
+                {% endif %}
+                {% endfor %}
+
+                <hr>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-{{ 'warning' if action == 'edit' else 'success' }}">
+                        <i class="fas fa-{{ 'save' if action == 'edit' else 'plus' }} me-2"></i>
+                        {{ 'Update' if action == 'edit' else 'Create' }} Record
+                    </button>
+                    {% if action == 'edit' %}
+                    <a href="{{ url_for('developer.db_record', tablename=tablename, record_id=record.id) }}" class="btn btn-secondary">Cancel</a>
+                    {% else %}
+                    <a href="{{ url_for('developer.db_table', tablename=tablename) }}" class="btn btn-secondary">Cancel</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

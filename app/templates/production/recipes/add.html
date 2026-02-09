@@ -332,7 +332,8 @@ function updateSummary() {
             <strong>Total Output:</strong> ${outputSize} ml<br>
             <strong>Total Oil:</strong> ${totalOilMl.toFixed(2)} ml (${(oilPercentage * 100).toFixed(0)}%)`;
         if (recipeType === 'perfume') {
-            html += `<br><strong>Total Ethanol:</strong> ${(outputSize - totalOilMl).toFixed(2)} ml (${((1 - oilPercentage) * 100).toFixed(0)}%)`;
+            const ethanolMl = outputSize * (1 - oilPercentage);
+            html += `<br><strong>Total Ethanol:</strong> ${ethanolMl.toFixed(2)} ml (${((1 - oilPercentage) * 100).toFixed(0)}%)`;
         }
         html += '</div>';
 

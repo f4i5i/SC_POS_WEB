@@ -38,6 +38,7 @@ class User(UserMixin, db.Model):
     # Multi-kiosk support
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'))  # Assigned kiosk/warehouse
     is_global_admin = db.Column(db.Boolean, default=False)  # Can access all locations
+    is_developer = db.Column(db.Boolean, default=False)  # Can access developer tools & DB browser
 
     # Relationships
     sales = db.relationship('Sale', backref='cashier', lazy='dynamic', foreign_keys='Sale.user_id')
@@ -1021,6 +1022,51 @@ class ActivityLog(db.Model):
 
     def __repr__(self):
         return f'<ActivityLog {self.action}>'
+
+
+class ErrorLog(db.Model):
+    """Application error log for tracking all errors"""
+    __tablename__ = 'error_logs'
+    __table_args__ = (
+        db.Index('ix_error_logs_timestamp', 'timestamp'),
+        db.Index('ix_error_logs_error_type', 'error_type'),
+        db.Index('ix_error_logs_status_code', 'status_code'),
+        db.Index('ix_error_logs_type_timestamp', 'error_type', 'timestamp'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    error_type = db.Column(db.String(128), nullable=False)
+    error_message = db.Column(db.Text, nullable=False)
+    traceback = db.Column(db.Text)
+
+    # Request context
+    request_url = db.Column(db.String(512))
+    request_method = db.Column(db.String(10))
+    request_data = db.Column(db.Text)
+
+    # User context
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    ip_address = db.Column(db.String(64))
+    user_agent = db.Column(db.String(512))
+
+    # Error classification
+    status_code = db.Column(db.Integer, default=500)
+    blueprint = db.Column(db.String(64))
+    endpoint = db.Column(db.String(128))
+
+    # Resolution tracking
+    is_resolved = db.Column(db.Boolean, default=False)
+    resolved_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    resolved_at = db.Column(db.DateTime)
+    resolution_notes = db.Column(db.Text)
+
+    # Relationships
+    user = db.relationship('User', foreign_keys=[user_id], backref=db.backref('error_logs', lazy='dynamic'))
+    resolver = db.relationship('User', foreign_keys=[resolved_by])
+
+    def __repr__(self):
+        return f'<ErrorLog {self.error_type}: {self.status_code}>'
 
 
 class Report(db.Model):

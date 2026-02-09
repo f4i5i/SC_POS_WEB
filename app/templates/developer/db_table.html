@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}{{ model.__name__ }} - DB Browser{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-table text-primary me-2"></i>{{ model.__name__ }}</h2>
+            <p class="text-muted mb-0">Table: <code>{{ tablename }}</code> | {{ pagination.total }} records</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('developer.db_dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Dashboard
+            </a>
+            <a href="{{ url_for('developer.db_create', tablename=tablename) }}" class="btn btn-success">
+                <i class="fas fa-plus me-2"></i>New Record
+            </a>
+        </div>
+    </div>
+
+    <!-- Search -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-body py-2">
+            <form method="GET" class="d-flex gap-2">
+                <input type="text" name="search" class="form-control form-control-sm"
+                       placeholder="Search across text columns..." value="{{ search }}">
+                <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i></button>
+                {% if search %}
+                <a href="{{ url_for('developer.db_table', tablename=tablename) }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        {% for col in display_columns %}
+                        <th>
+                            <a href="{{ url_for('developer.db_table', tablename=tablename, search=search, sort=col.name, dir='asc' if sort_by == col.name and sort_dir == 'desc' else 'desc') }}" class="text-white text-decoration-none">
+                                {{ col.name }}
+                                {% if sort_by == col.name %}
+                                <i class="fas fa-sort-{{ 'down' if sort_dir == 'desc' else 'up' }} ms-1"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        {% endfor %}
+                        <th style="width: 100px">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in records %}
+                    <tr>
+                        {% for col in display_columns %}
+                        <td class="small" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            {% set val = record.__dict__.get(col.name, '') %}
+                            {% if col.name == 'id' %}
+                            <a href="{{ url_for('developer.db_record', tablename=tablename, record_id=val) }}">
+                                <strong>{{ val }}</strong>
+                            </a>
+                            {% elif col.is_hidden %}
+                            <span class="text-muted">[hidden]</span>
+                            {% elif col.python_type == 'Boolean' %}
+                                {% if val %}
+                                <span class="badge bg-success">True</span>
+                                {% else %}
+                                <span class="badge bg-secondary">False</span>
+                                {% endif %}
+                            {% elif val is none %}
+                            <span class="text-muted">null</span>
+                            {% else %}
+                            {{ val|string|truncate(50) }}
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('developer.db_record', tablename=tablename, record_id=record.id) }}" class="btn btn-outline-primary" title="View">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{{ url_for('developer.db_edit', tablename=tablename, record_id=record.id) }}" class="btn btn-outline-warning" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button type="button" class="btn btn-outline-danger" title="Delete" onclick="confirmDelete('{{ tablename }}', {{ record.id }})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="{{ display_columns|length + 1 }}" class="text-center py-4 text-muted">
+                            {% if search %}No records matching "{{ search }}"{% else %}No records in this table{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if pagination.pages > 1 %}
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <small class="text-muted">
+                Page {{ pagination.page }} of {{ pagination.pages }}
+                ({{ pagination.total }} records)
+            </small>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    {% if pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('developer.db_table', tablename=tablename, page=pagination.prev_num, search=search, sort=sort_by, dir=sort_dir) }}">Prev</a>
+                    </li>
+                    {% endif %}
+                    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if p %}
+                        <li class="page-item {{ 'active' if p == pagination.page }}">
+                            <a class="page-link" href="{{ url_for('developer.db_table', tablename=tablename, page=p, search=search, sort=sort_by, dir=sort_dir) }}">{{ p }}</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('developer.db_table', tablename=tablename, page=pagination.next_num, search=search, sort=sort_by, dir=sort_dir) }}">Next</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Delete Form (hidden) -->
+<form id="deleteForm" method="POST" style="display: none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+</form>
+
+<script>
+function confirmDelete(tablename, recordId) {
+    if (confirm('Are you sure you want to delete this record?\n\nThis action cannot be undone.')) {
+        const form = document.getElementById('deleteForm');
+        form.action = `/developer/db/${tablename}/${recordId}/delete`;
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

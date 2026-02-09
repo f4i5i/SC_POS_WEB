@@ -288,7 +288,9 @@ function deleteRecipe() {
 function calculateMaterials() {
     const qty = document.getElementById('calc-qty').value;
     const recipeId = {{ recipe.id }};
+    const locationId = {{ current_location.id if current_location else 'null' }};
 
+    // First get calculation requirements
     fetch(`{{ url_for('production.api_calculate_requirements') }}?recipe_id=${recipeId}&quantity=${qty}`)
         .then(response => response.json())
         .then(data => {
@@ -305,23 +307,67 @@ function calculateMaterials() {
                 ethanolEl.textContent = data.ethanol_amount_ml.toFixed(2) + 'ml';
             }
 
-            // Update table (simplified - just update required column)
-            const tbody = document.querySelector('#materials-table tbody');
-            tbody.innerHTML = '';
+            // If location available, also fetch availability
+            if (locationId) {
+                fetch(`{{ url_for('production.api_check_availability') }}?recipe_id=${recipeId}&quantity=${qty}&location_id=${locationId}`)
+                    .then(resp => resp.json())
+                    .then(avail => {
+                        const tbody = document.querySelector('#materials-table tbody');
+                        tbody.innerHTML = '';
 
-            data.materials.forEach(mat => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>
-                        <strong>${mat.code}</strong>
-                        <div class="small text-muted">${mat.name}</div>
-                    </td>
-                    <td class="text-end">${mat.quantity_required.toFixed(2)} ${mat.unit}</td>
-                `;
-                tbody.appendChild(tr);
-            });
+                        // Build availability lookup
+                        const availMap = {};
+                        if (avail.materials) {
+                            avail.materials.forEach(m => { availMap[m.id] = m; });
+                        }
+
+                        data.materials.forEach(mat => {
+                            const tr = document.createElement('tr');
+                            const av = availMap[mat.id];
+                            let warningBadge = mat.percentage_warning ? ' <span class="badge bg-warning text-dark" title="Percentages were normalized to 100%"><i class="fas fa-exclamation-triangle"></i></span>' : '';
+                            tr.innerHTML = `
+                                <td>
+                                    <strong>${mat.code}</strong>${warningBadge}
+                                    <div class="small text-muted">${mat.name}</div>
+                                </td>
+                                <td class="text-end">${mat.quantity_required.toFixed(2)} ${mat.unit}</td>
+                                <td class="text-end">${av ? av.available_quantity.toFixed(2) : '-'}</td>
+                                <td>
+                                    ${av ? (av.is_available
+                                        ? '<span class="badge bg-success"><i class="fas fa-check"></i> OK</span>'
+                                        : '<span class="badge bg-danger"><i class="fas fa-times"></i> Short</span>')
+                                    : '-'}
+                                </td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    })
+                    .catch(err => {
+                        // Fallback: show without availability
+                        updateTableWithoutAvailability(data);
+                    });
+            } else {
+                updateTableWithoutAvailability(data);
+            }
         })
         .catch(err => console.error('Error:', err));
+}
+
+function updateTableWithoutAvailability(data) {
+    const tbody = document.querySelector('#materials-table tbody');
+    tbody.innerHTML = '';
+    data.materials.forEach(mat => {
+        const tr = document.createElement('tr');
+        let warningBadge = mat.percentage_warning ? ' <span class="badge bg-warning text-dark" title="Percentages were normalized to 100%"><i class="fas fa-exclamation-triangle"></i></span>' : '';
+        tr.innerHTML = `
+            <td>
+                <strong>${mat.code}</strong>${warningBadge}
+                <div class="small text-muted">${mat.name}</div>
+            </td>
+            <td class="text-end">${mat.quantity_required.toFixed(2)} ${mat.unit}</td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
 </script>
 {% endblock %}

@@ -70,6 +70,14 @@
                         </label>
                     </div>
 
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="is_developer" id="isDeveloper"
+                               {% if user.is_developer %}checked{% endif %}>
+                        <label class="form-check-label" for="isDeveloper">
+                            <strong>Developer Access</strong> - Can access error logs & DB browser
+                        </label>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label">Status</label>
                         <select class="form-select" name="is_active">

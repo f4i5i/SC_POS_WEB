@@ -188,6 +188,9 @@ def create_app(config_name='default'):
     from app.routes.production_reports import bp as production_reports_bp
     app.register_blueprint(production_reports_bp)  # url_prefix is in blueprint
 
+    from app.routes.developer import bp as developer_bp
+    app.register_blueprint(developer_bp, url_prefix='/developer')
+
     # Register main routes
     @app.route('/')
     def index():
@@ -381,13 +384,17 @@ def create_app(config_name='default'):
         return render_template('api_docs.html')
 
     # Error handlers
+    from app.utils.error_logger import log_error
+
     @app.errorhandler(404)
     def not_found_error(error):
+        log_error(error, status_code=404)
         return render_template('errors/404.html'), 404
 
     @app.errorhandler(500)
     def internal_error(error):
         db.session.rollback()
+        log_error(error, status_code=500)
         return render_template('errors/500.html'), 500
 
     # CSRF error handler - returns JSON for API calls
@@ -395,6 +402,7 @@ def create_app(config_name='default'):
     @app.errorhandler(CSRFError)
     def handle_csrf_error(error):
         from flask import jsonify, request
+        log_error(error, status_code=400)
         # Return JSON for AJAX/API requests
         if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or '/api/' in request.path:
             return jsonify({
@@ -404,6 +412,12 @@ def create_app(config_name='default'):
         # Flash message and redirect for regular requests
         flash('Session expired. Please try again.', 'warning')
         return redirect(request.url)
+
+    @app.errorhandler(Exception)
+    def handle_exception(error):
+        db.session.rollback()
+        log_error(error, status_code=500)
+        return render_template('errors/500.html'), 500
 
     # Context processors
     @app.context_processor

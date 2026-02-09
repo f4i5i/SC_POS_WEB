@@ -1909,6 +1909,13 @@
                                     <i class="fas fa-clipboard-list"></i> Orders
                                 </a>
                             </li>
+                            {% if current_user.has_permission('production.create_order') %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="/production/orders/create">
+                                    <i class="fas fa-plus-circle"></i> Create Order
+                                </a>
+                            </li>
+                            {% endif %}
                         </ul>
                     </div>
                 </li>
@@ -2023,6 +2030,30 @@
                             <li class="nav-item">
                                 <a class="nav-link" href="/settings">
                                     <i class="fas fa-cog"></i> Settings
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+                {% endif %}
+
+                <!-- DEVELOPER SECTION -->
+                {% if current_user.is_developer %}
+                <li class="nav-item nav-category">
+                    <a class="nav-link nav-category-toggle" data-bs-toggle="collapse" href="#developerMenu" role="button">
+                        <i class="fas fa-code"></i> Developer
+                        <i class="fas fa-chevron-down float-end toggle-icon"></i>
+                    </a>
+                    <div class="collapse" id="developerMenu">
+                        <ul class="nav flex-column nav-submenu">
+                            <li class="nav-item">
+                                <a class="nav-link" href="/developer/errors">
+                                    <i class="fas fa-bug"></i> Error Logs
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/developer/db">
+                                    <i class="fas fa-database"></i> DB Browser
                                 </a>
                             </li>
                         </ul>

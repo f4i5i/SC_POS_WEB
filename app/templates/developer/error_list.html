@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}Error Logs - Developer{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-bug text-danger me-2"></i>Error Logs</h2>
+            <p class="text-muted mb-0">{{ total_errors }} total errors, {{ unresolved_count }} unresolved</p>
+        </div>
+        <a href="{{ url_for('developer.db_dashboard') }}" class="btn btn-outline-primary">
+            <i class="fas fa-database me-2"></i>DB Browser
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-2">
+                    <label class="form-label small">Error Type</label>
+                    <select name="error_type" class="form-select form-select-sm">
+                        <option value="">All Types</option>
+                        {% for et in error_types %}
+                        <option value="{{ et }}" {{ 'selected' if filters.error_type == et }}>{{ et }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Status Code</label>
+                    <select name="status_code" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        {% for sc in status_codes %}
+                        <option value="{{ sc }}" {{ 'selected' if filters.status_code == sc|string }}>{{ sc }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Resolved</label>
+                    <select name="resolved" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        <option value="no" {{ 'selected' if filters.resolved == 'no' }}>Unresolved</option>
+                        <option value="yes" {{ 'selected' if filters.resolved == 'yes' }}>Resolved</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">From</label>
+                    <input type="date" name="date_from" class="form-control form-control-sm" value="{{ filters.date_from }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">To</label>
+                    <input type="date" name="date_to" class="form-control form-control-sm" value="{{ filters.date_to }}">
+                </div>
+                <div class="col-md-2 d-flex align-items-end gap-1">
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter"></i> Filter</button>
+                    <a href="{{ url_for('developer.error_list') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+                </div>
+                <div class="col-12">
+                    <div class="input-group input-group-sm">
+                        <input type="text" name="search" class="form-control" placeholder="Search error messages, URLs, endpoints..." value="{{ filters.search }}">
+                        <button class="btn btn-outline-secondary" type="submit"><i class="fas fa-search"></i></button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Error List -->
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="width: 50px">#</th>
+                        <th>Error</th>
+                        <th>URL</th>
+                        <th class="text-center">Code</th>
+                        <th>User</th>
+                        <th>Time</th>
+                        <th class="text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for error in errors %}
+                    <tr class="{{ 'table-success' if error.is_resolved else '' }}">
+                        <td>
+                            <a href="{{ url_for('developer.error_detail', id=error.id) }}" class="text-decoration-none">
+                                {{ error.id }}
+                            </a>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('developer.error_detail', id=error.id) }}" class="text-decoration-none">
+                                <strong class="text-danger">{{ error.error_type }}</strong>
+                            </a>
+                            <div class="small text-muted text-truncate" style="max-width: 300px;">{{ error.error_message }}</div>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary me-1">{{ error.request_method or '-' }}</span>
+                            <span class="small text-truncate d-inline-block" style="max-width: 200px;">{{ error.request_url or '-' }}</span>
+                        </td>
+                        <td class="text-center">
+                            {% if error.status_code %}
+                            <span class="badge {{ 'bg-warning text-dark' if error.status_code == 404 else 'bg-danger' }}">
+                                {{ error.status_code }}
+                            </span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="small">{{ error.user.username if error.user else '-' }}</td>
+                        <td class="small text-nowrap">{{ error.timestamp.strftime('%d %b %H:%M') }}</td>
+                        <td class="text-center">
+                            {% if error.is_resolved %}
+                            <span class="badge bg-success"><i class="fas fa-check"></i></span>
+                            {% else %}
+                            <span class="badge bg-danger"><i class="fas fa-times"></i></span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">No errors found</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if pagination.pages > 1 %}
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <small class="text-muted">
+                Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }} -
+                {{ [pagination.page * pagination.per_page, pagination.total] | min }}
+                of {{ pagination.total }}
+            </small>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    {% if pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('developer.error_list', page=pagination.prev_num, **filters) }}">Prev</a>
+                    </li>
+                    {% endif %}
+                    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if p %}
+                        <li class="page-item {{ 'active' if p == pagination.page }}">
+                            <a class="page-link" href="{{ url_for('developer.error_list', page=p, **filters) }}">{{ p }}</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('developer.error_list', page=pagination.next_num, **filters) }}">Next</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

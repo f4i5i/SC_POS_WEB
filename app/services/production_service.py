@@ -89,16 +89,23 @@ class ProductionService:
         if recipe.recipe_type == 'perfume':
             ethanol_amount_ml = total_ml * (1 - oil_percentage)
 
+        # Load all ingredients once (avoid multiple queries on dynamic relationship)
+        all_ingredients = list(recipe.ingredients)
+
         # Count oil ingredients (non-packaging, non-ethanol)
         oil_ingredients = [
-            ing for ing in recipe.ingredients
+            ing for ing in all_ingredients
             if not ing.is_packaging and ing.raw_material and
                not (ing.raw_material.category and ing.raw_material.category.code == 'ETHANOL')
         ]
         is_single_oil = len(oil_ingredients) == 1
 
+        # Calculate total oil percentage for normalization
+        # If percentages don't sum to 100%, normalize them to avoid under/over-consumption
+        total_oil_percent = sum(float(ing.percentage or 0) for ing in oil_ingredients)
+
         # Process each ingredient
-        for ingredient in recipe.ingredients:
+        for ingredient in all_ingredients:
             material = ingredient.raw_material
             if not material:
                 continue
@@ -116,13 +123,20 @@ class ProductionService:
                 unit = 'ml'
             else:
                 # Oil ingredients
-                if recipe.recipe_type == 'single_oil' or is_single_oil:
-                    # Single oil attar OR perfume with single oil - all oil is this ingredient
+                if is_single_oil:
+                    # Only one oil ingredient - it gets all the oil
                     required_qty = oil_amount_ml
                 else:
-                    # Blended - calculate based on percentage
-                    ing_percentage = float(ingredient.percentage or 0) / 100
-                    required_qty = oil_amount_ml * ing_percentage
+                    # Multiple oils - calculate based on percentage, normalized to 100%
+                    ing_percentage = float(ingredient.percentage or 0)
+                    if total_oil_percent > 0:
+                        # Normalize: if percentages sum to 80%, each gets proportionally more
+                        # so total oil consumed still equals oil_amount_ml
+                        normalized_fraction = ing_percentage / total_oil_percent
+                    else:
+                        # Fallback: distribute equally
+                        normalized_fraction = 1.0 / len(oil_ingredients) if oil_ingredients else 0
+                    required_qty = oil_amount_ml * normalized_fraction
                 unit = 'ml'
 
             # Determine display unit
@@ -142,13 +156,19 @@ class ProductionService:
                 'unit': display_unit,
                 'quantity_required': round(required_qty, 4),
                 'is_packaging': is_pack,
-                'percentage': float(ingredient.percentage or 0) if not is_pack else None
+                'percentage': float(ingredient.percentage or 0) if not is_pack else None,
+                'percentage_warning': (
+                    not is_pack and not is_single_oil and
+                    mat_category not in ('ETHANOL', 'BOTTLE') and
+                    total_oil_percent > 0 and abs(total_oil_percent - 100) > 0.01
+                )
             })
 
         # Add ethanol if perfume and not already in ingredients
         if recipe.recipe_type == 'perfume' and ethanol_amount_ml > 0:
             ethanol_in_recipe = any(
-                m['raw_material'].category and m['raw_material'].category.code == 'ETHANOL'
+                m.get('raw_material') and m['raw_material'].category and
+                m['raw_material'].category.code == 'ETHANOL'
                 for m in materials
             )
             if not ethanol_in_recipe:
@@ -165,7 +185,8 @@ class ProductionService:
                             'unit': ethanol.unit,
                             'quantity_required': round(ethanol_amount_ml, 4),
                             'is_packaging': False,
-                            'percentage': None
+                            'percentage': None,
+                            'percentage_warning': False
                         })
 
         return {
@@ -174,7 +195,9 @@ class ProductionService:
             'total_output_ml': total_ml,
             'oil_amount_ml': oil_amount_ml,
             'ethanol_amount_ml': ethanol_amount_ml,
-            'materials': materials
+            'materials': materials,
+            'oil_percentage_sum': total_oil_percent,
+            'percentages_normalized': abs(total_oil_percent - 100) > 0.01 and total_oil_percent > 0
         }
 
     @staticmethod

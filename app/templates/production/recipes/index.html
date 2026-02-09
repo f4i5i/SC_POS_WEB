@@ -21,23 +21,35 @@
         </div>
     </div>
 
-    <!-- Type Filter -->
+    <!-- Search & Type Filter -->
     <div class="card shadow-sm mb-4">
         <div class="card-body py-2">
+            <form method="GET" class="d-flex gap-2 align-items-center mb-2">
+                {% if current_type %}
+                <input type="hidden" name="type" value="{{ current_type }}">
+                {% endif %}
+                <div class="input-group input-group-sm">
+                    <input type="text" name="search" class="form-control" placeholder="Search by name or code..." value="{{ search }}">
+                    <button class="btn btn-success" type="submit"><i class="fas fa-search"></i></button>
+                    {% if search %}
+                    <a href="{{ url_for('production.recipes', type=current_type) }}" class="btn btn-outline-secondary"><i class="fas fa-times"></i></a>
+                    {% endif %}
+                </div>
+            </form>
             <div class="d-flex gap-2 flex-wrap">
-                <a href="{{ url_for('production.recipes') }}"
+                <a href="{{ url_for('production.recipes') }}{% if search %}?search={{ search }}{% endif %}"
                    class="btn btn-sm {% if not current_type %}btn-success{% else %}btn-outline-success{% endif %}">
                     All Recipes
                 </a>
-                <a href="{{ url_for('production.recipes', type='single_oil') }}"
+                <a href="{{ url_for('production.recipes', type='single_oil') }}{% if search %}&search={{ search }}{% endif %}"
                    class="btn btn-sm {% if current_type == 'single_oil' %}btn-success{% else %}btn-outline-success{% endif %}">
                     <i class="fas fa-tint me-1"></i> Single Oil Attars
                 </a>
-                <a href="{{ url_for('production.recipes', type='blended') }}"
+                <a href="{{ url_for('production.recipes', type='blended') }}{% if search %}&search={{ search }}{% endif %}"
                    class="btn btn-sm {% if current_type == 'blended' %}btn-success{% else %}btn-outline-success{% endif %}">
                     <i class="fas fa-blender me-1"></i> Blended Attars
                 </a>
-                <a href="{{ url_for('production.recipes', type='perfume') }}"
+                <a href="{{ url_for('production.recipes', type='perfume') }}{% if search %}&search={{ search }}{% endif %}"
                    class="btn btn-sm {% if current_type == 'perfume' %}btn-success{% else %}btn-outline-success{% endif %}">
                     <i class="fas fa-spray-can me-1"></i> Perfumes
                 </a>

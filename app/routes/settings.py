@@ -67,6 +67,7 @@ def add_user():
                 role=request.form.get('role'),
                 location_id=location_id,
                 is_global_admin=request.form.get('is_global_admin') == 'on',
+                is_developer=request.form.get('is_developer') == 'on',
                 is_active=True
             )
             user.set_password(request.form.get('password'))
@@ -108,8 +109,9 @@ def edit_user(user_id):
             location_id = request.form.get('location_id')
             user.location_id = int(location_id) if location_id else None
 
-            # Update global admin status
+            # Update global admin and developer status
             user.is_global_admin = request.form.get('is_global_admin') == 'on'
+            user.is_developer = request.form.get('is_developer') == 'on'
 
             # Update password if provided
             new_password = request.form.get('password')

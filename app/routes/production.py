@@ -317,12 +317,12 @@ def delete_raw_material(id):
 
     try:
         # Check if material is used in any recipes
-        if material.recipe_ingredients:
+        if material.recipe_usages:
             flash('Cannot delete material that is used in recipes.', 'danger')
             return redirect(url_for('production.view_raw_material', id=id))
 
         # Check if there is stock
-        total_stock = sum(s.quantity for s in material.stock_levels)
+        total_stock = sum(s.quantity for s in material.location_stocks)
         if total_stock > 0:
             flash('Cannot delete material with existing stock. Please adjust stock to 0 first.', 'danger')
             return redirect(url_for('production.view_raw_material', id=id))
@@ -348,16 +348,25 @@ def delete_raw_material(id):
 def recipes():
     """List all recipes"""
     recipe_type = request.args.get('type')
+    search = request.args.get('search', '').strip()
 
     query = Recipe.query.filter_by(is_active=True)
     if recipe_type:
         query = query.filter_by(recipe_type=recipe_type)
+    if search:
+        query = query.filter(
+            db.or_(
+                Recipe.name.ilike(f'%{search}%'),
+                Recipe.code.ilike(f'%{search}%')
+            )
+        )
 
     recipes = query.order_by(Recipe.name).all()
 
     return render_template('production/recipes/index.html',
                            recipes=recipes,
-                           current_type=recipe_type)
+                           current_type=recipe_type,
+                           search=search)
 
 
 @bp.route('/recipes/add', methods=['GET', 'POST'])
@@ -412,6 +421,9 @@ def add_recipe():
             percentages = request.form.getlist('percentage[]')
             is_packaging_list = request.form.getlist('is_packaging[]')
 
+            total_oil_percent = 0
+            oil_count = 0
+
             for i, mat_id in enumerate(ingredient_ids):
                 if mat_id:
                     # Auto-detect packaging from material category
@@ -420,6 +432,11 @@ def add_recipe():
                     is_pack = mat_cat == 'BOTTLE'
                     pct = float(percentages[i]) if i < len(percentages) and percentages[i] else None
 
+                    # Track oil percentages for validation
+                    if not is_pack and mat_cat != 'ETHANOL':
+                        oil_count += 1
+                        total_oil_percent += pct or 0
+
                     ingredient = RecipeIngredient(
                         recipe_id=recipe.id,
                         raw_material_id=int(mat_id),
@@ -427,6 +444,11 @@ def add_recipe():
                         is_packaging=is_pack
                     )
                     db.session.add(ingredient)
+
+            # Validate oil percentages sum to 100% for multi-oil recipes
+            if oil_count > 1 and abs(total_oil_percent - 100) > 0.01:
+                flash(f'Warning: Oil percentages sum to {total_oil_percent:.1f}% instead of 100%. '
+                      f'Calculations will auto-normalize, but please verify ingredient ratios.', 'warning')
 
             db.session.commit()
             flash(f'Recipe "{name}" created successfully.', 'success')
@@ -507,6 +529,9 @@ def edit_recipe(id):
             percentages = request.form.getlist('percentage[]')
             is_packaging_list = request.form.getlist('is_packaging[]')
 
+            total_oil_percent = 0
+            oil_count = 0
+
             for i, mat_id in enumerate(ingredient_ids):
                 if mat_id:
                     # Auto-detect packaging from material category
@@ -515,6 +540,11 @@ def edit_recipe(id):
                     is_pack = mat_cat == 'BOTTLE'
                     pct = float(percentages[i]) if i < len(percentages) and percentages[i] else None
 
+                    # Track oil percentages for validation
+                    if not is_pack and mat_cat != 'ETHANOL':
+                        oil_count += 1
+                        total_oil_percent += pct or 0
+
                     ingredient = RecipeIngredient(
                         recipe_id=recipe.id,
                         raw_material_id=int(mat_id),
@@ -522,6 +552,11 @@ def edit_recipe(id):
                         is_packaging=is_pack
                     )
                     db.session.add(ingredient)
+
+            # Validate oil percentages sum to 100% for multi-oil recipes
+            if oil_count > 1 and abs(total_oil_percent - 100) > 0.01:
+                flash(f'Warning: Oil percentages sum to {total_oil_percent:.1f}% instead of 100%. '
+                      f'Calculations will auto-normalize, but please verify ingredient ratios.', 'warning')
 
             db.session.commit()
             flash(f'Recipe "{recipe.name}" updated successfully.', 'success')
@@ -556,7 +591,7 @@ def delete_recipe(id):
         recipe = Recipe.query.get_or_404(id)
 
         # Check if recipe has production orders
-        if recipe.production_orders.count() > 0:
+        if len(list(recipe.production_orders)) > 0:
             flash('Cannot delete recipe with existing production orders.', 'danger')
             return redirect(url_for('production.view_recipe', id=id))
 
@@ -827,7 +862,9 @@ def api_calculate_requirements():
             'name': m['name'],
             'unit': m['unit'],
             'quantity_required': m['quantity_required'],
-            'is_packaging': m['is_packaging']
+            'is_packaging': m['is_packaging'],
+            'percentage': m.get('percentage'),
+            'percentage_warning': m.get('percentage_warning', False)
         })
 
     return jsonify({
@@ -835,7 +872,9 @@ def api_calculate_requirements():
         'total_output_ml': requirements.get('total_output_ml', 0),
         'oil_amount_ml': requirements.get('oil_amount_ml', 0),
         'ethanol_amount_ml': requirements.get('ethanol_amount_ml', 0),
-        'materials': materials
+        'materials': materials,
+        'oil_percentage_sum': requirements.get('oil_percentage_sum', 100),
+        'percentages_normalized': requirements.get('percentages_normalized', False)
     })
 
 

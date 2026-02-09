@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Error #{{ error.id }} - Developer{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-bug text-danger me-2"></i>Error #{{ error.id }}</h2>
+            <p class="text-muted mb-0">{{ error.timestamp.strftime('%d %b %Y, %H:%M:%S') }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('developer.error_list') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+            {% if not error.is_resolved %}
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#resolveModal">
+                <i class="fas fa-check me-2"></i>Mark Resolved
+            </button>
+            {% else %}
+            <form method="POST" action="{{ url_for('developer.unresolve_error', id=error.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="btn btn-warning">
+                    <i class="fas fa-undo me-2"></i>Reopen
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Error Info -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Error Info</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="text-muted" style="width: 40%">Type</td>
+                            <td><strong class="text-danger">{{ error.error_type }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Status Code</td>
+                            <td>
+                                {% if error.status_code %}
+                                <span class="badge {{ 'bg-warning text-dark' if error.status_code == 404 else 'bg-danger' }}">{{ error.status_code }}</span>
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Blueprint</td>
+                            <td>{{ error.blueprint or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Endpoint</td>
+                            <td><code>{{ error.endpoint or '-' }}</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Status</td>
+                            <td>
+                                {% if error.is_resolved %}
+                                <span class="badge bg-success"><i class="fas fa-check me-1"></i>Resolved</span>
+                                {% else %}
+                                <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Unresolved</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% if error.is_resolved %}
+                        <tr>
+                            <td class="text-muted">Resolved By</td>
+                            <td>{{ error.resolver.username if error.resolver else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Resolved At</td>
+                            <td>{{ error.resolved_at.strftime('%d %b %Y, %H:%M') if error.resolved_at else '-' }}</td>
+                        </tr>
+                        {% if error.resolution_notes %}
+                        <tr>
+                            <td class="text-muted">Notes</td>
+                            <td>{{ error.resolution_notes }}</td>
+                        </tr>
+                        {% endif %}
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            <!-- Request Info -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-globe me-2"></i>Request Info</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="text-muted" style="width: 40%">Method</td>
+                            <td><span class="badge bg-secondary">{{ error.request_method or '-' }}</span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">URL</td>
+                            <td class="small" style="word-break: break-all;">{{ error.request_url or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">User</td>
+                            <td>{{ error.user.username if error.user else 'Anonymous' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">IP Address</td>
+                            <td><code>{{ error.ip_address or '-' }}</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">User Agent</td>
+                            <td class="small" style="word-break: break-all;">{{ error.user_agent or '-' }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Details -->
+        <div class="col-lg-8">
+            <!-- Error Message -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Error Message</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger mb-0">
+                        <strong>{{ error.error_type }}:</strong> {{ error.error_message }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Traceback -->
+            {% if error.traceback %}
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-code me-2"></i>Traceback</h5>
+                </div>
+                <div class="card-body p-0">
+                    <pre class="mb-0 p-3 bg-dark text-light" style="max-height: 500px; overflow-y: auto; font-size: 0.8rem;">{{ error.traceback }}</pre>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Request Data -->
+            {% if error.request_data %}
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-database me-2"></i>Request Data</h5>
+                </div>
+                <div class="card-body p-0">
+                    <pre class="mb-0 p-3 bg-light" style="max-height: 300px; overflow-y: auto; font-size: 0.8rem;">{{ error.request_data }}</pre>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Resolve Modal -->
+{% if not error.is_resolved %}
+<div class="modal fade" id="resolveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" action="{{ url_for('developer.resolve_error', id=error.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Resolve Error #{{ error.id }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Resolution Notes (optional)</label>
+                        <textarea name="resolution_notes" class="form-control" rows="3" placeholder="What fixed this issue?"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success"><i class="fas fa-check me-2"></i>Mark Resolved</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
