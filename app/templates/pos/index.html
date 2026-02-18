@@ -1467,6 +1467,7 @@ function addToCart(product) {
             id: product.id,
             name: product.name,
             price: product.selling_price,
+            original_price: product.selling_price,
             quantity: 1,
             max_quantity: product.quantity,
             is_made_to_order: isMadeToOrder,
@@ -1517,7 +1518,20 @@ function updateCartDisplay() {
                                onchange="setQuantity(${index}, this.value)">
                         <button class="btn btn-outline-secondary" onclick="updateQuantity(${index}, 1)">+</button>
                     </div>
-                    <span class="item-price">Rs. ${(item.price * item.quantity).toLocaleString()}</span>
+                    <div class="text-end">
+                        ${item.original_price && item.price !== item.original_price ? `
+                            <small class="text-muted text-decoration-line-through d-block" style="font-size:0.7rem;">Rs. ${item.original_price.toLocaleString()}</small>
+                        ` : ''}
+                        <span class="item-price" style="cursor:pointer;" onclick="editPrice(${index})" title="Click to adjust price">
+                            Rs. ${(item.price * item.quantity).toLocaleString()}
+                            <i class="fas fa-pen" style="font-size:0.55rem; opacity:0.5;"></i>
+                        </span>
+                        ${item.original_price && item.price !== item.original_price ? `
+                            <button class="btn btn-link btn-sm p-0 ms-1 text-danger" onclick="resetPrice(${index})" title="Reset to original price" style="font-size:0.65rem;">
+                                <i class="fas fa-undo"></i>
+                            </button>
+                        ` : ''}
+                    </div>
                 </div>
             </div>
         `;
@@ -1575,6 +1589,54 @@ function setQuantity(index, value) {
 function removeFromCart(index) {
     cart.splice(index, 1);
     updateCartDisplay();
+}
+
+function editPrice(index) {
+    const item = cart[index];
+    const currentUnitPrice = item.price;
+
+    // Replace the price span with an inline input
+    const priceContainer = $(`#cartItems .cart-item:eq(${index}) .text-end`);
+    priceContainer.html(`
+        <div class="d-flex align-items-center justify-content-end gap-1">
+            <small class="text-muted">Rs.</small>
+            <input type="number" class="form-control form-control-sm text-end" id="priceEdit_${index}"
+                   value="${currentUnitPrice}" min="0" step="0.01"
+                   style="width: 90px; font-size: 0.85rem;"
+                   onkeydown="if(event.key==='Enter') applyPrice(${index})">
+            <button class="btn btn-success btn-sm py-0 px-1" onclick="applyPrice(${index})" title="Apply">
+                <i class="fas fa-check" style="font-size:0.7rem;"></i>
+            </button>
+            <button class="btn btn-secondary btn-sm py-0 px-1" onclick="updateCartDisplay()" title="Cancel">
+                <i class="fas fa-times" style="font-size:0.7rem;"></i>
+            </button>
+        </div>
+    `);
+    $(`#priceEdit_${index}`).focus().select();
+}
+
+function applyPrice(index) {
+    const newPrice = parseFloat($(`#priceEdit_${index}`).val()) || 0;
+    if (newPrice < 0) {
+        showToast('Price cannot be negative!', 'error');
+        return;
+    }
+    const item = cart[index];
+    if (!item.original_price) {
+        item.original_price = item.price;
+    }
+    item.price = newPrice;
+    updateCartDisplay();
+    showToast('Price adjusted to Rs. ' + newPrice.toLocaleString(), 'info');
+}
+
+function resetPrice(index) {
+    const item = cart[index];
+    if (item.original_price) {
+        item.price = item.original_price;
+        updateCartDisplay();
+        showToast('Price reset to Rs. ' + item.original_price.toLocaleString(), 'info');
+    }
 }
 
 function clearCart() {
@@ -1888,7 +1950,8 @@ function completeSale() {
             product_id: item.id,
             quantity: item.quantity,
             unit_price: item.price,
-            discount: 0,
+            discount: item.original_price && item.price < item.original_price
+                ? (item.original_price - item.price) * item.quantity : 0,
             subtotal: item.price * item.quantity
         })),
         subtotal: subtotal,
