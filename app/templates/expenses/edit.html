@@ -10,6 +10,7 @@
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
                         <i class="fas fa-edit text-primary"></i> Edit Expense
+                        <small class="text-muted ms-2">{{ expense.expense_number }}</small>
                     </h5>
                     <a href="{{ url_for('expenses.index') }}" class="btn btn-outline-secondary btn-sm">
                         <i class="fas fa-arrow-left"></i> Back
@@ -18,6 +19,8 @@
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                        <!-- Category & Amount -->
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Category <span class="text-danger">*</span></label>
@@ -37,25 +40,41 @@
                             </div>
                         </div>
 
+                        <!-- Date & Location -->
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Expense Date <span class="text-danger">*</span></label>
                                 <input type="date" class="form-control" name="expense_date"
                                        value="{{ expense.expense_date.strftime('%Y-%m-%d') }}" required>
                             </div>
+                            {% if current_user.is_global_admin %}
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Vendor/Paid To</label>
+                                <label class="form-label">Location / Kiosk</label>
+                                <select class="form-select" name="location_id">
+                                    <option value="">Select Location</option>
+                                    {% for loc in locations %}
+                                    <option value="{{ loc.id }}" {% if expense.location_id == loc.id %}selected{% endif %}>
+                                        {{ loc.name }} ({{ loc.location_type|capitalize }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Description -->
+                        <div class="mb-3">
+                            <label class="form-label">Description <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="description" rows="2" required>{{ expense.description }}</textarea>
+                        </div>
+
+                        <!-- Vendor & Payment -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Vendor / Paid To</label>
                                 <input type="text" class="form-control" name="vendor_name"
                                        value="{{ expense.vendor_name or '' }}">
                             </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Description <span class="text-danger">*</span></label>
-                            <textarea class="form-control" name="description" rows="3" required>{{ expense.description }}</textarea>
-                        </div>
-
-                        <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Payment Method</label>
                                 <select class="form-select" name="payment_method">
@@ -63,16 +82,44 @@
                                     <option value="bank_transfer" {% if expense.payment_method == 'bank_transfer' %}selected{% endif %}>Bank Transfer</option>
                                     <option value="cheque" {% if expense.payment_method == 'cheque' %}selected{% endif %}>Cheque</option>
                                     <option value="card" {% if expense.payment_method == 'card' %}selected{% endif %}>Card</option>
+                                    <option value="easypaisa" {% if expense.payment_method == 'easypaisa' %}selected{% endif %}>Easypaisa</option>
+                                    <option value="jazzcash" {% if expense.payment_method == 'jazzcash' %}selected{% endif %}>JazzCash</option>
                                     <option value="other" {% if expense.payment_method == 'other' %}selected{% endif %}>Other</option>
                                 </select>
                             </div>
+                        </div>
+
+                        <!-- Reference & Recurring -->
+                        <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Reference Number</label>
-                                <input type="text" class="form-control" name="reference_number"
-                                       value="{{ expense.reference_number or '' }}">
+                                <label class="form-label">Bill / Reference Number</label>
+                                <input type="text" class="form-control" name="reference"
+                                       value="{{ expense.reference or '' }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Expense Type</label>
+                                <div class="d-flex align-items-center gap-3 mt-1">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="is_recurring"
+                                               id="isRecurring" {% if expense.is_recurring %}checked{% endif %}
+                                               onchange="toggleRecurring()">
+                                        <label class="form-check-label" for="isRecurring">
+                                            Recurring expense
+                                        </label>
+                                    </div>
+                                </div>
+                                <div id="recurringOptions" style="display: {{ 'block' if expense.is_recurring else 'none' }};" class="mt-2">
+                                    <select class="form-select form-select-sm" name="recurring_frequency">
+                                        <option value="monthly" {% if expense.recurring_frequency == 'monthly' %}selected{% endif %}>Monthly</option>
+                                        <option value="weekly" {% if expense.recurring_frequency == 'weekly' %}selected{% endif %}>Weekly</option>
+                                        <option value="daily" {% if expense.recurring_frequency == 'daily' %}selected{% endif %}>Daily</option>
+                                        <option value="yearly" {% if expense.recurring_frequency == 'yearly' %}selected{% endif %}>Yearly</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
+                        <!-- Notes -->
                         <div class="mb-3">
                             <label class="form-label">Notes</label>
                             <textarea class="form-control" name="notes" rows="2">{{ expense.notes or '' }}</textarea>
@@ -90,4 +137,13 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleRecurring() {
+    const checked = document.getElementById('isRecurring').checked;
+    document.getElementById('recurringOptions').style.display = checked ? 'block' : 'none';
+}
+</script>
 {% endblock %}

@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Supplier Payables Aging - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-clock text-warning me-2"></i>Supplier Payables Aging</h2>
+            <p class="text-muted mb-0">{{ supplier_count }} suppliers with outstanding balances</p>
+        </div>
+        <div>
+            <button onclick="window.print()" class="btn btn-outline-primary"><i class="fas fa-print"></i> Print</button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2"><i class="fas fa-arrow-left"></i> Back</a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-2">
+            <div class="card border-0 shadow-sm bg-success bg-opacity-10">
+                <div class="card-body text-center">
+                    <h5 class="text-success mb-0">{{ format_currency(totals.current) }}</h5>
+                    <small class="text-muted">Current</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-0 shadow-sm bg-info bg-opacity-10">
+                <div class="card-body text-center">
+                    <h5 class="text-info mb-0">{{ format_currency(totals.days_30) }}</h5>
+                    <small class="text-muted">1-30 Days</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-0 shadow-sm bg-warning bg-opacity-10">
+                <div class="card-body text-center">
+                    <h5 class="text-warning mb-0">{{ format_currency(totals.days_60) }}</h5>
+                    <small class="text-muted">31-60 Days</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-0 shadow-sm bg-danger bg-opacity-10">
+                <div class="card-body text-center">
+                    <h5 class="text-danger mb-0">{{ format_currency(totals.days_90) }}</h5>
+                    <small class="text-muted">61-90 Days</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-0 shadow-sm bg-dark bg-opacity-10">
+                <div class="card-body text-center">
+                    <h5 class="text-dark mb-0">{{ format_currency(totals.over_90) }}</h5>
+                    <small class="text-muted">90+ Days</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-0 shadow-sm border-primary">
+                <div class="card-body text-center">
+                    <h5 class="text-primary mb-0">{{ format_currency(totals.total) }}</h5>
+                    <small class="text-muted">Total Payable</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aging Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Supplier</th>
+                            <th>Contact</th>
+                            <th class="text-end">Current</th>
+                            <th class="text-end">1-30 Days</th>
+                            <th class="text-end">31-60 Days</th>
+                            <th class="text-end">61-90 Days</th>
+                            <th class="text-end">90+ Days</th>
+                            <th class="text-end">Total</th>
+                            <th>Last Payment</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in aging_data %}
+                        <tr class="{{ 'table-danger' if item.over_limit else '' }}">
+                            <td>
+                                <strong>{{ item.supplier_name }}</strong>
+                                {% if item.over_limit %}
+                                <br><span class="badge bg-danger">Over Credit Limit</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ item.contact }}
+                                {% if item.phone %}<br><small>{{ item.phone }}</small>{% endif %}
+                            </td>
+                            <td class="text-end">{{ format_currency(item.current) if item.current else '-' }}</td>
+                            <td class="text-end">{{ format_currency(item.days_30) if item.days_30 else '-' }}</td>
+                            <td class="text-end text-warning">{{ format_currency(item.days_60) if item.days_60 else '-' }}</td>
+                            <td class="text-end text-danger">{{ format_currency(item.days_90) if item.days_90 else '-' }}</td>
+                            <td class="text-end text-danger fw-bold">{{ format_currency(item.over_90) if item.over_90 else '-' }}</td>
+                            <td class="text-end fw-bold">{{ format_currency(item.total) }}</td>
+                            <td>
+                                {% if item.last_payment_date %}
+                                {{ item.last_payment_date.strftime('%d/%m/%Y') }}
+                                <br><small class="text-muted">{{ item.days_outstanding }} days ago</small>
+                                {% else %}
+                                <span class="text-muted">Never</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-dark">
+                        <tr>
+                            <th colspan="2">TOTALS</th>
+                            <th class="text-end">{{ format_currency(totals.current) }}</th>
+                            <th class="text-end">{{ format_currency(totals.days_30) }}</th>
+                            <th class="text-end">{{ format_currency(totals.days_60) }}</th>
+                            <th class="text-end">{{ format_currency(totals.days_90) }}</th>
+                            <th class="text-end">{{ format_currency(totals.over_90) }}</th>
+                            <th class="text-end">{{ format_currency(totals.total) }}</th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if not aging_data %}
+    <div class="text-center py-5">
+        <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+        <h5 class="text-success">All suppliers are paid up!</h5>
+        <p class="text-muted">No outstanding balances found</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

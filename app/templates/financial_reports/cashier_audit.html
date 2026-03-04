@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Per-Cashier Exception Audit - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-user-shield text-primary me-2"></i>Per-Cashier Exception Audit</h2>
+            <p class="text-muted mb-0">Discounts, voids, refunds and price changes per employee</p>
+        </div>
+        <div>
+            <button onclick="window.print()" class="btn btn-outline-primary"><i class="fas fa-print"></i> Print</button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2"><i class="fas fa-arrow-left"></i> Back</a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+                </div>
+                {% if current_user.is_global_admin %}
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i>Apply</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Employee</th>
+                            <th class="text-center">Sales</th>
+                            <th class="text-end">Revenue</th>
+                            <th class="text-center">Discounts</th>
+                            <th class="text-end">Discount Value</th>
+                            <th class="text-center">Voids</th>
+                            <th class="text-end">Void Value</th>
+                            <th class="text-center">Refunds</th>
+                            <th class="text-end">Refund Value</th>
+                            <th class="text-center">Price Changes</th>
+                            <th class="text-end">Exception Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in cashier_list %}
+                        {% set exception_total = c.discount_total + c.void_total + c.refund_total %}
+                        {% set exception_rate = (exception_total / c.total_sales * 100) if c.total_sales else 0 %}
+                        <tr class="{{ 'table-warning' if exception_rate > 10 else 'table-danger' if exception_rate > 20 else '' }}">
+                            <td><strong>{{ c.user_name }}</strong></td>
+                            <td class="text-center">{{ c.sale_count }}</td>
+                            <td class="text-end">{{ format_currency(c.total_sales) }}</td>
+                            <td class="text-center">
+                                {% if c.discount_count %}
+                                <span class="badge bg-warning text-dark">{{ c.discount_count }}</span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-end">{{ format_currency(c.discount_total) if c.discount_total else '-' }}</td>
+                            <td class="text-center">
+                                {% if c.void_count %}
+                                <span class="badge bg-danger">{{ c.void_count }}</span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-end text-danger">{{ format_currency(c.void_total) if c.void_total else '-' }}</td>
+                            <td class="text-center">
+                                {% if c.refund_count %}
+                                <span class="badge bg-info">{{ c.refund_count }}</span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-end text-danger">{{ format_currency(c.refund_total) if c.refund_total else '-' }}</td>
+                            <td class="text-center">{{ c.price_change_count or '-' }}</td>
+                            <td class="text-end">
+                                <span class="badge bg-{{ 'danger' if exception_rate > 20 else 'warning' if exception_rate > 10 else 'success' }}">
+                                    {{ "{:.1f}".format(exception_rate) }}%
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if not cashier_list %}
+    <div class="text-center py-5">
+        <i class="fas fa-user-check fa-4x text-success mb-3"></i>
+        <h5 class="text-success">No cashier activity found</h5>
+        <p class="text-muted">Try adjusting the date range</p>
+    </div>
+    {% endif %}
+
+    <!-- Legend -->
+    <div class="card border-0 shadow-sm mt-4">
+        <div class="card-body">
+            <h6><i class="fas fa-info-circle text-primary"></i> Exception Rate Guide</h6>
+            <div class="d-flex gap-4 mt-2">
+                <div><span class="badge bg-success">&lt; 10%</span> Normal</div>
+                <div><span class="badge bg-warning">10-20%</span> Needs Review</div>
+                <div><span class="badge bg-danger">&gt; 20%</span> Investigate</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

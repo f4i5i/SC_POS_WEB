@@ -98,6 +98,12 @@ def add_expense():
     """Add new expense"""
     if request.method == 'POST':
         try:
+            # Admin can pick location, others use their assigned location
+            if current_user.is_global_admin and request.form.get('location_id'):
+                location_id = int(request.form.get('location_id'))
+            else:
+                location_id = current_user.location_id
+
             expense = Expense(
                 expense_number=generate_expense_number(),
                 category_id=request.form.get('category_id'),
@@ -105,11 +111,13 @@ def add_expense():
                 amount=Decimal(request.form.get('amount')),
                 expense_date=datetime.strptime(request.form.get('expense_date'), '%Y-%m-%d').date(),
                 payment_method=request.form.get('payment_method', 'cash'),
-                reference=request.form.get('reference'),
+                reference=request.form.get('reference') or request.form.get('reference_number'),
                 vendor_name=request.form.get('vendor_name'),
+                is_recurring=request.form.get('is_recurring') == 'on',
+                recurring_frequency=request.form.get('recurring_frequency') if request.form.get('is_recurring') == 'on' else None,
                 notes=request.form.get('notes'),
                 created_by=current_user.id,
-                location_id=current_user.location_id,  # Link to user's location
+                location_id=location_id,
                 status='pending' if current_user.role in ['cashier', 'manager'] else 'approved'
             )
 
@@ -128,8 +136,10 @@ def add_expense():
             db.session.rollback()
             flash(f'Error adding expense: {str(e)}', 'danger')
 
+    from app.models import Location
     categories = ExpenseCategory.query.filter_by(is_active=True).all()
-    return render_template('expenses/add.html', categories=categories)
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    return render_template('expenses/add.html', categories=categories, locations=locations)
 
 
 @bp.route('/edit/<int:expense_id>', methods=['GET', 'POST'])
@@ -151,9 +161,13 @@ def edit_expense(expense_id):
             expense.amount = Decimal(request.form.get('amount'))
             expense.expense_date = datetime.strptime(request.form.get('expense_date'), '%Y-%m-%d').date()
             expense.payment_method = request.form.get('payment_method', 'cash')
-            expense.reference = request.form.get('reference')
+            expense.reference = request.form.get('reference') or request.form.get('reference_number')
             expense.vendor_name = request.form.get('vendor_name')
+            expense.is_recurring = request.form.get('is_recurring') == 'on'
+            expense.recurring_frequency = request.form.get('recurring_frequency') if request.form.get('is_recurring') == 'on' else None
             expense.notes = request.form.get('notes')
+            if current_user.is_global_admin and request.form.get('location_id'):
+                expense.location_id = int(request.form.get('location_id'))
 
             db.session.commit()
             flash('Expense updated successfully.', 'success')
@@ -163,8 +177,10 @@ def edit_expense(expense_id):
             db.session.rollback()
             flash(f'Error updating expense: {str(e)}', 'danger')
 
+    from app.models import Location
     categories = ExpenseCategory.query.filter_by(is_active=True).all()
-    return render_template('expenses/edit.html', expense=expense, categories=categories)
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    return render_template('expenses/edit.html', expense=expense, categories=categories, locations=locations)
 
 
 @bp.route('/approve/<int:expense_id>', methods=['POST'])
@@ -196,6 +212,39 @@ def reject_expense(expense_id):
     db.session.commit()
 
     return jsonify({'success': True, 'message': 'Expense rejected'})
+
+
+@bp.route('/duplicate/<int:expense_id>', methods=['POST'])
+@login_required
+@feature_required(Features.EXPENSE_TRACKING)
+def duplicate_expense(expense_id):
+    """Duplicate an expense with today's date (for recurring bills)"""
+    original = Expense.query.get_or_404(expense_id)
+
+    new_expense = Expense(
+        expense_number=generate_expense_number(),
+        category_id=original.category_id,
+        description=original.description,
+        amount=original.amount,
+        expense_date=date.today(),
+        payment_method=original.payment_method,
+        vendor_name=original.vendor_name,
+        is_recurring=original.is_recurring,
+        recurring_frequency=original.recurring_frequency,
+        notes=original.notes,
+        created_by=current_user.id,
+        location_id=original.location_id,
+        status='approved' if (current_user.role == 'admin' or current_user.is_global_admin) else 'pending'
+    )
+
+    if current_user.role == 'admin' or current_user.is_global_admin:
+        new_expense.approved_by = current_user.id
+
+    db.session.add(new_expense)
+    db.session.commit()
+
+    flash(f'Expense duplicated as {new_expense.expense_number} (date: {date.today().strftime("%d %b %Y")}). Update the amount if needed.', 'success')
+    return redirect(url_for('expenses.edit_expense', expense_id=new_expense.id))
 
 
 @bp.route('/delete/<int:expense_id>', methods=['POST'])
@@ -295,18 +344,26 @@ def seed_default_categories():
         return redirect(url_for('expenses.categories'))
 
     default_categories = [
-        {'name': 'Rent', 'description': 'Shop/office rent payments', 'icon': 'home', 'color': '#EF4444'},
-        {'name': 'Electricity', 'description': 'Electricity bills', 'icon': 'bolt', 'color': '#F59E0B'},
+        # Monthly recurring expenses
+        {'name': 'Rent', 'description': 'Shop/kiosk rent payments', 'icon': 'home', 'color': '#EF4444'},
+        {'name': 'Salaries', 'description': 'Employee salaries and wages', 'icon': 'users', 'color': '#10B981'},
+        {'name': 'Electricity', 'description': 'WAPDA / electricity bills', 'icon': 'bolt', 'color': '#F59E0B'},
+        {'name': 'Internet/Phone', 'description': 'Internet, Wi-Fi, phone bills', 'icon': 'wifi', 'color': '#8B5CF6'},
         {'name': 'Water', 'description': 'Water utility bills', 'icon': 'tint', 'color': '#3B82F6'},
         {'name': 'Gas', 'description': 'Gas utility bills', 'icon': 'fire', 'color': '#F97316'},
-        {'name': 'Internet/Phone', 'description': 'Internet and phone bills', 'icon': 'wifi', 'color': '#8B5CF6'},
-        {'name': 'Salaries', 'description': 'Employee salaries and wages', 'icon': 'users', 'color': '#10B981'},
-        {'name': 'Supplies', 'description': 'Office and shop supplies', 'icon': 'shopping-cart', 'color': '#06B6D4'},
+        # Operational expenses
+        {'name': 'Supplies', 'description': 'Bags, cleaning, office supplies', 'icon': 'shopping-cart', 'color': '#06B6D4'},
         {'name': 'Transport', 'description': 'Transportation and delivery', 'icon': 'truck', 'color': '#6366F1'},
-        {'name': 'Maintenance', 'description': 'Repairs and maintenance', 'icon': 'tools', 'color': '#EC4899'},
-        {'name': 'Marketing', 'description': 'Advertising and promotion', 'icon': 'bullhorn', 'color': '#14B8A6'},
-        {'name': 'Food/Refreshments', 'description': 'Tea, snacks, meals', 'icon': 'utensils', 'color': '#84CC16'},
-        {'name': 'Miscellaneous', 'description': 'Other expenses', 'icon': 'money-bill', 'color': '#6B7280'},
+        {'name': 'Maintenance', 'description': 'Repairs, fixes, servicing', 'icon': 'tools', 'color': '#EC4899'},
+        {'name': 'Marketing', 'description': 'Advertising, banners, promotion', 'icon': 'bullhorn', 'color': '#14B8A6'},
+        {'name': 'Food/Refreshments', 'description': 'Tea, snacks, meals for staff', 'icon': 'utensils', 'color': '#84CC16'},
+        # Investment / one-time setup costs
+        {'name': 'Shop Setup', 'description': 'Renovation, construction, fitting', 'icon': 'store', 'color': '#7C3AED'},
+        {'name': 'Furniture/Fixtures', 'description': 'Shelves, counter, display, chairs', 'icon': 'couch', 'color': '#DB2777'},
+        {'name': 'Equipment', 'description': 'POS machine, printer, AC, lights', 'icon': 'desktop', 'color': '#0891B2'},
+        {'name': 'Security Deposit', 'description': 'Shop deposit, advance rent', 'icon': 'shield-alt', 'color': '#059669'},
+        # Catch-all
+        {'name': 'Miscellaneous', 'description': 'Any other expenses', 'icon': 'money-bill', 'color': '#6B7280'},
     ]
 
     added = 0

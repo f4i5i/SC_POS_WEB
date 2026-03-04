@@ -343,6 +343,16 @@
                 <div class="col-md-6">
                     <form method="GET" class="row g-2 justify-content-end">
                         <input type="hidden" name="period" value="{{ period }}">
+                        {% if current_user.is_global_admin and locations is defined %}
+                        <div class="col-auto">
+                            <select name="location_id" class="form-select" onchange="this.form.submit()">
+                                <option value="">All Locations</option>
+                                {% for loc in locations %}
+                                <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
                         {% if period == 'custom' %}
                         <div class="col-auto">
                             <input type="date" name="start_date" class="form-control"
@@ -499,12 +509,50 @@
 
                             <!-- Cost of Goods Sold -->
                             <tr class="section-header">
-                                <td colspan="2"><i class="fas fa-minus-circle text-danger me-2"></i>COST OF GOODS SOLD</td>
+                                <td colspan="2">
+                                    <i class="fas fa-minus-circle text-danger me-2"></i>COST OF GOODS SOLD
+                                    {% if cogs_breakdown.total_units %}
+                                    <small class="text-muted fw-normal ms-2">({{ cogs_breakdown.total_units }} units sold)</small>
+                                    {% endif %}
+                                </td>
                             </tr>
+                            {% if cogs_breakdown.base_cost %}
                             <tr>
-                                <td class="ps-4">Product Cost (COGS)</td>
-                                <td class="text-end text-danger">(Rs. {{ "{:,.2f}".format(cogs) }})</td>
+                                <td class="ps-4"><i class="fas fa-boxes text-secondary me-2"></i>Product / Supplier Cost</td>
+                                <td class="text-end text-danger">(Rs. {{ "{:,.2f}".format(cogs_breakdown.base_cost) }})</td>
                             </tr>
+                            {% endif %}
+                            {% if cogs_breakdown.packaging_cost %}
+                            <tr>
+                                <td class="ps-4"><i class="fas fa-box-open text-secondary me-2"></i>Packaging Cost</td>
+                                <td class="text-end text-danger">(Rs. {{ "{:,.2f}".format(cogs_breakdown.packaging_cost) }})</td>
+                            </tr>
+                            {% endif %}
+                            {% if cogs_breakdown.bottle_cost %}
+                            <tr>
+                                <td class="ps-4"><i class="fas fa-flask text-secondary me-2"></i>Bottle Cost</td>
+                                <td class="text-end text-danger">(Rs. {{ "{:,.2f}".format(cogs_breakdown.bottle_cost) }})</td>
+                            </tr>
+                            {% endif %}
+                            {% if cogs_breakdown.delivery_cost %}
+                            <tr>
+                                <td class="ps-4"><i class="fas fa-truck text-secondary me-2"></i>Delivery / Freight Cost</td>
+                                <td class="text-end text-danger">(Rs. {{ "{:,.2f}".format(cogs_breakdown.delivery_cost) }})</td>
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <td class="ps-4"><strong>Total COGS</strong></td>
+                                <td class="text-end text-danger"><strong>(Rs. {{ "{:,.2f}".format(cogs - cogs_breakdown.kiosk_cost) }})</strong></td>
+                            </tr>
+                            {% if cogs_breakdown.kiosk_cost %}
+                            <tr>
+                                <td class="ps-4 text-muted small">
+                                    <i class="fas fa-info-circle me-1"></i>Rent Recovery via Product Pricing
+                                    <br><span class="ps-3">Kiosk cost built into {{ cogs_breakdown.total_units }} units sold</span>
+                                </td>
+                                <td class="text-end text-muted small">Rs. {{ "{:,.2f}".format(cogs_breakdown.kiosk_cost) }} recovered</td>
+                            </tr>
+                            {% endif %}
                             <tr class="total-row">
                                 <td><strong>Gross Profit</strong></td>
                                 <td class="text-end">
@@ -603,6 +651,110 @@
                                 </td>
                                 <td class="text-end">Rs. {{ "{:,.0f}".format(product.revenue or 0) }}</td>
                                 <td class="text-end text-success fw-bold">Rs. {{ "{:,.0f}".format(product.profit or 0) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Category Breakdown -->
+            {% if category_breakdown %}
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-layer-group text-info"></i>
+                        Revenue & Profit by Category
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Category</th>
+                                <th class="text-center">Units</th>
+                                <th class="text-end">Revenue</th>
+                                <th class="text-end">COGS</th>
+                                <th class="text-end">Gross Profit</th>
+                                <th class="text-end">Margin</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cat in category_breakdown %}
+                            <tr>
+                                <td><strong>{{ cat.category }}</strong></td>
+                                <td class="text-center"><span class="badge bg-secondary">{{ cat.units_sold }}</span></td>
+                                <td class="text-end">Rs. {{ "{:,.0f}".format(cat.revenue) }}</td>
+                                <td class="text-end text-danger">Rs. {{ "{:,.0f}".format(cat.cogs) }}</td>
+                                <td class="text-end text-{{ 'success' if cat.gross_profit >= 0 else 'danger' }} fw-bold">
+                                    Rs. {{ "{:,.0f}".format(cat.gross_profit) }}
+                                </td>
+                                <td class="text-end">
+                                    <span class="badge bg-{{ 'success' if cat.margin >= 40 else 'warning' if cat.margin >= 20 else 'danger' }}">
+                                        {{ "{:.1f}".format(cat.margin) }}%
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Period-over-Period Comparison -->
+            {% if period_comparison %}
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exchange-alt text-purple"></i>
+                        Period Comparison
+                    </h5>
+                    <small class="text-muted">Current: {{ period_label }} vs Previous: {{ period_comparison.prev_label }}</small>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Metric</th>
+                                <th class="text-end">Current Period</th>
+                                <th class="text-end">Previous Period</th>
+                                <th class="text-end">Change</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set metrics = [
+                                ('Gross Revenue', period_comparison.gross_revenue),
+                                ('Discounts', period_comparison.discounts),
+                                ('Net Revenue', period_comparison.revenue),
+                                ('COGS', period_comparison.cogs),
+                                ('Gross Profit', period_comparison.gross_profit),
+                                ('Expenses', period_comparison.expenses),
+                                ('Net Profit', period_comparison.net_profit),
+                                ('Transactions', period_comparison.transactions)
+                            ] %}
+                            {% for label, data in metrics %}
+                            <tr class="{{ 'table-active fw-bold' if label in ['Net Revenue', 'Gross Profit', 'Net Profit'] }}">
+                                <td>{{ label }}</td>
+                                {% if label == 'Transactions' %}
+                                <td class="text-end">{{ "{:,.0f}".format(data.current) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(data.previous) }}</td>
+                                {% else %}
+                                <td class="text-end">Rs. {{ "{:,.0f}".format(data.current) }}</td>
+                                <td class="text-end">Rs. {{ "{:,.0f}".format(data.previous) }}</td>
+                                {% endif %}
+                                <td class="text-end">
+                                    {% if data.change != 0 %}
+                                    {% set is_good = (data.change > 0 and label not in ['Discounts', 'COGS', 'Expenses']) or (data.change < 0 and label in ['Discounts', 'COGS', 'Expenses']) %}
+                                    <span class="badge bg-{{ 'success' if is_good else 'danger' }}">
+                                        <i class="fas fa-arrow-{{ 'up' if data.change > 0 else 'down' }}"></i>
+                                        {{ "{:.1f}".format(data.change|abs) }}%
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">--</span>
+                                    {% endif %}
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>

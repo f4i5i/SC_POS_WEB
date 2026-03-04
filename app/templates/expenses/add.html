@@ -18,6 +18,8 @@
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('expenses.add_expense') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                        <!-- Category & Amount -->
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Category <span class="text-danger">*</span></label>
@@ -27,32 +29,58 @@
                                     <option value="{{ cat.id }}">{{ cat.name }}</option>
                                     {% endfor %}
                                 </select>
+                                {% if not categories %}
+                                <small class="text-warning">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    No categories yet.
+                                    <a href="{{ url_for('expenses.seed_default_categories') }}">Add default categories</a>
+                                </small>
+                                {% endif %}
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Amount (Rs.) <span class="text-danger">*</span></label>
-                                <input type="number" step="0.01" class="form-control" name="amount" required>
+                                <input type="number" step="0.01" class="form-control" name="amount" required
+                                       placeholder="e.g., 55000">
                             </div>
                         </div>
 
+                        <!-- Date & Location -->
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Expense Date <span class="text-danger">*</span></label>
                                 <input type="date" class="form-control" name="expense_date" id="expense_date" required>
                             </div>
+                            {% if current_user.is_global_admin %}
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Vendor/Paid To</label>
-                                <input type="text" class="form-control" name="vendor_name"
-                                       placeholder="e.g., Electricity Company">
+                                <label class="form-label">Location / Kiosk <span class="text-danger">*</span></label>
+                                <select class="form-select" name="location_id" required>
+                                    <option value="">Select Location</option>
+                                    {% for loc in locations %}
+                                    <option value="{{ loc.id }}">
+                                        {{ loc.name }}
+                                        ({{ loc.location_type|capitalize }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">Which kiosk/shop is this expense for?</small>
                             </div>
+                            {% endif %}
                         </div>
 
+                        <!-- Description -->
                         <div class="mb-3">
                             <label class="form-label">Description <span class="text-danger">*</span></label>
-                            <textarea class="form-control" name="description" rows="3" required
-                                      placeholder="Describe the expense..."></textarea>
+                            <textarea class="form-control" name="description" rows="2" required
+                                      placeholder="e.g., March 2026 shop rent, Staff salary for Feb, WAPDA bill..."></textarea>
                         </div>
 
+                        <!-- Vendor & Payment -->
                         <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Vendor / Paid To</label>
+                                <input type="text" class="form-control" name="vendor_name"
+                                       placeholder="e.g., Landlord, WAPDA, Employee name">
+                            </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Payment Method</label>
                                 <select class="form-select" name="payment_method">
@@ -60,20 +88,72 @@
                                     <option value="bank_transfer">Bank Transfer</option>
                                     <option value="cheque">Cheque</option>
                                     <option value="card">Card</option>
+                                    <option value="easypaisa">Easypaisa</option>
+                                    <option value="jazzcash">JazzCash</option>
                                     <option value="other">Other</option>
                                 </select>
                             </div>
+                        </div>
+
+                        <!-- Reference & Recurring -->
+                        <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Reference Number</label>
-                                <input type="text" class="form-control" name="reference_number"
-                                       placeholder="Invoice/Receipt number">
+                                <label class="form-label">Bill / Reference Number</label>
+                                <input type="text" class="form-control" name="reference"
+                                       placeholder="Invoice #, receipt #, bill #">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Expense Type</label>
+                                <div class="d-flex align-items-center gap-3 mt-1">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="is_recurring"
+                                               id="isRecurring" onchange="toggleRecurring()">
+                                        <label class="form-check-label" for="isRecurring">
+                                            This is a recurring expense
+                                        </label>
+                                    </div>
+                                </div>
+                                <div id="recurringOptions" style="display: none;" class="mt-2">
+                                    <select class="form-select form-select-sm" name="recurring_frequency">
+                                        <option value="monthly">Monthly (Rent, Salary, Internet)</option>
+                                        <option value="weekly">Weekly</option>
+                                        <option value="daily">Daily</option>
+                                        <option value="yearly">Yearly</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
+                        <!-- Notes -->
                         <div class="mb-3">
                             <label class="form-label">Notes</label>
                             <textarea class="form-control" name="notes" rows="2"
-                                      placeholder="Additional notes (optional)"></textarea>
+                                      placeholder="Any additional details (optional)"></textarea>
+                        </div>
+
+                        <!-- Quick Add Hint -->
+                        <div class="alert alert-light border mb-3">
+                            <h6 class="mb-2"><i class="fas fa-lightbulb text-warning me-1"></i> Quick Guide</h6>
+                            <div class="row small">
+                                <div class="col-md-6">
+                                    <strong>Monthly Bills (Recurring):</strong>
+                                    <ul class="mb-1">
+                                        <li>Rent - Rs. 55,000</li>
+                                        <li>Salary - Rs. 30,000</li>
+                                        <li>Electricity - Rs. 10,000</li>
+                                        <li>Internet - Rs. 3,000</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>One-Time / Investment:</strong>
+                                    <ul class="mb-1">
+                                        <li>Shop setup / renovation</li>
+                                        <li>Furniture / fixtures</li>
+                                        <li>Display shelves / counter</li>
+                                        <li>Security deposit</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="d-flex justify-content-end gap-2">
@@ -94,5 +174,10 @@
 <script>
 // Set default date to today
 document.getElementById('expense_date').valueAsDate = new Date();
+
+function toggleRecurring() {
+    const checked = document.getElementById('isRecurring').checked;
+    document.getElementById('recurringOptions').style.display = checked ? 'block' : 'none';
+}
 </script>
 {% endblock %}

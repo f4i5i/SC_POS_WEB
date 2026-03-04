@@ -176,7 +176,7 @@
                         <tr>
                             <th>{{ 'Category' if group_by == 'category' else 'Product' }}</th>
                             {% if group_by == 'product' %}
-                            <th>SKU</th>
+                            <th>Barcode</th>
                             {% endif %}
                             <th class="text-end">Qty Sold</th>
                             <th class="text-end">Revenue</th>
@@ -190,7 +190,7 @@
                         <tr>
                             <td><strong>{{ item.name }}</strong></td>
                             {% if group_by == 'product' %}
-                            <td><code>{{ item.sku or '-' }}</code></td>
+                            <td><code>{{ item.barcode or '-' }}</code></td>
                             {% endif %}
                             <td class="text-end">{{ item.qty_sold|int }}</td>
                             <td class="text-end">{{ format_currency(item.revenue) }}</td>

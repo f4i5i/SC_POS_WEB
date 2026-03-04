@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory Shrinkage Report - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-chart-line text-danger me-2"></i>Inventory Shrinkage & Loss</h2>
+            <p class="text-muted mb-0">Spot check variances and damage movements</p>
+        </div>
+        <div>
+            <button onclick="window.print()" class="btn btn-outline-primary"><i class="fas fa-print"></i> Print</button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2"><i class="fas fa-arrow-left"></i> Back</a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+                </div>
+                {% if current_user.is_global_admin %}
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i>Apply</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-search fa-2x text-info mb-2"></i>
+                    <h4 class="text-info mb-0">{{ total_items_checked }}</h4>
+                    <small class="text-muted">Items Checked</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
+                    <h4 class="text-warning mb-0">{{ total_items_variance }}</h4>
+                    <small class="text-muted">Items with Variance</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-trash fa-2x text-danger mb-2"></i>
+                    <h4 class="text-danger mb-0">{{ format_currency(total_damage_value) }}</h4>
+                    <small class="text-muted">Damage Losses</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm border-danger">
+                <div class="card-body text-center">
+                    <i class="fas fa-rupee-sign fa-2x text-danger mb-2"></i>
+                    <h4 class="text-danger mb-0">{{ format_currency(total_shrinkage) }}</h4>
+                    <small class="text-muted">Total Shrinkage Value</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Spot Checks -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0"><i class="fas fa-clipboard-check text-info"></i> Spot Check Variances</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if spot_checks %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Location</th>
+                                    <th class="text-center">Checked</th>
+                                    <th class="text-center">Variance</th>
+                                    <th class="text-end">Value</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sc in spot_checks %}
+                                <tr>
+                                    <td>{{ sc.check_date.strftime('%d/%m/%Y') }}</td>
+                                    <td>{{ sc.location.name if sc.location else '-' }}</td>
+                                    <td class="text-center">{{ sc.total_items_checked }}</td>
+                                    <td class="text-center text-{{ 'danger' if sc.items_variance > 0 else 'success' }}">
+                                        {{ sc.items_variance }}
+                                    </td>
+                                    <td class="text-end text-danger">{{ format_currency(sc.total_variance_value) }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if sc.status == 'approved' else 'warning' if sc.status == 'completed' else 'secondary' }}">
+                                            {{ sc.status|capitalize }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-clipboard fa-2x mb-2"></i>
+                        <p>No spot checks in this period</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Damage Movements -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0"><i class="fas fa-ban text-danger"></i> Damage/Loss by Product</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if damage_movements %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Product</th>
+                                    <th class="text-center">Qty Damaged</th>
+                                    <th class="text-end">Loss Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for d in damage_movements %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ d.product_name }}</strong>
+                                        <br><small class="text-muted">{{ d.product_code }}</small>
+                                    </td>
+                                    <td class="text-center"><span class="badge bg-danger">{{ "{:,.0f}".format(d.damaged_qty) }}</span></td>
+                                    <td class="text-end text-danger fw-bold">{{ format_currency(d.damage_value) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-dark">
+                                <tr>
+                                    <th>TOTAL</th>
+                                    <th class="text-center">{{ "{:,.0f}".format(total_damage_qty) }}</th>
+                                    <th class="text-end">{{ format_currency(total_damage_value) }}</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                        <p>No damage recorded in this period</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

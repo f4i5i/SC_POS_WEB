@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}Stock In/Out Comparison - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-exchange-alt text-primary"></i>
+                Stock In/Out Comparison
+            </h2>
+            <p class="text-muted mb-0">
+                {{ from_date.strftime('%B %d, %Y') }} - {{ to_date.strftime('%B %d, %Y') }}
+            </p>
+        </div>
+        <div>
+            <button onclick="window.print()" class="btn btn-outline-primary">
+                <i class="fas fa-print"></i> Print
+            </button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ from_date.strftime('%Y-%m-%d') }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control" value="{{ to_date.strftime('%Y-%m-%d') }}">
+                </div>
+                {% if current_user.is_global_admin %}
+                <div class="col-md-2">
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="col-md-2">
+                    <label class="form-label">Category</label>
+                    <select name="category_id" class="form-select">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if selected_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">View</label>
+                    <select name="view" class="form-select">
+                        <option value="summary" {% if view_mode == 'summary' %}selected{% endif %}>Summary (In/Out)</option>
+                        <option value="detailed" {% if view_mode == 'detailed' %}selected{% endif %}>Detailed Breakdown</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i>Apply</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-arrow-down fa-2x text-success mb-2"></i>
+                    <h4 class="text-success mb-0">{{ "{:,.1f}".format(totals.stock_in) }}</h4>
+                    <small class="text-muted">Total Stock In</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-arrow-up fa-2x text-danger mb-2"></i>
+                    <h4 class="text-danger mb-0">{{ "{:,.1f}".format(totals.stock_out) }}</h4>
+                    <small class="text-muted">Total Stock Out</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-balance-scale fa-2x text-primary mb-2"></i>
+                    <h4 class="text-{{ 'success' if totals.net_change >= 0 else 'danger' }} mb-0">
+                        {{ "{:+,.1f}".format(totals.net_change) }}
+                    </h4>
+                    <small class="text-muted">Net Change</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-boxes fa-2x text-info mb-2"></i>
+                    <h4 class="text-info mb-0">{{ product_data|length }}</h4>
+                    <small class="text-muted">Products with Movement</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0">
+                {% if view_mode == 'detailed' %}
+                <i class="fas fa-table text-primary"></i> Detailed Movement Breakdown
+                {% else %}
+                <i class="fas fa-exchange-alt text-primary"></i> Stock In vs Stock Out
+                {% endif %}
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                {% if view_mode == 'detailed' %}
+                <!-- Detailed view: all movement types as columns -->
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Product</th>
+                            <th class="text-end text-success">Purchase</th>
+                            <th class="text-end text-success">Transfer In</th>
+                            <th class="text-end text-success">Return</th>
+                            <th class="text-end text-success">Production</th>
+                            <th class="text-end text-danger">Sale</th>
+                            <th class="text-end text-danger">Transfer Out</th>
+                            <th class="text-end text-danger">Damage</th>
+                            <th class="text-end">Adjustment</th>
+                            <th class="text-end fw-bold">Net</th>
+                            <th class="text-end">Current Stock</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in product_data %}
+                        <tr>
+                            <td>
+                                <strong>{{ item.product_name }}</strong>
+                                <br><small class="text-muted">{{ item.product_code }}</small>
+                            </td>
+                            <td class="text-end text-success">{{ "{:,.1f}".format(item.purchase) if item.purchase else '-' }}</td>
+                            <td class="text-end text-success">{{ "{:,.1f}".format(item.transfer_in) if item.transfer_in else '-' }}</td>
+                            <td class="text-end text-success">{{ "{:,.1f}".format(item['return']) if item['return'] else '-' }}</td>
+                            <td class="text-end text-success">{{ "{:,.1f}".format(item.production) if item.production else '-' }}</td>
+                            <td class="text-end text-danger">{{ "{:,.1f}".format(item.sale|abs) if item.sale else '-' }}</td>
+                            <td class="text-end text-danger">{{ "{:,.1f}".format(item.transfer_out|abs) if item.transfer_out else '-' }}</td>
+                            <td class="text-end text-danger">{{ "{:,.1f}".format(item.damage|abs) if item.damage else '-' }}</td>
+                            <td class="text-end">{{ "{:+,.1f}".format(item.adjustment) if item.adjustment else '-' }}</td>
+                            <td class="text-end fw-bold text-{{ 'success' if item.net_change >= 0 else 'danger' }}">
+                                {{ "{:+,.1f}".format(item.net_change) }}
+                            </td>
+                            <td class="text-end"><span class="badge bg-secondary">{{ "{:,.1f}".format(item.current_stock) }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-dark">
+                        <tr>
+                            <th>TOTALS</th>
+                            <th class="text-end">{{ "{:,.1f}".format(totals.purchase) }}</th>
+                            <th class="text-end">{{ "{:,.1f}".format(totals.transfer_in) }}</th>
+                            <th class="text-end">{{ "{:,.1f}".format(totals['return']) }}</th>
+                            <th class="text-end">{{ "{:,.1f}".format(totals.production) }}</th>
+                            <th class="text-end">{{ "{:,.1f}".format(totals.sale|abs) }}</th>
+                            <th class="text-end">{{ "{:,.1f}".format(totals.transfer_out|abs) }}</th>
+                            <th class="text-end">{{ "{:,.1f}".format(totals.damage|abs) }}</th>
+                            <th class="text-end">{{ "{:+,.1f}".format(totals.adjustment) }}</th>
+                            <th class="text-end">{{ "{:+,.1f}".format(totals.net_change) }}</th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                </table>
+                {% else %}
+                <!-- Summary view: Stock In vs Stock Out -->
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Product</th>
+                            <th class="text-end text-success">Stock In</th>
+                            <th class="text-end text-danger">Stock Out</th>
+                            <th class="text-end">Net Change</th>
+                            <th class="text-end">Current Stock</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in product_data %}
+                        <tr>
+                            <td>
+                                <strong>{{ item.product_name }}</strong>
+                                <br><small class="text-muted">{{ item.product_code }}</small>
+                            </td>
+                            <td class="text-end text-success fw-bold">{{ "{:,.1f}".format(item.stock_in) }}</td>
+                            <td class="text-end text-danger fw-bold">{{ "{:,.1f}".format(item.stock_out) }}</td>
+                            <td class="text-end fw-bold text-{{ 'success' if item.net_change >= 0 else 'danger' }}">
+                                {{ "{:+,.1f}".format(item.net_change) }}
+                            </td>
+                            <td class="text-end"><span class="badge bg-secondary">{{ "{:,.1f}".format(item.current_stock) }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-dark">
+                        <tr>
+                            <th>TOTALS</th>
+                            <th class="text-end">{{ "{:,.1f}".format(totals.stock_in) }}</th>
+                            <th class="text-end">{{ "{:,.1f}".format(totals.stock_out) }}</th>
+                            <th class="text-end">{{ "{:+,.1f}".format(totals.net_change) }}</th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                </table>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if not product_data %}
+    <div class="text-center py-5">
+        <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+        <h5 class="text-muted">No stock movements found for the selected filters</h5>
+        <p class="text-muted">Try adjusting the date range or filters</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

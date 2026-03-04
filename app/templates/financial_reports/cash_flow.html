@@ -14,7 +14,7 @@
         </a>
     </div>
 
-    <!-- Date Filter -->
+    <!-- Filters -->
     <div class="card shadow-sm mb-4">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
@@ -26,6 +26,17 @@
                     <label class="form-label">To Date</label>
                     <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
                 </div>
+                {% if current_user.is_global_admin %}
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
                 <div class="col-md-2">
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="fas fa-filter me-2"></i>Apply
@@ -82,6 +93,20 @@
                             <div><strong>{{ format_currency(total_refunds) }}</strong></div>
                         </div>
                     </div>
+                    <div class="row small mt-2">
+                        <div class="col-6">
+                            <span class="text-muted">Supplier Payments</span>
+                            <div><strong>{{ format_currency(total_supplier_payments) }}</strong></div>
+                        </div>
+                        <div class="col-6">
+                            {% if supplier_by_method %}
+                            {% for method, total in supplier_by_method %}
+                            <span class="text-muted">{{ method|capitalize }}</span>
+                            <div><small>{{ format_currency(total) }}</small></div>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -117,8 +142,8 @@
                 <div class="card-header">
                     <h5 class="mb-0"><i class="fas fa-chart-area me-2"></i>Daily Cash Flow</h5>
                 </div>
-                <div class="card-body">
-                    <canvas id="cashFlowChart" height="300"></canvas>
+                <div class="card-body" style="position: relative; height: 300px; overflow: hidden;">
+                    <canvas id="cashFlowChart" style="max-height: 100%;"></canvas>
                 </div>
             </div>
         </div>
@@ -127,21 +152,56 @@
         <div class="col-lg-4 mb-4">
             <div class="card shadow-sm h-100">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-pie-chart me-2"></i>Expense Breakdown</h5>
+                    <h5 class="mb-0"><i class="fas fa-pie-chart me-2"></i>Outflow Breakdown</h5>
                 </div>
                 <div class="card-body">
+                    <!-- Outflow summary -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Expenses</span>
+                            <strong>{{ format_currency(total_expenses) }}</strong>
+                        </div>
+                        {% if total_outflow > 0 %}
+                        <div class="progress mb-2" style="height: 6px;">
+                            <div class="progress-bar bg-danger" style="width: {{ (total_expenses / total_outflow * 100)|round }}%"></div>
+                        </div>
+                        {% endif %}
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Supplier Payments</span>
+                            <strong>{{ format_currency(total_supplier_payments) }}</strong>
+                        </div>
+                        {% if total_outflow > 0 %}
+                        <div class="progress mb-2" style="height: 6px;">
+                            <div class="progress-bar bg-warning" style="width: {{ (total_supplier_payments / total_outflow * 100)|round }}%"></div>
+                        </div>
+                        {% endif %}
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Refunds</span>
+                            <strong>{{ format_currency(total_refunds) }}</strong>
+                        </div>
+                        {% if total_outflow > 0 %}
+                        <div class="progress mb-2" style="height: 6px;">
+                            <div class="progress-bar bg-info" style="width: {{ (total_refunds / total_outflow * 100)|round }}%"></div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <hr>
+                    <!-- Expense categories -->
                     {% if expense_by_category %}
-                    <canvas id="expenseChart" height="250"></canvas>
+                    <h6 class="text-muted mb-2">By Expense Category</h6>
+                    <div style="position: relative; height: 200px; overflow: hidden;">
+                        <canvas id="expenseChart" style="max-height: 100%;"></canvas>
+                    </div>
                     <ul class="list-group list-group-flush mt-3">
                         {% for cat, total in expense_by_category %}
-                        <li class="list-group-item d-flex justify-content-between">
+                        <li class="list-group-item d-flex justify-content-between px-0">
                             <span>{{ cat or 'Other' }}</span>
                             <strong>{{ format_currency(total) }}</strong>
                         </li>
                         {% endfor %}
                     </ul>
                     {% else %}
-                    <div class="text-center py-4 text-muted">
+                    <div class="text-center py-3 text-muted">
                         <i class="fas fa-receipt fa-2x mb-2"></i>
                         <p>No expenses recorded</p>
                     </div>
@@ -166,15 +226,19 @@
                         <tr>
                             <th>Date</th>
                             <th class="text-end">Inflows</th>
-                            <th class="text-end">Outflows</th>
+                            <th class="text-end">Expenses</th>
+                            <th class="text-end">Supplier Payments</th>
+                            <th class="text-end">Total Outflows</th>
                             <th class="text-end">Net Flow</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for day in daily_data %}
                         <tr>
-                            <td>{{ day.date.strftime('%a, %d/%m/%Y') }}</td>
+                            <td>{{ day.date_obj.strftime('%a, %d/%m/%Y') }}</td>
                             <td class="text-end text-success">{{ format_currency(day.inflow) }}</td>
+                            <td class="text-end text-danger">{{ format_currency(day.expenses) }}</td>
+                            <td class="text-end text-warning">{{ format_currency(day.supplier_payments) }}</td>
                             <td class="text-end text-danger">{{ format_currency(day.outflow) }}</td>
                             <td class="text-end {% if day.net >= 0 %}text-success{% else %}text-danger{% endif %}">
                                 <strong>{{ format_currency(day.net) }}</strong>
@@ -182,6 +246,16 @@
                         </tr>
                         {% endfor %}
                     </tbody>
+                    <tfoot class="table-dark">
+                        <tr>
+                            <th>TOTALS</th>
+                            <th class="text-end">{{ format_currency(total_inflow) }}</th>
+                            <th class="text-end">{{ format_currency(total_expenses) }}</th>
+                            <th class="text-end">{{ format_currency(total_supplier_payments) }}</th>
+                            <th class="text-end">{{ format_currency(total_outflow) }}</th>
+                            <th class="text-end">{{ format_currency(net_cash_flow) }}</th>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
         </div>
@@ -191,7 +265,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 // Cash Flow Chart
-const dailyData = {{ daily_data|tojson|safe }};
+const dailyData = [{% for day in daily_data %}{"date":"{{ day.date }}","inflow":{{ day.inflow }},"outflow":{{ day.outflow }},"net":{{ day.net }}}{% if not loop.last %},{% endif %}{% endfor %}];
 const labels = dailyData.map(d => d.date);
 const inflows = dailyData.map(d => d.inflow);
 const outflows = dailyData.map(d => d.outflow);
@@ -249,8 +323,8 @@ new Chart(document.getElementById('cashFlowChart'), {
 
 // Expense Chart
 {% if expense_by_category %}
-const expenseLabels = {{ [cat or 'Other' for cat, total in expense_by_category]|tojson|safe }};
-const expenseData = {{ [float(total) for cat, total in expense_by_category]|tojson|safe }};
+const expenseLabels = [{% for cat, total in expense_by_category %}"{{ cat or 'Other' }}"{% if not loop.last %},{% endif %}{% endfor %}];
+const expenseData = [{% for cat, total in expense_by_category %}{{ total }}{% if not loop.last %},{% endif %}{% endfor %}];
 
 new Chart(document.getElementById('expenseChart'), {
     type: 'doughnut',
@@ -263,6 +337,7 @@ new Chart(document.getElementById('expenseChart'), {
     },
     options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
             legend: { position: 'bottom', labels: { boxWidth: 12 } }
         }

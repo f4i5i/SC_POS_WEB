@@ -27,6 +27,16 @@
             </p>
         </div>
         <div>
+            {% if current_user.is_global_admin and locations is defined %}
+            <form method="GET" class="d-inline">
+                <select name="location_id" class="form-select d-inline-block" style="width: auto;" onchange="this.form.submit()">
+                    <option value="">All Locations</option>
+                    {% for loc in locations %}
+                    <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+            {% endif %}
             <button onclick="window.print()" class="btn btn-outline-primary">
                 <i class="fas fa-print"></i> Print
             </button>

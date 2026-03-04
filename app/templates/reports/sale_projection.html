@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}Sale Projection - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="fas fa-chart-line text-primary"></i>
+                Projected Sale Estimation
+            </h2>
+            <p class="text-muted mb-0">
+                Based on {{ lookback_days }}-day sales history
+                {% if user_location %}
+                <span class="badge bg-info ms-2">{{ user_location.name }}</span>
+                {% endif %}
+            </p>
+        </div>
+        <div>
+            <button onclick="window.print()" class="btn btn-outline-primary">
+                <i class="fas fa-print"></i> Print
+            </button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                {% if current_user.is_global_admin %}
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="col-md-3">
+                    <label class="form-label">Category</label>
+                    <select name="category_id" class="form-select">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if selected_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Lookback Period</label>
+                    <select name="lookback_days" class="form-select">
+                        {% for days in [7, 14, 30, 60, 90] %}
+                        <option value="{{ days }}" {% if lookback_days == days %}selected{% endif %}>Last {{ days }} days</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i>Apply</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-money-bill-wave fa-2x text-success mb-2"></i>
+                    <h4 class="text-success mb-0">Rs. {{ "{:,.0f}".format(total_projected_revenue) }}</h4>
+                    <small class="text-muted">Projected Revenue (if all stock sold)</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-line fa-2x text-primary mb-2"></i>
+                    <h4 class="text-primary mb-0">Rs. {{ "{:,.0f}".format(total_projected_profit) }}</h4>
+                    <small class="text-muted">Projected Profit</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-exclamation-triangle fa-2x text-{{ 'danger' if at_risk_count > 0 else 'success' }} mb-2"></i>
+                    <h4 class="text-{{ 'danger' if at_risk_count > 0 else 'success' }} mb-0">{{ at_risk_count }}</h4>
+                    <small class="text-muted">Products at Risk (&lt; 7 days stock)</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Main Table -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-table text-primary"></i>
+                        Stock Projection by Product
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Category</th>
+                                    <th class="text-center">Stock</th>
+                                    <th class="text-center">Avg Daily Sales</th>
+                                    <th class="text-center">Days Remaining</th>
+                                    <th class="text-end">Projected Revenue</th>
+                                    <th class="text-end">Projected Profit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in product_data %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ item.product_name }}</strong>
+                                        <br><small class="text-muted">{{ item.product_code }}</small>
+                                    </td>
+                                    <td><span class="badge bg-light text-dark">{{ item.category }}</span></td>
+                                    <td class="text-center">
+                                        <span class="badge bg-secondary">{{ "{:,.0f}".format(item.current_stock) }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if item.avg_daily_sales > 0 %}
+                                        {{ "{:.1f}".format(item.avg_daily_sales) }}
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if item.days_remaining is none %}
+                                        <span class="badge bg-secondary" title="No sales history">N/A</span>
+                                        {% elif item.days_remaining < 7 %}
+                                        <span class="badge bg-danger">{{ "{:.0f}".format(item.days_remaining) }} days</span>
+                                        {% elif item.days_remaining < 14 %}
+                                        <span class="badge bg-warning text-dark">{{ "{:.0f}".format(item.days_remaining) }} days</span>
+                                        {% elif item.days_remaining < 30 %}
+                                        <span class="badge bg-info">{{ "{:.0f}".format(item.days_remaining) }} days</span>
+                                        {% else %}
+                                        <span class="badge bg-success">{{ "{:.0f}".format(item.days_remaining) }} days</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">Rs. {{ "{:,.0f}".format(item.projected_revenue) }}</td>
+                                    <td class="text-end text-{{ 'success' if item.projected_profit >= 0 else 'danger' }}">
+                                        Rs. {{ "{:,.0f}".format(item.projected_profit) }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {% if not product_data %}
+            <div class="text-center py-5">
+                <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+                <h5 class="text-muted">No products with stock found</h5>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="col-lg-4">
+            <!-- Top 10 by Projected Revenue -->
+            {% if top_by_revenue %}
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0">
+                        <i class="fas fa-chart-bar text-primary"></i>
+                        Top 10 by Projected Revenue
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="projectionChart" height="300"></canvas>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Legend -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0"><i class="fas fa-info-circle text-primary"></i> Stock Status Legend</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge bg-danger me-2">&nbsp;&nbsp;&nbsp;</span>
+                        <span>Critical: &lt; 7 days of stock</span>
+                    </div>
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge bg-warning me-2">&nbsp;&nbsp;&nbsp;</span>
+                        <span>Low: 7-14 days of stock</span>
+                    </div>
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge bg-info me-2">&nbsp;&nbsp;&nbsp;</span>
+                        <span>Moderate: 14-30 days of stock</span>
+                    </div>
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge bg-success me-2">&nbsp;&nbsp;&nbsp;</span>
+                        <span>Healthy: 30+ days of stock</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-secondary me-2">&nbsp;&nbsp;&nbsp;</span>
+                        <span>N/A: No sales history</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if top_by_revenue %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const topData = {{ top_by_revenue | tojson }};
+new Chart(document.getElementById('projectionChart'), {
+    type: 'bar',
+    data: {
+        labels: topData.map(d => d.product_name.length > 15 ? d.product_name.substring(0, 15) + '...' : d.product_name),
+        datasets: [{
+            label: 'Projected Revenue',
+            data: topData.map(d => d.projected_revenue),
+            backgroundColor: 'rgba(99, 102, 241, 0.8)',
+            borderRadius: 6
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: ctx => 'Rs. ' + ctx.parsed.x.toLocaleString()
+                }
+            }
+        },
+        scales: {
+            x: {
+                beginAtZero: true,
+                ticks: {
+                    callback: value => 'Rs. ' + (value / 1000).toFixed(0) + 'k'
+                }
+            }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}A/P vs A/R Balance Sheet - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-balance-scale text-primary me-2"></i>Accounts Payable vs Receivable</h2>
+            <p class="text-muted mb-0">Consolidated balance sheet view</p>
+        </div>
+        <div>
+            <button onclick="window.print()" class="btn btn-outline-primary"><i class="fas fa-print"></i> Print</button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2"><i class="fas fa-arrow-left"></i> Back</a>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-success bg-opacity-10 border-success">
+                <div class="card-body">
+                    <h6 class="text-success"><i class="fas fa-arrow-down me-2"></i>Accounts Receivable (Owed to Us)</h6>
+                    <h2 class="text-success">{{ format_currency(total_ar) }}</h2>
+                    <div class="row small mt-2">
+                        <div class="col-6">
+                            <span class="text-muted">Current</span>
+                            <div><strong class="text-success">{{ format_currency(ar_current) }}</strong></div>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Overdue</span>
+                            <div><strong class="text-danger">{{ format_currency(ar_overdue) }}</strong></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-danger bg-opacity-10 border-danger">
+                <div class="card-body">
+                    <h6 class="text-danger"><i class="fas fa-arrow-up me-2"></i>Accounts Payable (We Owe)</h6>
+                    <h2 class="text-danger">{{ format_currency(total_ap) }}</h2>
+                    <div class="row small mt-2">
+                        <div class="col-6">
+                            <span class="text-muted">Suppliers</span>
+                            <div><strong>{{ suppliers|length }}</strong></div>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted">Voucher Liability</span>
+                            <div><strong>{{ format_currency(voucher_liability) }}</strong></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm border-{{ 'success' if net_position >= 0 else 'danger' }}">
+                <div class="card-body">
+                    <h6 class="text-{{ 'success' if net_position >= 0 else 'danger' }}">
+                        <i class="fas fa-chart-line me-2"></i>Net Position (A/R - A/P)
+                    </h6>
+                    <h2 class="text-{{ 'success' if net_position >= 0 else 'danger' }}">{{ format_currency(net_position) }}</h2>
+                    <div class="small mt-2">
+                        <span class="text-muted">
+                            {% if net_position >= 0 %}
+                            Net positive — more money owed to you than you owe
+                            {% else %}
+                            Net negative — you owe more than what is owed to you
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Accounts Receivable -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0"><i class="fas fa-hand-holding-usd text-success"></i> Receivables by Customer</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if ar_customers %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Customer</th>
+                                    <th class="text-end">Current</th>
+                                    <th class="text-end">Overdue</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for c in ar_customers %}
+                                <tr>
+                                    <td><strong>{{ c.name }}</strong></td>
+                                    <td class="text-end text-success">{{ format_currency(c.current) }}</td>
+                                    <td class="text-end text-danger">{{ format_currency(c.overdue) if c.overdue else '-' }}</td>
+                                    <td class="text-end fw-bold">{{ format_currency(c.total) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-dark">
+                                <tr>
+                                    <th>TOTAL</th>
+                                    <th class="text-end">{{ format_currency(ar_current) }}</th>
+                                    <th class="text-end">{{ format_currency(ar_overdue) }}</th>
+                                    <th class="text-end">{{ format_currency(total_ar) }}</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-check-circle fa-2x mb-2 text-success"></i>
+                        <p>No outstanding receivables</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Accounts Payable -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0"><i class="fas fa-file-invoice-dollar text-danger"></i> Payables by Supplier</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if suppliers %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Supplier</th>
+                                    <th class="text-end">Balance</th>
+                                    <th class="text-end">Credit Limit</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in suppliers %}
+                                <tr class="{{ 'table-danger' if s.is_over_credit_limit else '' }}">
+                                    <td><strong>{{ s.name }}</strong></td>
+                                    <td class="text-end fw-bold">{{ format_currency(s.current_balance) }}</td>
+                                    <td class="text-end">{{ format_currency(s.credit_limit) if s.credit_limit else '-' }}</td>
+                                    <td>
+                                        {% if s.is_over_credit_limit %}
+                                        <span class="badge bg-danger">Over Limit</span>
+                                        {% else %}
+                                        <span class="badge bg-success">OK</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-dark">
+                                <tr>
+                                    <th>TOTAL</th>
+                                    <th class="text-end">{{ format_currency(total_ap) }}</th>
+                                    <th></th>
+                                    <th></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-check-circle fa-2x mb-2 text-success"></i>
+                        <p>No outstanding payables</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

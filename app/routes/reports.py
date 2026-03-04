@@ -38,6 +38,10 @@ def daily_report():
     else:
         report_date = datetime.now().date()
 
+    # Location filter support
+    location_id = request.args.get('location_id', type=int)
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+
     # Build query with location filter - include both completed and refunded
     query = Sale.query.filter(
         and_(
@@ -46,14 +50,20 @@ def daily_report():
         )
     )
 
-    # Filter by location for non-global admins
+    # Filter by location for non-global admins, or by selected location for admins
     user_location = None
+    effective_location_id = None
     if not current_user.is_global_admin:
         if current_user.location_id:
+            effective_location_id = current_user.location_id
             query = query.filter(Sale.location_id == current_user.location_id)
             user_location = Location.query.get(current_user.location_id)
         else:
             query = query.filter(False)  # No location = no data
+    elif location_id:
+        effective_location_id = location_id
+        query = query.filter(Sale.location_id == location_id)
+        user_location = Location.query.get(location_id)
 
     # Get sales for the day
     all_sales = query.all()
@@ -91,8 +101,8 @@ def daily_report():
     ).join(SaleItem).join(Sale).filter(
         func.date(Sale.sale_date) == report_date
     )
-    if not current_user.is_global_admin and current_user.location_id:
-        top_products_query = top_products_query.filter(Sale.location_id == current_user.location_id)
+    if effective_location_id:
+        top_products_query = top_products_query.filter(Sale.location_id == effective_location_id)
     top_products_rows = top_products_query.group_by(Product.id).order_by(func.sum(SaleItem.quantity).desc()).limit(10).all()
     # Convert to serializable list
     top_products = [
@@ -113,8 +123,8 @@ def daily_report():
     ).filter(
         func.date(Sale.sale_date) == report_date
     )
-    if not current_user.is_global_admin and current_user.location_id:
-        hourly_sales_query = hourly_sales_query.filter(Sale.location_id == current_user.location_id)
+    if effective_location_id:
+        hourly_sales_query = hourly_sales_query.filter(Sale.location_id == effective_location_id)
     hourly_sales_rows = hourly_sales_query.group_by(extract('hour', Sale.sale_date)).all()
     # Convert to serializable list
     hourly_sales = [
@@ -128,16 +138,16 @@ def daily_report():
 
     # Low stock alerts - use LocationStock for per-location data
     from app.models import LocationStock
-    if not current_user.is_global_admin and current_user.location_id:
+    if effective_location_id:
         # Get low stock for this location
         location_stock = LocationStock.query.filter(
-            LocationStock.location_id == current_user.location_id,
+            LocationStock.location_id == effective_location_id,
             LocationStock.quantity <= LocationStock.reorder_level,
             LocationStock.quantity > 0
         ).all()
         low_stock = [ls.product for ls in location_stock if ls.product]
         out_of_stock_ls = LocationStock.query.filter(
-            LocationStock.location_id == current_user.location_id,
+            LocationStock.location_id == effective_location_id,
             LocationStock.quantity == 0
         ).all()
         out_of_stock = [ls.product for ls in out_of_stock_ls if ls.product]
@@ -161,7 +171,9 @@ def daily_report():
                          hourly_sales=hourly_sales,
                          low_stock=low_stock,
                          out_of_stock=out_of_stock,
-                         user_location=user_location)
+                         user_location=user_location,
+                         locations=locations,
+                         selected_location_id=location_id)
 
 
 @bp.route('/weekly')
@@ -170,6 +182,10 @@ def daily_report():
 def weekly_report():
     """Weekly sales comparison report - filtered by location"""
     from app.models import Location
+
+    # Location filter support
+    location_id = request.args.get('location_id', type=int)
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
 
     # Get week ending date
     end_date = datetime.now().date()
@@ -184,14 +200,20 @@ def weekly_report():
         )
     )
 
-    # Filter by location for non-global admins
+    # Filter by location for non-global admins, or by selected location for admins
     user_location = None
+    effective_location_id = None
     if not current_user.is_global_admin:
         if current_user.location_id:
+            effective_location_id = current_user.location_id
             current_query = current_query.filter(Sale.location_id == current_user.location_id)
             user_location = Location.query.get(current_user.location_id)
         else:
             current_query = current_query.filter(False)
+    elif location_id:
+        effective_location_id = location_id
+        current_query = current_query.filter(Sale.location_id == location_id)
+        user_location = Location.query.get(location_id)
 
     current_week_sales = current_query.all()
 
@@ -205,8 +227,8 @@ def weekly_report():
             Sale.status == 'completed'
         )
     )
-    if not current_user.is_global_admin and current_user.location_id:
-        prev_query = prev_query.filter(Sale.location_id == current_user.location_id)
+    if effective_location_id:
+        prev_query = prev_query.filter(Sale.location_id == effective_location_id)
     previous_week_sales = prev_query.all()
 
     # Calculate metrics
@@ -229,8 +251,8 @@ def weekly_report():
             Sale.status == 'completed'
         )
     )
-    if not current_user.is_global_admin and current_user.location_id:
-        daily_query = daily_query.filter(Sale.location_id == current_user.location_id)
+    if effective_location_id:
+        daily_query = daily_query.filter(Sale.location_id == effective_location_id)
     daily_sales_raw = daily_query.group_by(func.date(Sale.sale_date)).all()
 
     # Convert to list of dicts with proper date objects
@@ -255,7 +277,9 @@ def weekly_report():
                          previous_total=previous_total,
                          change_percent=change_percent,
                          daily_sales=daily_sales,
-                         user_location=user_location)
+                         user_location=user_location,
+                         locations=locations,
+                         selected_location_id=location_id)
 
 
 @bp.route('/monthly')
@@ -264,6 +288,10 @@ def weekly_report():
 def monthly_report():
     """Monthly comprehensive report - filtered by location"""
     from app.models import Location
+
+    # Location filter support
+    location_id = request.args.get('location_id', type=int)
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
 
     # Get month from request or use current month
     month_str = request.args.get('month')
@@ -284,14 +312,20 @@ def monthly_report():
         )
     )
 
-    # Filter by location for non-global admins
+    # Filter by location
     user_location = None
+    effective_location_id = None
     if not current_user.is_global_admin:
         if current_user.location_id:
+            effective_location_id = current_user.location_id
             query = query.filter(Sale.location_id == current_user.location_id)
             user_location = Location.query.get(current_user.location_id)
         else:
             query = query.filter(False)
+    elif location_id:
+        effective_location_id = location_id
+        query = query.filter(Sale.location_id == location_id)
+        user_location = Location.query.get(location_id)
 
     sales = query.all()
 
@@ -311,8 +345,8 @@ def monthly_report():
             Sale.status == 'completed'
         )
     )
-    if not current_user.is_global_admin and current_user.location_id:
-        category_query = category_query.filter(Sale.location_id == current_user.location_id)
+    if effective_location_id:
+        category_query = category_query.filter(Sale.location_id == effective_location_id)
     category_sales_rows = category_query.group_by('category').all()
     # Convert to serializable format
     category_sales = [
@@ -332,8 +366,8 @@ def monthly_report():
             Sale.status == 'completed'
         )
     )
-    if not current_user.is_global_admin and current_user.location_id:
-        customers_query = customers_query.filter(Sale.location_id == current_user.location_id)
+    if effective_location_id:
+        customers_query = customers_query.filter(Sale.location_id == effective_location_id)
     top_customers_rows = customers_query.group_by(Customer.id).order_by(func.sum(Sale.total).desc()).limit(10).all()
     # Convert to serializable format
     top_customers = [
@@ -348,7 +382,9 @@ def monthly_report():
                          total_transactions=total_transactions,
                          category_sales=category_sales,
                          top_customers=top_customers,
-                         user_location=user_location)
+                         user_location=user_location,
+                         locations=locations,
+                         selected_location_id=location_id)
 
 
 @bp.route('/custom')
@@ -358,13 +394,22 @@ def custom_report():
     """Custom date range report - filtered by location"""
     from app.models import Location
 
+    # Location filter support
+    location_id = request.args.get('location_id', type=int)
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+
     from_date = request.args.get('from_date')
     to_date = request.args.get('to_date')
 
     # Get user location for display
     user_location = None
+    effective_location_id = None
     if not current_user.is_global_admin and current_user.location_id:
+        effective_location_id = current_user.location_id
         user_location = Location.query.get(current_user.location_id)
+    elif current_user.is_global_admin and location_id:
+        effective_location_id = location_id
+        user_location = Location.query.get(location_id)
 
     if from_date and to_date:
         from_dt = datetime.strptime(from_date, '%Y-%m-%d')
@@ -383,6 +428,8 @@ def custom_report():
                 query = query.filter(Sale.location_id == current_user.location_id)
             else:
                 query = query.filter(False)
+        elif effective_location_id:
+            query = query.filter(Sale.location_id == effective_location_id)
 
         sales = query.all()
 
@@ -403,8 +450,8 @@ def custom_report():
                 Sale.status == 'completed'
             )
         )
-        if not current_user.is_global_admin and current_user.location_id:
-            product_query = product_query.filter(Sale.location_id == current_user.location_id)
+        if effective_location_id:
+            product_query = product_query.filter(Sale.location_id == effective_location_id)
         product_performance = product_query.group_by(Product.id).order_by(func.sum(SaleItem.subtotal).desc()).all()
 
         return render_template('reports/custom_report.html',
@@ -413,9 +460,14 @@ def custom_report():
                              total_sales=total_sales,
                              total_transactions=total_transactions,
                              product_performance=product_performance,
-                             user_location=user_location)
+                             user_location=user_location,
+                             locations=locations,
+                             selected_location_id=location_id)
 
-    return render_template('reports/custom_report.html', user_location=user_location)
+    return render_template('reports/custom_report.html',
+                         user_location=user_location,
+                         locations=locations,
+                         selected_location_id=location_id)
 
 
 @bp.route('/inventory-valuation')
@@ -517,6 +569,10 @@ def employee_performance():
     """Employee performance and sales report - filtered by location"""
     from app.models import User, Location
 
+    # Location filter support
+    location_id = request.args.get('location_id', type=int)
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+
     # Get date range from request or default to current month
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
@@ -532,8 +588,13 @@ def employee_performance():
 
     # Get user location for display
     user_location = None
+    effective_location_id = None
     if not current_user.is_global_admin and current_user.location_id:
+        effective_location_id = current_user.location_id
         user_location = Location.query.get(current_user.location_id)
+    elif current_user.is_global_admin and location_id:
+        effective_location_id = location_id
+        user_location = Location.query.get(location_id)
 
     # Employee sales performance
     # Subquery to count items per sale
@@ -549,9 +610,9 @@ def employee_performance():
         Sale.status == 'completed'
     )
 
-    # Add location filter for non-global admins
-    if not current_user.is_global_admin and current_user.location_id:
-        base_filter = and_(base_filter, Sale.location_id == current_user.location_id)
+    # Add location filter
+    if effective_location_id:
+        base_filter = and_(base_filter, Sale.location_id == effective_location_id)
 
     employee_stats = db.session.query(
         User.full_name,
@@ -565,16 +626,31 @@ def employee_performance():
     ).filter(base_filter).group_by(User.id).order_by(func.sum(Sale.total).desc()).all()
 
     # Calculate totals
-    total_revenue = sum(emp.total_revenue or 0 for emp in employee_stats)
+    total_revenue = float(sum(emp.total_revenue or 0 for emp in employee_stats))
     total_sales_count = sum(emp.total_sales or 0 for emp in employee_stats)
+
+    # Convert Row objects to dicts for tojson serialization in template
+    employee_stats_serializable = [
+        {
+            'full_name': emp.full_name or emp.username,
+            'username': emp.username,
+            'total_sales': emp.total_sales or 0,
+            'total_revenue': float(emp.total_revenue or 0),
+            'avg_sale': float(emp.avg_sale or 0),
+            'items_sold': int(emp.items_sold or 0)
+        }
+        for emp in employee_stats
+    ]
 
     return render_template('reports/employee_performance.html',
                          start_date=start_date,
                          end_date=end_date,
-                         employee_stats=employee_stats,
+                         employee_stats=employee_stats_serializable,
                          total_revenue=total_revenue,
                          total_sales_count=total_sales_count,
-                         user_location=user_location)
+                         user_location=user_location,
+                         locations=locations,
+                         selected_location_id=location_id)
 
 
 @bp.route('/product-performance')
@@ -583,6 +659,10 @@ def employee_performance():
 def product_performance():
     """Product performance analysis - filtered by location"""
     from app.models import Location
+
+    # Location filter support
+    location_id = request.args.get('location_id', type=int)
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
 
     # Get date range
     start_date_str = request.args.get('start_date')
@@ -598,8 +678,13 @@ def product_performance():
 
     # Get user location for display
     user_location = None
+    effective_location_id = None
     if not current_user.is_global_admin and current_user.location_id:
+        effective_location_id = current_user.location_id
         user_location = Location.query.get(current_user.location_id)
+    elif current_user.is_global_admin and location_id:
+        effective_location_id = location_id
+        user_location = Location.query.get(location_id)
 
     # Build base filter
     base_filter = and_(
@@ -607,9 +692,9 @@ def product_performance():
         Sale.sale_date <= end_date,
         Sale.status == 'completed'
     )
-    # Add location filter for non-global admins
-    if not current_user.is_global_admin and current_user.location_id:
-        base_filter = and_(base_filter, Sale.location_id == current_user.location_id)
+    # Add location filter
+    if effective_location_id:
+        base_filter = and_(base_filter, Sale.location_id == effective_location_id)
 
     # Top performing products
     top_products = db.session.query(
@@ -642,10 +727,10 @@ def product_performance():
     # Never sold products - also filter by location
     sold_product_ids = db.session.query(func.distinct(SaleItem.product_id)).join(Sale).filter(
         base_filter
-    ).subquery()
+    )
 
     never_sold = Product.query.filter(
-        ~Product.id.in_(sold_product_ids),
+        ~Product.id.in_(sold_product_ids.subquery().select()),
         Product.is_active == True
     ).limit(20).all()
 
@@ -655,7 +740,9 @@ def product_performance():
                          top_products=top_products,
                          worst_products=worst_products,
                          never_sold=never_sold,
-                         user_location=user_location)
+                         user_location=user_location,
+                         locations=locations,
+                         selected_location_id=location_id)
 
 
 @bp.route('/sales-by-category')
@@ -664,6 +751,10 @@ def product_performance():
 def sales_by_category():
     """Sales breakdown by product category - filtered by location"""
     from app.models import Category, Location
+
+    # Location filter support
+    location_id = request.args.get('location_id', type=int)
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
 
     # Get date range
     start_date_str = request.args.get('start_date')
@@ -680,8 +771,13 @@ def sales_by_category():
 
     # Get user location for display
     user_location = None
+    effective_location_id = None
     if not current_user.is_global_admin and current_user.location_id:
+        effective_location_id = current_user.location_id
         user_location = Location.query.get(current_user.location_id)
+    elif current_user.is_global_admin and location_id:
+        effective_location_id = location_id
+        user_location = Location.query.get(location_id)
 
     # Build base filter
     base_filter = and_(
@@ -689,9 +785,9 @@ def sales_by_category():
         Sale.sale_date <= end_date,
         Sale.status == 'completed'
     )
-    # Add location filter for non-global admins
-    if not current_user.is_global_admin and current_user.location_id:
-        base_filter = and_(base_filter, Sale.location_id == current_user.location_id)
+    # Add location filter
+    if effective_location_id:
+        base_filter = and_(base_filter, Sale.location_id == effective_location_id)
 
     # Sales by category
     category_sales_rows = db.session.query(
@@ -728,7 +824,9 @@ def sales_by_category():
                          total_revenue=total_revenue,
                          total_profit=total_profit,
                          total_units=total_units,
-                         user_location=user_location)
+                         user_location=user_location,
+                         locations=locations,
+                         selected_location_id=location_id)
 
 
 @bp.route('/profit-loss')
@@ -736,8 +834,12 @@ def sales_by_category():
 @permission_required(Permissions.REPORT_VIEW_SALES)
 def profit_loss():
     """Profit and Loss (P&L) statement with daily/weekly/monthly presets"""
-    from app.models import Location
+    from app.models import Location, Category
     from calendar import monthrange
+
+    # Location filter support
+    location_id = request.args.get('location_id', type=int)
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
 
     # Get period type: daily, weekly, monthly, custom
     period = request.args.get('period', 'daily')
@@ -748,16 +850,13 @@ def profit_loss():
 
     # Determine date range based on period
     if period == 'daily':
-        # Single day - today or specified date
         if start_date_str:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
         else:
             start_date = today.replace(hour=0, minute=0, second=0, microsecond=0)
         end_date = start_date.replace(hour=23, minute=59, second=59)
         period_label = start_date.strftime('%B %d, %Y')
-
     elif period == 'weekly':
-        # Current week (Monday to Sunday)
         if start_date_str:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
         else:
@@ -766,9 +865,7 @@ def profit_loss():
         end_date = start_date + timedelta(days=6)
         end_date = end_date.replace(hour=23, minute=59, second=59)
         period_label = f"{start_date.strftime('%b %d')} - {end_date.strftime('%b %d, %Y')}"
-
     elif period == 'monthly':
-        # Current month or specified month
         if start_date_str:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
         else:
@@ -777,7 +874,6 @@ def profit_loss():
         _, last_day = monthrange(start_date.year, start_date.month)
         end_date = start_date.replace(day=last_day, hour=23, minute=59, second=59)
         period_label = start_date.strftime('%B %Y')
-
     else:  # custom
         if start_date_str and end_date_str:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
@@ -790,13 +886,19 @@ def profit_loss():
 
     # Get user location for filtering
     user_location = None
+    effective_location_id = None
     location_filter = True  # Default: no filter
     if not current_user.is_global_admin:
         if current_user.location_id:
+            effective_location_id = current_user.location_id
             location_filter = Sale.location_id == current_user.location_id
             user_location = Location.query.get(current_user.location_id)
         else:
             location_filter = False
+    elif location_id:
+        effective_location_id = location_id
+        location_filter = Sale.location_id == location_id
+        user_location = Location.query.get(location_id)
 
     # ===== REVENUE SECTION =====
     sales = Sale.query.filter(
@@ -823,16 +925,50 @@ def profit_loss():
             Sale.status == 'completed'
         )
     )
-    if not current_user.is_global_admin and current_user.location_id:
-        cogs_query = cogs_query.filter(Sale.location_id == current_user.location_id)
+    if effective_location_id:
+        cogs_query = cogs_query.filter(Sale.location_id == effective_location_id)
+    elif not current_user.is_global_admin and not current_user.location_id:
+        cogs_query = cogs_query.filter(False)
     cogs = float(cogs_query.scalar() or 0)
 
+    # ===== COGS BREAKDOWN BY COST COMPONENT =====
+    cogs_detail_query = db.session.query(
+        func.sum(func.coalesce(Product.base_cost, 0) * SaleItem.quantity).label('base_cost'),
+        func.sum(func.coalesce(Product.packaging_cost, 0) * SaleItem.quantity).label('packaging_cost'),
+        func.sum(func.coalesce(Product.delivery_cost, 0) * SaleItem.quantity).label('delivery_cost'),
+        func.sum(func.coalesce(Product.bottle_cost, 0) * SaleItem.quantity).label('bottle_cost'),
+        func.sum(func.coalesce(Product.kiosk_cost, 0) * SaleItem.quantity).label('kiosk_cost'),
+        func.sum(SaleItem.quantity).label('total_units')
+    ).select_from(SaleItem).join(Sale).join(Product).filter(
+        and_(
+            Sale.sale_date >= start_date,
+            Sale.sale_date <= end_date,
+            Sale.status == 'completed'
+        )
+    )
+    if effective_location_id:
+        cogs_detail_query = cogs_detail_query.filter(Sale.location_id == effective_location_id)
+    elif not current_user.is_global_admin and not current_user.location_id:
+        cogs_detail_query = cogs_detail_query.filter(False)
+    cogs_row = cogs_detail_query.first()
+    cogs_breakdown = {
+        'base_cost': float(cogs_row.base_cost or 0) if cogs_row else 0,
+        'packaging_cost': float(cogs_row.packaging_cost or 0) if cogs_row else 0,
+        'delivery_cost': float(cogs_row.delivery_cost or 0) if cogs_row else 0,
+        'bottle_cost': float(cogs_row.bottle_cost or 0) if cogs_row else 0,
+        'kiosk_cost': float(cogs_row.kiosk_cost or 0) if cogs_row else 0,
+        'total_units': int(cogs_row.total_units or 0) if cogs_row else 0
+    }
+
     # ===== GROSS PROFIT =====
-    gross_profit = net_revenue - cogs
+    # Exclude kiosk_cost from COGS (it's rent recovery built into pricing,
+    # actual rent is tracked in Operating Expenses to avoid double-counting)
+    direct_cogs = cogs - cogs_breakdown.get('kiosk_cost', 0)
+    gross_profit = net_revenue - direct_cogs
     gross_margin = (gross_profit / net_revenue * 100) if net_revenue > 0 else 0
 
     # ===== GROWTH SHARE (20% of Gross Profit) =====
-    growth_share_percent = 20  # Can be made configurable later
+    growth_share_percent = 20
     growth_share = (gross_profit * growth_share_percent / 100) if gross_profit > 0 else 0
     profit_after_growth_share = gross_profit - growth_share
 
@@ -845,14 +981,16 @@ def profit_loss():
                 Expense.expense_date <= end_date.date()
             )
         )
-        if not current_user.is_global_admin and current_user.location_id:
-            expense_query = expense_query.filter(Expense.location_id == current_user.location_id)
+        if effective_location_id:
+            expense_query = expense_query.filter(Expense.location_id == effective_location_id)
+        elif not current_user.is_global_admin and not current_user.location_id:
+            expense_query = expense_query.filter(False)
 
         expenses = expense_query.all()
         total_expenses = sum(float(exp.amount or 0) for exp in expenses)
 
         # Expenses by category
-        expense_by_category = db.session.query(
+        expense_by_cat_query = db.session.query(
             ExpenseCategory.name,
             ExpenseCategory.icon,
             ExpenseCategory.color,
@@ -863,9 +1001,11 @@ def profit_loss():
                 Expense.expense_date <= end_date.date()
             )
         )
-        if not current_user.is_global_admin and current_user.location_id:
-            expense_by_category = expense_by_category.filter(Expense.location_id == current_user.location_id)
-        expense_by_category = expense_by_category.group_by(ExpenseCategory.id).all()
+        if effective_location_id:
+            expense_by_cat_query = expense_by_cat_query.filter(Expense.location_id == effective_location_id)
+        elif not current_user.is_global_admin and not current_user.location_id:
+            expense_by_cat_query = expense_by_cat_query.filter(False)
+        expense_by_category = expense_by_cat_query.group_by(ExpenseCategory.id).all()
     except:
         expenses = []
         total_expenses = 0
@@ -907,32 +1047,120 @@ def profit_loss():
             Sale.status == 'completed'
         )
     )
-    if not current_user.is_global_admin and current_user.location_id:
-        top_products_query = top_products_query.filter(Sale.location_id == current_user.location_id)
+    if effective_location_id:
+        top_products_query = top_products_query.filter(Sale.location_id == effective_location_id)
     top_products = top_products_query.group_by(Product.id).order_by(
         func.sum((SaleItem.unit_price - Product.cost_price) * SaleItem.quantity).desc()
     ).limit(10).all()
 
-    # ===== COMPARISON WITH PREVIOUS PERIOD =====
+    # ===== CATEGORY BREAKDOWN =====
+    category_breakdown = []
+    try:
+        cat_query = db.session.query(
+            func.coalesce(Category.name, 'Uncategorized').label('category'),
+            func.sum(SaleItem.subtotal).label('revenue'),
+            func.sum(Product.cost_price * SaleItem.quantity).label('cogs'),
+            func.sum((SaleItem.unit_price - Product.cost_price) * SaleItem.quantity).label('profit'),
+            func.sum(SaleItem.quantity).label('units_sold')
+        ).select_from(SaleItem).join(Sale).join(Product).outerjoin(Category).filter(
+            and_(
+                Sale.sale_date >= start_date,
+                Sale.sale_date <= end_date,
+                Sale.status == 'completed'
+            )
+        )
+        if effective_location_id:
+            cat_query = cat_query.filter(Sale.location_id == effective_location_id)
+        elif not current_user.is_global_admin and not current_user.location_id:
+            cat_query = cat_query.filter(False)
+        cat_rows = cat_query.group_by('category').order_by(func.sum(SaleItem.subtotal).desc()).all()
+        for row in cat_rows:
+            rev = float(row.revenue or 0)
+            cost = float(row.cogs or 0)
+            profit = float(row.profit or 0)
+            category_breakdown.append({
+                'category': row.category or 'Uncategorized',
+                'revenue': rev,
+                'cogs': cost,
+                'gross_profit': profit,
+                'margin': (profit / rev * 100) if rev > 0 else 0,
+                'units_sold': int(row.units_sold or 0)
+            })
+    except:
+        category_breakdown = []
+
+    # ===== COMPARISON WITH PREVIOUS PERIOD (full metrics) =====
     period_duration = (end_date - start_date).days + 1
     prev_start = start_date - timedelta(days=period_duration)
     prev_end = start_date - timedelta(seconds=1)
 
-    prev_query = Sale.query.filter(
-        and_(
-            Sale.sale_date >= prev_start,
-            Sale.sale_date <= prev_end,
-            Sale.status == 'completed'
-        )
+    prev_sale_filter = and_(
+        Sale.sale_date >= prev_start,
+        Sale.sale_date <= prev_end,
+        Sale.status == 'completed'
     )
-    if not current_user.is_global_admin and current_user.location_id:
+
+    prev_query = Sale.query.filter(prev_sale_filter)
+    if effective_location_id:
+        prev_query = prev_query.filter(Sale.location_id == effective_location_id)
+    elif not current_user.is_global_admin and current_user.location_id:
         prev_query = prev_query.filter(Sale.location_id == current_user.location_id)
     prev_sales = prev_query.all()
     prev_revenue = sum(float(s.total or 0) for s in prev_sales)
+    prev_gross_revenue = sum(float(s.subtotal or 0) for s in prev_sales)
+    prev_discounts = sum(float(s.discount or 0) for s in prev_sales)
+    prev_transactions = len(prev_sales)
 
-    revenue_change = 0
-    if prev_revenue > 0:
-        revenue_change = ((net_revenue - prev_revenue) / prev_revenue) * 100
+    # Previous COGS
+    prev_cogs_query = db.session.query(
+        func.sum(Product.cost_price * SaleItem.quantity)
+    ).join(SaleItem).join(Sale).filter(prev_sale_filter)
+    if effective_location_id:
+        prev_cogs_query = prev_cogs_query.filter(Sale.location_id == effective_location_id)
+    elif not current_user.is_global_admin and current_user.location_id:
+        prev_cogs_query = prev_cogs_query.filter(Sale.location_id == current_user.location_id)
+    prev_cogs = float(prev_cogs_query.scalar() or 0)
+    prev_gross_profit = prev_revenue - prev_cogs
+
+    # Previous expenses
+    prev_expenses_total = 0
+    try:
+        from app.models_extended import Expense as Exp2
+        prev_exp_query = Exp2.query.filter(
+            and_(
+                Exp2.expense_date >= prev_start.date(),
+                Exp2.expense_date <= prev_end.date()
+            )
+        )
+        if effective_location_id:
+            prev_exp_query = prev_exp_query.filter(Exp2.location_id == effective_location_id)
+        elif not current_user.is_global_admin and current_user.location_id:
+            prev_exp_query = prev_exp_query.filter(Exp2.location_id == current_user.location_id)
+        prev_expenses_total = sum(float(e.amount or 0) for e in prev_exp_query.all())
+    except:
+        prev_expenses_total = 0
+
+    prev_growth_share = (prev_gross_profit * growth_share_percent / 100) if prev_gross_profit > 0 else 0
+    prev_net_profit = (prev_gross_profit - prev_growth_share) - prev_expenses_total
+
+    def pct_change(current, previous):
+        if previous > 0:
+            return ((current - previous) / previous) * 100
+        return 0
+
+    period_comparison = {
+        'prev_label': f"{prev_start.strftime('%b %d')} - {prev_end.strftime('%b %d, %Y')}",
+        'revenue': {'current': net_revenue, 'previous': prev_revenue, 'change': pct_change(net_revenue, prev_revenue)},
+        'gross_revenue': {'current': gross_revenue, 'previous': prev_gross_revenue, 'change': pct_change(gross_revenue, prev_gross_revenue)},
+        'discounts': {'current': total_discounts, 'previous': prev_discounts, 'change': pct_change(total_discounts, prev_discounts)},
+        'cogs': {'current': cogs, 'previous': prev_cogs, 'change': pct_change(cogs, prev_cogs)},
+        'gross_profit': {'current': gross_profit, 'previous': prev_gross_profit, 'change': pct_change(gross_profit, prev_gross_profit)},
+        'expenses': {'current': total_expenses, 'previous': prev_expenses_total, 'change': pct_change(total_expenses, prev_expenses_total)},
+        'net_profit': {'current': net_profit, 'previous': prev_net_profit, 'change': pct_change(net_profit, prev_net_profit)},
+        'transactions': {'current': total_transactions, 'previous': prev_transactions, 'change': pct_change(total_transactions, prev_transactions)},
+    }
+
+    revenue_change = pct_change(net_revenue, prev_revenue)
 
     return render_template('reports/profit_loss.html',
                          period=period,
@@ -946,6 +1174,8 @@ def profit_loss():
                          total_transactions=total_transactions,
                          # Costs
                          cogs=cogs,
+                         direct_cogs=direct_cogs,
+                         cogs_breakdown=cogs_breakdown,
                          # Growth Share
                          growth_share_percent=growth_share_percent,
                          growth_share=growth_share,
@@ -962,11 +1192,15 @@ def profit_loss():
                          payment_breakdown=payment_breakdown,
                          daily_data=daily_data,
                          top_products=top_products,
+                         category_breakdown=category_breakdown,
                          # Comparison
                          prev_revenue=prev_revenue,
                          revenue_change=revenue_change,
+                         period_comparison=period_comparison,
                          # Location
-                         user_location=user_location)
+                         user_location=user_location,
+                         locations=locations,
+                         selected_location_id=location_id)
 
 
 @bp.route('/customer-analysis')
@@ -975,6 +1209,10 @@ def profit_loss():
 def customer_analysis():
     """Customer purchase behavior analysis - filtered by location"""
     from app.models import Location
+
+    # Location filter support
+    location_id = request.args.get('location_id', type=int)
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
 
     # Get date range
     start_date_str = request.args.get('start_date')
@@ -990,8 +1228,13 @@ def customer_analysis():
 
     # Get user location for display
     user_location = None
+    effective_location_id = None
     if not current_user.is_global_admin and current_user.location_id:
+        effective_location_id = current_user.location_id
         user_location = Location.query.get(current_user.location_id)
+    elif current_user.is_global_admin and location_id:
+        effective_location_id = location_id
+        user_location = Location.query.get(location_id)
 
     # Build base filter for sales
     base_filter = and_(
@@ -999,9 +1242,9 @@ def customer_analysis():
         Sale.sale_date <= end_date,
         Sale.status == 'completed'
     )
-    # Add location filter for non-global admins
-    if not current_user.is_global_admin and current_user.location_id:
-        base_filter = and_(base_filter, Sale.location_id == current_user.location_id)
+    # Add location filter
+    if effective_location_id:
+        base_filter = and_(base_filter, Sale.location_id == effective_location_id)
 
     # Top customers by revenue - filtered by location
     top_customers = db.session.query(
@@ -1054,7 +1297,9 @@ def customer_analysis():
                          top_customers=top_customers,
                          tier_breakdown=tier_breakdown,
                          new_customers=new_customers,
-                         user_location=user_location)
+                         user_location=user_location,
+                         locations=locations,
+                         selected_location_id=location_id)
 
 
 @bp.route('/export/<report_type>')
@@ -1916,3 +2161,261 @@ def raw_material_stock():
                          total_purchased_value=total_purchased_value,
                          total_consumed_value=total_consumed_value,
                          production_summary=production_summary)
+
+
+@bp.route('/stock-in-out')
+@login_required
+@permission_required(Permissions.REPORT_VIEW_INVENTORY)
+def stock_in_out():
+    """Stock In/Out Comparison Report - Purchase vs Sale analysis with movement breakdown"""
+    from app.models import Category
+
+    # Filters
+    from_date_str = request.args.get('from_date')
+    to_date_str = request.args.get('to_date')
+    location_id = request.args.get('location_id', type=int)
+    category_id = request.args.get('category_id', type=int)
+    view_mode = request.args.get('view', 'summary')  # summary or detailed
+
+    today = datetime.now().date()
+    from_date = datetime.strptime(from_date_str, '%Y-%m-%d').date() if from_date_str else today - timedelta(days=30)
+    to_date = datetime.strptime(to_date_str, '%Y-%m-%d').date() if to_date_str else today
+
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    categories = Category.query.order_by(Category.name).all()
+
+    # Determine effective location
+    effective_location_id = None
+    if not current_user.is_global_admin and current_user.location_id:
+        effective_location_id = current_user.location_id
+    elif current_user.is_global_admin and location_id:
+        effective_location_id = location_id
+
+    # Build movement query with all types as separate columns using CASE
+    movement_types = ['purchase', 'sale', 'transfer_in', 'transfer_out', 'adjustment', 'damage', 'production', 'return']
+
+    base_filter = [
+        StockMovement.timestamp >= datetime.combine(from_date, datetime.min.time()),
+        StockMovement.timestamp <= datetime.combine(to_date, datetime.max.time())
+    ]
+    if effective_location_id:
+        base_filter.append(StockMovement.location_id == effective_location_id)
+
+    # Query: per-product breakdown by movement type
+    columns = [
+        Product.id.label('product_id'),
+        Product.name.label('product_name'),
+        Product.code.label('product_code'),
+    ]
+    for mt in movement_types:
+        columns.append(
+            func.coalesce(func.sum(case(
+                (StockMovement.movement_type == mt, StockMovement.quantity),
+                else_=0
+            )), 0).label(mt)
+        )
+    columns.append(func.sum(StockMovement.quantity).label('net_change'))
+
+    query = db.session.query(*columns).select_from(StockMovement).join(
+        Product, Product.id == StockMovement.product_id
+    ).filter(*base_filter)
+
+    if category_id:
+        query = query.filter(Product.category_id == category_id)
+
+    product_movements = query.group_by(Product.id).order_by(Product.name).all()
+
+    # Build result data
+    product_data = []
+    totals = {mt: 0 for mt in movement_types}
+    totals['net_change'] = 0
+    totals['stock_in'] = 0
+    totals['stock_out'] = 0
+
+    in_types = {'purchase', 'transfer_in', 'return', 'production'}
+    out_types = {'sale', 'transfer_out', 'damage'}
+
+    for row in product_movements:
+        item = {
+            'product_id': row.product_id,
+            'product_name': row.product_name,
+            'product_code': row.product_code,
+            'net_change': float(row.net_change or 0),
+        }
+        stock_in = 0
+        stock_out = 0
+        for mt in movement_types:
+            val = float(getattr(row, mt) or 0)
+            item[mt] = val
+            totals[mt] += val
+            if mt in in_types:
+                stock_in += val
+            elif mt in out_types:
+                stock_out += abs(val)
+
+        item['stock_in'] = stock_in
+        item['stock_out'] = stock_out
+        totals['stock_in'] += stock_in
+        totals['stock_out'] += stock_out
+        totals['net_change'] += item['net_change']
+
+        # Get current stock
+        if effective_location_id:
+            ls = LocationStock.query.filter_by(
+                product_id=row.product_id, location_id=effective_location_id
+            ).first()
+            item['current_stock'] = float(ls.quantity) if ls else 0
+        else:
+            product = Product.query.get(row.product_id)
+            item['current_stock'] = float(product.quantity) if product else 0
+
+        product_data.append(item)
+
+    return render_template('reports/stock_in_out.html',
+                         from_date=from_date,
+                         to_date=to_date,
+                         locations=locations,
+                         categories=categories,
+                         selected_location_id=location_id,
+                         selected_category_id=category_id,
+                         view_mode=view_mode,
+                         product_data=product_data,
+                         totals=totals,
+                         movement_types=movement_types)
+
+
+@bp.route('/sale-projection')
+@login_required
+@permission_required(Permissions.REPORT_VIEW_SALES)
+def sale_projection():
+    """Projected Sale Estimation based on available stock and historical sales rate"""
+    from app.models import Category
+
+    # Filters
+    location_id = request.args.get('location_id', type=int)
+    category_id = request.args.get('category_id', type=int)
+    lookback_days = request.args.get('lookback_days', 30, type=int)
+
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    categories = Category.query.order_by(Category.name).all()
+
+    # Determine effective location
+    effective_location_id = None
+    user_location = None
+    if not current_user.is_global_admin and current_user.location_id:
+        effective_location_id = current_user.location_id
+        user_location = Location.query.get(current_user.location_id)
+    elif current_user.is_global_admin and location_id:
+        effective_location_id = location_id
+        user_location = Location.query.get(location_id)
+
+    # Calculate date range for lookback
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=lookback_days)
+
+    # Get average daily sales per product
+    sale_filter = [
+        Sale.sale_date >= start_date,
+        Sale.sale_date <= end_date,
+        Sale.status == 'completed'
+    ]
+    if effective_location_id:
+        sale_filter.append(Sale.location_id == effective_location_id)
+
+    sales_query = db.session.query(
+        Product.id.label('product_id'),
+        Product.name.label('product_name'),
+        Product.code.label('product_code'),
+        Product.selling_price,
+        Product.cost_price,
+        Product.category_id,
+        func.sum(SaleItem.quantity).label('total_sold')
+    ).select_from(SaleItem).join(Sale).join(Product).filter(*sale_filter)
+
+    if category_id:
+        sales_query = sales_query.filter(Product.category_id == category_id)
+
+    sales_by_product = {row.product_id: row for row in sales_query.group_by(Product.id).all()}
+
+    # Get all active products with stock
+    products_query = Product.query.filter_by(is_active=True)
+    if category_id:
+        products_query = products_query.filter_by(category_id=category_id)
+    all_products = products_query.order_by(Product.name).all()
+
+    product_data = []
+    total_projected_revenue = 0
+    total_projected_profit = 0
+    at_risk_count = 0
+
+    for product in all_products:
+        # Get current stock
+        if effective_location_id:
+            ls = LocationStock.query.filter_by(
+                product_id=product.id, location_id=effective_location_id
+            ).first()
+            current_stock = float(ls.available_quantity) if ls else 0
+        else:
+            current_stock = float(product.quantity or 0)
+
+        if current_stock <= 0:
+            continue
+
+        selling_price = float(product.selling_price or 0)
+        cost_price = float(product.cost_price or 0)
+
+        # Get sales data
+        sale_data = sales_by_product.get(product.id)
+        total_sold = float(sale_data.total_sold) if sale_data else 0
+        avg_daily_sales = total_sold / lookback_days if lookback_days > 0 else 0
+
+        # Calculate projections
+        if avg_daily_sales > 0:
+            days_remaining = current_stock / avg_daily_sales
+        else:
+            days_remaining = None  # No sales history
+
+        projected_revenue = current_stock * selling_price
+        projected_profit = current_stock * (selling_price - cost_price)
+
+        if days_remaining is not None and days_remaining < 7:
+            at_risk_count += 1
+
+        # Get category name
+        cat_name = product.category.name if product.category else 'Uncategorized'
+
+        product_data.append({
+            'product_id': product.id,
+            'product_name': product.name,
+            'product_code': product.code,
+            'category': cat_name,
+            'current_stock': current_stock,
+            'avg_daily_sales': round(avg_daily_sales, 2),
+            'days_remaining': round(days_remaining, 1) if days_remaining is not None else None,
+            'projected_revenue': projected_revenue,
+            'projected_profit': projected_profit,
+            'selling_price': selling_price,
+            'cost_price': cost_price,
+        })
+
+        total_projected_revenue += projected_revenue
+        total_projected_profit += projected_profit
+
+    # Sort by days_remaining ascending (critical first), None values last
+    product_data.sort(key=lambda x: (x['days_remaining'] is None, x['days_remaining'] or 0))
+
+    # Top 10 by projected revenue for chart
+    top_by_revenue = sorted(product_data, key=lambda x: x['projected_revenue'], reverse=True)[:10]
+
+    return render_template('reports/sale_projection.html',
+                         locations=locations,
+                         categories=categories,
+                         selected_location_id=location_id,
+                         selected_category_id=category_id,
+                         lookback_days=lookback_days,
+                         user_location=user_location,
+                         product_data=product_data,
+                         total_projected_revenue=total_projected_revenue,
+                         total_projected_profit=total_projected_profit,
+                         at_risk_count=at_risk_count,
+                         top_by_revenue=top_by_revenue)

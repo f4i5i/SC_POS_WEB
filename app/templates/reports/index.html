@@ -213,6 +213,34 @@
         </div>
     </div>
 
+    <!-- Stock In/Out Comparison -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #2563EB;">
+            <div class="report-icon" style="background: #DBEAFE; color: #2563EB;">
+                <i class="fas fa-exchange-alt"></i>
+            </div>
+            <div class="report-title">Stock In/Out Comparison</div>
+            <p class="report-description">Compare stock purchased vs sold with movement breakdown</p>
+            <a href="{{ url_for('reports.stock_in_out') }}" class="btn btn-outline-primary w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Sale Projection -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #059669;">
+            <div class="report-icon" style="background: #D1FAE5; color: #059669;">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="report-title">Sale Projection</div>
+            <p class="report-description">Estimate days of stock remaining and projected revenue</p>
+            <a href="{{ url_for('reports.sale_projection') }}" class="btn btn-outline-success w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
     <!-- Employee Performance Report -->
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="report-card" style="border-left-color: #06B6D4;">
@@ -278,6 +306,190 @@
             <div class="report-title">Customer Analysis</div>
             <p class="report-description">Customer behavior and loyalty tier insights</p>
             <a href="{{ url_for('reports.customer_analysis') }}" class="btn btn-outline-primary w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- ── FINANCIAL AUDIT REPORTS ───────────────── -->
+
+    <!-- Cash Flow -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #16A34A;">
+            <div class="report-icon" style="background: #DCFCE7; color: #16A34A;">
+                <i class="fas fa-money-bill-wave"></i>
+            </div>
+            <div class="report-title">Cash Flow</div>
+            <p class="report-description">Inflows vs outflows including supplier payments</p>
+            <a href="{{ url_for('financial_reports.cash_flow') }}" class="btn btn-outline-success w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Production Cost Actuals -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #B45309;">
+            <div class="report-icon" style="background: #FEF3C7; color: #B45309;">
+                <i class="fas fa-industry"></i>
+            </div>
+            <div class="report-title">Production Cost Actuals</div>
+            <p class="report-description">Recipe vs actual cost per bottle + total oil consumed</p>
+            <a href="{{ url_for('financial_reports.production_cost') }}" class="btn btn-outline-warning w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Tax Liability -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #9333EA;">
+            <div class="report-icon" style="background: #F3E8FF; color: #9333EA;">
+                <i class="fas fa-file-invoice-dollar"></i>
+            </div>
+            <div class="report-title">Tax Liability</div>
+            <p class="report-description">Sales tax collected, input tax, and net liability</p>
+            <a href="{{ url_for('financial_reports.tax_liability') }}" class="btn btn-outline-primary w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Supplier Payables Aging -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #DC2626;">
+            <div class="report-icon" style="background: #FEE2E2; color: #DC2626;">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="report-title">Supplier Payables Aging</div>
+            <p class="report-description">Outstanding supplier balances by aging bucket</p>
+            <a href="{{ url_for('financial_reports.supplier_aging') }}" class="btn btn-outline-danger w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Inventory Shrinkage -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #E11D48;">
+            <div class="report-icon" style="background: #FFE4E6; color: #E11D48;">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="report-title">Inventory Shrinkage</div>
+            <p class="report-description">Spot check variances and damage losses</p>
+            <a href="{{ url_for('financial_reports.inventory_shrinkage') }}" class="btn btn-outline-danger w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Product Cost History -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #0D9488;">
+            <div class="report-icon" style="background: #CCFBF1; color: #0D9488;">
+                <i class="fas fa-history"></i>
+            </div>
+            <div class="report-title">Cost History & Margin Erosion</div>
+            <p class="report-description">Track product cost changes and margin impact</p>
+            <a href="{{ url_for('financial_reports.cost_history') }}" class="btn btn-outline-info w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Gift Voucher Liability -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #DB2777;">
+            <div class="report-icon" style="background: #FCE7F3; color: #DB2777;">
+                <i class="fas fa-gift"></i>
+            </div>
+            <div class="report-title">Gift Voucher Liability</div>
+            <p class="report-description">Outstanding voucher balances and redemptions</p>
+            <a href="{{ url_for('financial_reports.gift_voucher_liability') }}" class="btn btn-outline-primary w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- A/P vs A/R Balance -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #1D4ED8;">
+            <div class="report-icon" style="background: #DBEAFE; color: #1D4ED8;">
+                <i class="fas fa-balance-scale"></i>
+            </div>
+            <div class="report-title">A/P vs A/R Balance</div>
+            <p class="report-description">Consolidated payables vs receivables position</p>
+            <a href="{{ url_for('financial_reports.ap_ar_balance') }}" class="btn btn-outline-primary w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Cashier Exception Audit -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #EA580C;">
+            <div class="report-icon" style="background: #FFEDD5; color: #EA580C;">
+                <i class="fas fa-user-shield"></i>
+            </div>
+            <div class="report-title">Cashier Exception Audit</div>
+            <p class="report-description">Per-employee discounts, voids, and refunds</p>
+            <a href="{{ url_for('financial_reports.cashier_audit') }}" class="btn btn-outline-warning w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Promotion ROI -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #7C3AED;">
+            <div class="report-icon" style="background: #EDE9FE; color: #7C3AED;">
+                <i class="fas fa-bullhorn"></i>
+            </div>
+            <div class="report-title">Promotion ROI</div>
+            <p class="report-description">Discount cost vs revenue driven per promotion</p>
+            <a href="{{ url_for('financial_reports.promotion_roi') }}" class="btn btn-outline-primary w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Dead Stock -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #64748B;">
+            <div class="report-icon" style="background: #F1F5F9; color: #64748B;">
+                <i class="fas fa-archive"></i>
+            </div>
+            <div class="report-title">Dead Stock</div>
+            <p class="report-description">Products with no sales tying up your capital</p>
+            <a href="{{ url_for('financial_reports.dead_stock') }}" class="btn btn-outline-secondary w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Profit Margin Analysis -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #059669;">
+            <div class="report-icon" style="background: #D1FAE5; color: #059669;">
+                <i class="fas fa-percentage"></i>
+            </div>
+            <div class="report-title">Profit Margin Analysis</div>
+            <p class="report-description">Margin analysis by product and category</p>
+            <a href="{{ url_for('financial_reports.profit_margin') }}" class="btn btn-outline-success w-100">
+                <i class="fas fa-arrow-right"></i> View Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Exceptions Dashboard -->
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="report-card" style="border-left-color: #EF4444;">
+            <div class="report-icon" style="background: #FEE2E2; color: #EF4444;">
+                <i class="fas fa-exclamation-circle"></i>
+            </div>
+            <div class="report-title">Exceptions Dashboard</div>
+            <p class="report-description">Unusual activities requiring attention</p>
+            <a href="{{ url_for('financial_reports.exceptions_dashboard') }}" class="btn btn-outline-danger w-100">
                 <i class="fas fa-arrow-right"></i> View Report
             </a>
         </div>

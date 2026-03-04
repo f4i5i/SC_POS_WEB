@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Tax Liability Report - {{ business_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-file-invoice-dollar text-primary me-2"></i>Tax Liability Report</h2>
+            <p class="text-muted mb-0">Sales tax collected and net liability</p>
+        </div>
+        <div>
+            <button onclick="window.print()" class="btn btn-outline-primary"><i class="fas fa-print"></i> Print</button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2"><i class="fas fa-arrow-left"></i> Back</a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+                </div>
+                {% if current_user.is_global_admin %}
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i>Apply</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-shopping-cart fa-2x text-primary mb-2"></i>
+                    <h4 class="text-primary mb-0">{{ format_currency(total_sales) }}</h4>
+                    <small class="text-muted">Total Sales</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-percentage fa-2x text-warning mb-2"></i>
+                    <h4 class="text-warning mb-0">{{ format_currency(tax_collected) }}</h4>
+                    <small class="text-muted">Tax Collected</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-pie fa-2x text-info mb-2"></i>
+                    <h4 class="text-info mb-0">{{ "{:.2f}".format(effective_rate) }}%</h4>
+                    <small class="text-muted">Effective Tax Rate</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Breakdown -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0"><i class="fas fa-calendar-alt text-primary"></i> Monthly Breakdown</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Month</th>
+                            <th class="text-end">Total Sales</th>
+                            <th class="text-end">Tax Collected</th>
+                            <th class="text-end">Effective Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in monthly_data %}
+                        <tr>
+                            <td><strong>{{ m.month }}</strong></td>
+                            <td class="text-end">{{ format_currency(m.total_sales) }}</td>
+                            <td class="text-end">{{ format_currency(m.tax_collected) }}</td>
+                            <td class="text-end">{{ "{:.2f}".format(m.effective_rate) }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-dark">
+                        <tr>
+                            <th>TOTALS</th>
+                            <th class="text-end">{{ format_currency(total_sales) }}</th>
+                            <th class="text-end">{{ format_currency(tax_collected) }}</th>
+                            <th class="text-end">{{ "{:.2f}".format(effective_rate) }}%</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Existing Tax Reports -->
+    {% if tax_reports %}
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0"><i class="fas fa-file-alt text-primary"></i> Filed Tax Reports</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Period</th>
+                            <th>Type</th>
+                            <th class="text-end">Total Sales</th>
+                            <th class="text-end">Tax Collected</th>
+                            <th class="text-end">Net Liability</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tr in tax_reports %}
+                        <tr>
+                            <td>{{ tr.period_start.strftime('%d/%m/%Y') }} - {{ tr.period_end.strftime('%d/%m/%Y') }}</td>
+                            <td><span class="badge bg-info">{{ tr.report_period }}</span></td>
+                            <td class="text-end">{{ format_currency(tr.total_sales) }}</td>
+                            <td class="text-end">{{ format_currency(tr.total_tax_collected) }}</td>
+                            <td class="text-end text-{{ 'danger' if tr.net_tax_liability > 0 else 'success' }}">
+                                {{ format_currency(tr.net_tax_liability) }}
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if tr.status == 'submitted' else 'warning' if tr.status == 'finalized' else 'secondary' }}">
+                                    {{ tr.status|capitalize }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
