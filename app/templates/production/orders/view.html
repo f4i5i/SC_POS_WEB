@@ -292,10 +292,29 @@
                     {% endif %}
 
                     {% if order.status == 'completed' %}
-                    <div class="alert alert-success mb-0">
+                    <div class="alert alert-success mb-3">
                         <i class="fas fa-check-circle me-2"></i>
                         <strong>Production Complete!</strong><br>
                         {{ order.quantity_produced }} units of {{ order.product.name if order.product else 'product' }} added to inventory.
+                    </div>
+                    {% if current_user.role == 'admin' or current_user.is_global_admin %}
+                    <button type="button" class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#reverseModal">
+                        <i class="fas fa-undo me-2"></i>Reverse Production
+                    </button>
+                    <small class="text-muted d-block mt-2">
+                        Returns raw materials to stock and removes produced items from inventory.
+                    </small>
+                    {% endif %}
+                    {% endif %}
+
+                    {% if order.status == 'reversed' %}
+                    <div class="alert alert-warning mb-0">
+                        <i class="fas fa-undo me-2"></i>
+                        <strong>Order Reversed</strong><br>
+                        Raw materials returned, {{ order.quantity_produced }} products removed from inventory.
+                        {% if order.rejection_reason %}
+                        <br>Reason: {{ order.rejection_reason }}
+                        {% endif %}
                     </div>
                     {% endif %}
 
@@ -422,6 +441,46 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep Order</button>
                     <button type="submit" class="btn btn-warning">
                         <i class="fas fa-ban me-1"></i>Cancel Order
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Reverse Production Modal -->
+<div class="modal fade" id="reverseModal" tabindex="-1" aria-labelledby="reverseModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('production.reverse_order', id=order.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="reverseModalLabel"><i class="fas fa-undo me-2"></i>Reverse Production</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>This will:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Return all consumed raw materials back to stock</li>
+                            <li>Remove <strong>{{ order.quantity_produced }}</strong> units of <strong>{{ order.product.name if order.product else 'product' }}</strong> from inventory</li>
+                            <li>Mark this order as reversed</li>
+                        </ul>
+                    </div>
+                    <p class="text-danger">
+                        <strong>This cannot be undone.</strong> Only reverse if the products have NOT been sold.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label">Reason for reversal <span class="text-danger">*</span></label>
+                        <textarea name="reason" class="form-control" rows="2" required
+                                  placeholder="e.g., Bottles not deducted, wrong quantity, quality issue..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-undo me-1"></i>Reverse Production
                     </button>
                 </div>
             </form>

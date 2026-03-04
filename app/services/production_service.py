@@ -618,6 +618,119 @@ class ProductionService:
             return False, str(e)
 
     @staticmethod
+    def reverse_production(
+        order_id: int,
+        user_id: int,
+        reason: str = None
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Reverse a completed production order:
+        - Return consumed raw materials to stock
+        - Remove produced products from inventory
+        - Create reversal movement records for audit
+        - Mark order as 'reversed'
+        """
+        try:
+            order = ProductionOrder.query.get(order_id)
+            if not order:
+                return False, 'Order not found'
+
+            if order.status != 'completed':
+                return False, f'Only completed orders can be reversed (current: {order.status})'
+
+            qty_produced = order.quantity_produced or 0
+            if qty_produced == 0:
+                return False, 'Order has 0 produced quantity'
+
+            # Safety check: ensure enough product stock exists to reverse
+            location_stock = LocationStock.query.filter_by(
+                product_id=order.product_id,
+                location_id=order.location_id
+            ).first()
+
+            if location_stock and location_stock.quantity < qty_produced:
+                return False, (
+                    f'Cannot reverse: only {location_stock.quantity} units in stock '
+                    f'at this location, but {qty_produced} were produced. '
+                    f'Some units may have been sold already.'
+                )
+
+            product = Product.query.get(order.product_id)
+            if product and (product.quantity or 0) < qty_produced:
+                return False, (
+                    f'Cannot reverse: global stock ({product.quantity}) is less than '
+                    f'produced quantity ({qty_produced}). Some units may have been sold.'
+                )
+
+            # 1. Return raw materials from consumption records
+            consumptions = ProductionMaterialConsumption.query.filter_by(
+                production_order_id=order.id
+            ).all()
+
+            for consumption in consumptions:
+                qty_to_return = Decimal(str(consumption.quantity_consumed or 0))
+                if qty_to_return <= 0:
+                    continue
+
+                # Add back to raw material stock
+                stock = RawMaterialStock.query.filter_by(
+                    raw_material_id=consumption.raw_material_id,
+                    location_id=order.location_id
+                ).first()
+
+                if stock:
+                    stock.quantity = Decimal(str(stock.quantity or 0)) + qty_to_return
+                    stock.last_movement_at = datetime.utcnow()
+                else:
+                    # Stock record was deleted — recreate it
+                    stock = RawMaterialStock(
+                        raw_material_id=consumption.raw_material_id,
+                        location_id=order.location_id,
+                        quantity=qty_to_return
+                    )
+                    db.session.add(stock)
+
+                # Create reversal movement record
+                movement = RawMaterialMovement(
+                    raw_material_id=consumption.raw_material_id,
+                    location_id=order.location_id,
+                    user_id=user_id,
+                    movement_type='production_reversal',
+                    quantity=qty_to_return,  # Positive = returned to stock
+                    reference=order.order_number,
+                    production_order_id=order.id,
+                    notes=f"Reversed: {reason or 'Production order reversed'}"
+                )
+                db.session.add(movement)
+
+            # 2. Remove finished products from location stock
+            if location_stock:
+                location_stock.quantity -= qty_produced
+                location_stock.last_movement_at = datetime.utcnow()
+
+            # 3. Remove from global product stock
+            if product:
+                product.quantity = (product.quantity or 0) - qty_produced
+
+            # 4. Update order status
+            order.status = 'reversed'
+            order.rejection_reason = reason or 'Production reversed'
+
+            db.session.commit()
+
+            logger.info(
+                f"Production reversed: {order.order_number}, "
+                f"returned {len(consumptions)} materials, "
+                f"removed {qty_produced} units of {product.name if product else 'product'}"
+            )
+            return True, None
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error reversing production: {e}")
+            return False, str(e)
+
+    @staticmethod
     def get_production_stats(location_id: int = None) -> Dict:
         """Get production statistics"""
         query = ProductionOrder.query

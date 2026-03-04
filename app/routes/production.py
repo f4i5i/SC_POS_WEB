@@ -834,6 +834,23 @@ def cancel_order(id):
     return redirect(url_for('production.view_order', id=id))
 
 
+@bp.route('/orders/<int:id>/reverse', methods=['POST'])
+@login_required
+@permission_required(Permissions.PRODUCTION_APPROVE)
+def reverse_order(id):
+    """Reverse a completed production order - return materials, remove products"""
+    reason = request.form.get('reason', '')
+
+    success, error = ProductionService.reverse_production(id, current_user.id, reason)
+
+    if success:
+        flash('Production order reversed. Raw materials returned to stock and products removed from inventory.', 'warning')
+    else:
+        flash(f'Cannot reverse: {error}', 'danger')
+
+    return redirect(url_for('production.view_order', id=id))
+
+
 # ============================================================
 # API Endpoints
 # ============================================================

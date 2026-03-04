@@ -1917,7 +1917,8 @@ class ProductionOrder(db.Model):
             'in_progress': 'warning',
             'completed': 'success',
             'rejected': 'danger',
-            'cancelled': 'dark'
+            'cancelled': 'dark',
+            'reversed': 'warning'
         }
         return status_classes.get(self.status, 'secondary')
 
