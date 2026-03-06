@@ -213,6 +213,7 @@ class Expense(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     status = db.Column(db.String(32), default='pending')  # pending, approved, rejected
+    rejection_reason = db.Column(db.Text)  # Reason for rejection
 
     # Multi-kiosk support
     location_id = db.Column(db.Integer, db.ForeignKey('locations.id'))

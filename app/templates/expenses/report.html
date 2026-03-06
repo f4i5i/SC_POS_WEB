@@ -1,9 +1,16 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, report_buttons, export_script %}
 
 {% block title %}Expense Report - {{ business_name }}{% endblock %}
 
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
+    {{ print_header('EXPENSE REPORT', start_date.strftime('%d %b %Y') ~ ' - ' ~ end_date.strftime('%d %b %Y')) }}
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2 class="mb-1">
@@ -11,13 +18,13 @@
             </h2>
             <p class="text-muted mb-0">{{ start_date.strftime('%d %b %Y') }} - {{ end_date.strftime('%d %b %Y') }}</p>
         </div>
-        <a href="{{ url_for('expenses.index') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left"></i> Back to Expenses
-        </a>
+        <div>
+            {{ report_buttons(url_for('expenses.index'), 'expense_report') }}
+        </div>
     </div>
 
     <!-- Date Filter -->
-    <div class="card mb-4">
+    <div class="card mb-4 no-print">
         <div class="card-body">
             <form method="GET" class="row g-3">
                 <div class="col-md-4">
@@ -67,7 +74,31 @@
         </div>
     </div>
 
-    <!-- Category Breakdown -->
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-lg-6 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Category Breakdown</h5>
+                </div>
+                <div class="card-body" style="position:relative; height:280px; overflow:hidden;">
+                    <canvas id="categoryChart" style="max-height:100%;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Monthly Trend</h5>
+                </div>
+                <div class="card-body" style="position:relative; height:280px; overflow:hidden;">
+                    <canvas id="trendChart" style="max-height:100%;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Breakdown Table -->
     <div class="card mb-4">
         <div class="card-header">
             <h5 class="mb-0">Expenses by Category</h5>
@@ -114,5 +145,104 @@
             </div>
         </div>
     </div>
+
+    <!-- Payment Method Breakdown -->
+    {% if method_totals %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">By Payment Method</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Method</th>
+                            <th class="text-end">Amount</th>
+                            <th class="text-end">% of Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for method, amount in method_totals.items() %}
+                        <tr>
+                            <td><i class="fas fa-credit-card me-2"></i>{{ method.replace('_', ' ')|title }}</td>
+                            <td class="text-end">Rs. {{ "{:,.2f}".format(amount) }}</td>
+                            <td class="text-end">{{ "{:.1f}".format(amount / total_amount * 100 if total_amount > 0 else 0) }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {{ print_footer() }}
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+{% if by_category %}
+// Category Pie Chart
+new Chart(document.getElementById('categoryChart'), {
+    type: 'doughnut',
+    data: {
+        labels: [{% for item in by_category %}"{{ item.name }}"{% if not loop.last %},{% endif %}{% endfor %}],
+        datasets: [{
+            data: [{% for item in by_category %}{{ item.amount }}{% if not loop.last %},{% endif %}{% endfor %}],
+            backgroundColor: [{% for item in by_category %}"{{ item.color }}"{% if not loop.last %},{% endif %}{% endfor %}]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
+            tooltip: {
+                callbacks: {
+                    label: function(ctx) {
+                        return ctx.label + ': Rs. ' + ctx.parsed.toLocaleString();
+                    }
+                }
+            }
+        }
+    }
+});
+{% endif %}
+
+{% if monthly_trend %}
+// Monthly Trend Bar Chart
+new Chart(document.getElementById('trendChart'), {
+    type: 'bar',
+    data: {
+        labels: [{% for m in monthly_trend %}"{{ m.label }}"{% if not loop.last %},{% endif %}{% endfor %}],
+        datasets: [{
+            label: 'Monthly Expenses',
+            data: [{% for m in monthly_trend %}{{ m.total }}{% if not loop.last %},{% endif %}{% endfor %}],
+            backgroundColor: 'rgba(99, 102, 241, 0.7)',
+            borderColor: '#6366F1',
+            borderWidth: 1,
+            borderRadius: 4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(v) { return 'Rs. ' + v.toLocaleString(); }
+                }
+            }
+        }
+    }
+});
+{% endif %}
+</script>
+{% endblock %}
+
+{% block extra_js %}
+{{ export_script() }}
 {% endblock %}

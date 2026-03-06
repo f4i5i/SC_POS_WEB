@@ -203,15 +203,52 @@ def approve_expense(expense_id):
 @login_required
 @feature_required(Features.EXPENSE_TRACKING)
 def reject_expense(expense_id):
-    """Reject an expense"""
-    if current_user.role not in ['admin', 'manager']:
+    """Reject an expense with optional reason"""
+    if current_user.role not in ['admin', 'manager'] and not current_user.is_global_admin:
         return jsonify({'success': False, 'error': 'Permission denied'}), 403
 
     expense = Expense.query.get_or_404(expense_id)
     expense.status = 'rejected'
+
+    # Accept reason from JSON body or form data
+    if request.is_json:
+        expense.rejection_reason = request.json.get('reason', '')
+    else:
+        expense.rejection_reason = request.form.get('reason', '')
+
     db.session.commit()
 
     return jsonify({'success': True, 'message': 'Expense rejected'})
+
+
+@bp.route('/bulk-action', methods=['POST'])
+@login_required
+@feature_required(Features.EXPENSE_TRACKING)
+def bulk_action():
+    """Bulk approve or reject expenses"""
+    if current_user.role not in ['admin', 'manager'] and not current_user.is_global_admin:
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+
+    data = request.get_json()
+    ids = data.get('ids', [])
+    action = data.get('action', '')
+
+    if not ids or action not in ['approve', 'reject']:
+        return jsonify({'success': False, 'error': 'Invalid request'}), 400
+
+    count = 0
+    for expense_id in ids:
+        expense = Expense.query.get(expense_id)
+        if expense and expense.status == 'pending':
+            if action == 'approve':
+                expense.status = 'approved'
+                expense.approved_by = current_user.id
+            elif action == 'reject':
+                expense.status = 'rejected'
+            count += 1
+
+    db.session.commit()
+    return jsonify({'success': True, 'message': f'{count} expenses {action}d'})
 
 
 @bp.route('/duplicate/<int:expense_id>', methods=['POST'])
@@ -415,13 +452,23 @@ def expense_report():
         Expense.status == 'approved'
     ).all()
 
-    # Calculate totals by category
-    category_totals = {}
+    # Calculate totals by category with metadata for template
+    cat_data = {}
     for expense in expenses:
-        cat_name = expense.category.name if expense.category else 'Uncategorized'
-        if cat_name not in category_totals:
-            category_totals[cat_name] = 0
-        category_totals[cat_name] += float(expense.amount)
+        cat = expense.category
+        cat_name = cat.name if cat else 'Uncategorized'
+        if cat_name not in cat_data:
+            cat_data[cat_name] = {
+                'name': cat_name,
+                'amount': 0,
+                'count': 0,
+                'color': cat.color if cat else '#6B7280',
+                'icon': cat.icon if cat else 'money-bill'
+            }
+        cat_data[cat_name]['amount'] += float(expense.amount)
+        cat_data[cat_name]['count'] += 1
+
+    by_category = sorted(cat_data.values(), key=lambda x: x['amount'], reverse=True)
 
     # Calculate totals by payment method
     method_totals = {}
@@ -434,10 +481,32 @@ def expense_report():
     total_amount = sum(float(e.amount) for e in expenses)
     total_count = len(expenses)
 
+    # Monthly trend (last 6 months for chart)
+    monthly_trend = []
+    for i in range(5, -1, -1):
+        month_date = date.today().replace(day=1) - timedelta(days=i * 30)
+        month_start = month_date.replace(day=1)
+        if month_start.month == 12:
+            month_end = month_start.replace(year=month_start.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            month_end = month_start.replace(month=month_start.month + 1, day=1) - timedelta(days=1)
+
+        month_total = db.session.query(db.func.sum(Expense.amount)).filter(
+            Expense.expense_date >= month_start,
+            Expense.expense_date <= month_end,
+            Expense.status == 'approved'
+        ).scalar() or 0
+
+        monthly_trend.append({
+            'label': month_start.strftime('%b %Y'),
+            'total': float(month_total)
+        })
+
     return render_template('expenses/report.html',
                          expenses=expenses,
-                         category_totals=category_totals,
+                         by_category=by_category,
                          method_totals=method_totals,
+                         monthly_trend=monthly_trend,
                          total_amount=total_amount,
                          total_count=total_count,
                          start_date=start_date,

@@ -90,6 +90,10 @@
     <div class="filter-card">
         <form method="GET" class="row g-3 align-items-end">
             <div class="col-md-2">
+                <label class="form-label small">Search PO# / Supplier</label>
+                <input type="text" name="search" class="form-control form-control-sm" placeholder="PO number or supplier..." value="{{ request.args.get('search', '') }}">
+            </div>
+            <div class="col-md-2">
                 <label class="form-label small">Status</label>
                 <select name="status" class="form-select form-select-sm">
                     <option value="">All Statuses</option>
@@ -184,6 +188,15 @@
                                         <i class="fas fa-box"></i>
                                     </a>
                                     {% endif %}
+                                    <a href="{{ url_for('purchase_orders.print_po', id=po.id) }}" class="btn btn-outline-info" title="Print" target="_blank">
+                                        <i class="fas fa-print"></i>
+                                    </a>
+                                    <form method="POST" action="{{ url_for('purchase_orders.duplicate', id=po.id) }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-outline-warning btn-sm" title="Duplicate as Draft">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
@@ -228,4 +241,13 @@
     </nav>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.pageShortcuts = [
+    {key: 'F2', label: 'Create New PO', action: function() { window.location.href = '{{ url_for("purchase_orders.create") }}'; }},
+    {key: 'F3', label: 'Focus Search', action: function() { var s = document.querySelector('input[name="search"]'); if (s) { s.focus(); s.select(); } }}
+];
+</script>
 {% endblock %}

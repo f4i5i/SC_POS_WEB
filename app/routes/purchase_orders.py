@@ -33,8 +33,17 @@ def index():
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
 
+    search = request.args.get('search', '').strip()
+
     query = PurchaseOrder.query
 
+    if search:
+        query = query.filter(
+            db.or_(
+                PurchaseOrder.po_number.ilike(f'%{search}%'),
+                PurchaseOrder.supplier.has(Supplier.name.ilike(f'%{search}%'))
+            )
+        )
     if status:
         query = query.filter_by(status=status)
     if supplier_id:
@@ -503,3 +512,54 @@ def api_supplier_products(supplier_id):
         'reorder_quantity': p.reorder_quantity,
         'is_low_stock': p.quantity <= p.reorder_level
     } for p in products])
+
+
+@bp.route('/<int:id>/duplicate', methods=['POST'])
+@login_required
+@permission_required(Permissions.PO_CREATE)
+def duplicate(id):
+    """Duplicate a PO as a new draft"""
+    original = PurchaseOrder.query.get_or_404(id)
+
+    new_po = PurchaseOrder(
+        po_number=generate_po_number(),
+        supplier_id=original.supplier_id,
+        user_id=current_user.id,
+        status='draft',
+        is_auto_generated=False,
+        source_type='manual',
+        notes=f'Duplicated from {original.po_number}',
+        order_date=datetime.utcnow()
+    )
+    db.session.add(new_po)
+    db.session.flush()
+
+    for item in original.items:
+        new_item = PurchaseOrderItem(
+            po_id=new_po.id,
+            product_id=item.product_id,
+            quantity_ordered=item.quantity_ordered,
+            unit_cost=item.unit_cost,
+            subtotal=item.subtotal,
+            base_cost=item.base_cost,
+            packaging_cost=item.packaging_cost,
+            delivery_cost=item.delivery_cost,
+            bottle_cost=item.bottle_cost
+        )
+        new_item.calculate_landed_cost()
+        db.session.add(new_item)
+
+    new_po.calculate_totals()
+    db.session.commit()
+
+    flash(f'PO duplicated as {new_po.po_number} (draft)', 'success')
+    return redirect(url_for('purchase_orders.edit', id=new_po.id))
+
+
+@bp.route('/<int:id>/print')
+@login_required
+@permission_required(Permissions.PO_VIEW)
+def print_po(id):
+    """Printable PO for supplier"""
+    po = PurchaseOrder.query.get_or_404(id)
+    return render_template('purchase_orders/print.html', po=po)

@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, export_script %}
 
 {% block title %}Expense Tracking - {{ business_name }}{% endblock %}
 
 {% block extra_css %}
+{% include "reports/_print_styles.html" %}
 <style>
     .expense-card {
         background: white;
@@ -32,34 +34,30 @@
     .status-approved { color: #10B981; }
     .status-rejected { color: #EF4444; }
 
-    /* Clean Theme Overrides for Expenses */
-    [data-theme="clean"] .stat-card {
-        background: #2563EB !important;
+    .bulk-bar {
+        display: none;
+        background: #EFF6FF;
+        border: 1px solid #BFDBFE;
+        border-radius: 8px;
+        padding: 10px 16px;
+        margin-bottom: 12px;
+        align-items: center;
+        gap: 12px;
     }
+    .bulk-bar.active { display: flex; }
 
-    [data-theme="clean"] .stat-card[style*="10B981"] {
-        background: #059669 !important;
-    }
-
-    [data-theme="clean"] .stat-card[style*="F59E0B"] {
-        background: #D97706 !important;
-    }
-
-    [data-theme="clean"] .expense-card {
-        background: #FFFFFF !important;
-        border: 1px solid #E2E8F0 !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
-    }
-
-    [data-theme="clean"] .expense-card:hover {
-        transform: none !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-    }
+    [data-theme="clean"] .stat-card { background: #2563EB !important; }
+    [data-theme="clean"] .stat-card[style*="10B981"] { background: #059669 !important; }
+    [data-theme="clean"] .stat-card[style*="F59E0B"] { background: #D97706 !important; }
+    [data-theme="clean"] .expense-card { background: #FFFFFF !important; border: 1px solid #E2E8F0 !important; box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important; }
+    [data-theme="clean"] .expense-card:hover { transform: none !important; box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
+    {{ print_header('EXPENSE TRACKING', '') }}
+
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
@@ -69,8 +67,14 @@
             </h2>
             <p class="text-muted mb-0">Track and manage shop expenses</p>
         </div>
-        <div>
-            <a href="{{ url_for('expenses.categories') }}" class="btn btn-outline-primary me-2">
+        <div class="no-print">
+            <button onclick="exportExpenseCSV()" class="btn btn-outline-success me-1" title="Export CSV">
+                <i class="fas fa-file-csv"></i> CSV
+            </button>
+            <a href="{{ url_for('expenses.expense_report') }}" class="btn btn-outline-info me-1">
+                <i class="fas fa-chart-pie"></i> Report
+            </a>
+            <a href="{{ url_for('expenses.categories') }}" class="btn btn-outline-primary me-1">
                 <i class="fas fa-tags"></i> Categories
             </a>
             <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary">
@@ -102,7 +106,7 @@
     </div>
 
     <!-- Filters -->
-    <div class="card mb-4">
+    <div class="card mb-4 no-print">
         <div class="card-body">
             <form method="GET" class="row g-3">
                 <div class="col-md-3">
@@ -144,12 +148,30 @@
         </div>
     </div>
 
+    <!-- Bulk Action Bar -->
+    {% if current_user.role in ['admin', 'manager'] or current_user.is_global_admin %}
+    <div id="bulkBar" class="bulk-bar no-print">
+        <span id="bulkCount">0</span> selected
+        <button class="btn btn-success btn-sm" onclick="bulkAction('approve')">
+            <i class="fas fa-check me-1"></i>Approve Selected
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="bulkAction('reject')">
+            <i class="fas fa-times me-1"></i>Reject Selected
+        </button>
+    </div>
+    {% endif %}
+
     <!-- Expenses Table -->
     <div class="card">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="expenseTable">
                 <thead class="table-light">
                     <tr>
+                        {% if current_user.role in ['admin', 'manager'] or current_user.is_global_admin %}
+                        <th class="no-print" style="width: 30px;">
+                            <input type="checkbox" id="selectAll" onchange="toggleAll(this)">
+                        </th>
+                        {% endif %}
                         <th>Date</th>
                         <th>Number</th>
                         <th>Category</th>
@@ -158,12 +180,19 @@
                         <th>Vendor</th>
                         <th class="text-end">Amount</th>
                         <th>Status</th>
-                        <th>Actions</th>
+                        <th class="no-print">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for expense in expenses.items %}
                     <tr>
+                        {% if current_user.role in ['admin', 'manager'] or current_user.is_global_admin %}
+                        <td class="no-print">
+                            {% if expense.status == 'pending' %}
+                            <input type="checkbox" class="bulk-check" value="{{ expense.id }}" onchange="updateBulkBar()">
+                            {% endif %}
+                        </td>
+                        {% endif %}
                         <td>{{ expense.expense_date.strftime('%d %b %Y') }}</td>
                         <td><code>{{ expense.expense_number }}</code></td>
                         <td>
@@ -198,8 +227,11 @@
                                 {% endif %}
                                 {{ expense.status|title }}
                             </span>
+                            {% if expense.status == 'rejected' and expense.rejection_reason %}
+                            <br><small class="text-muted" title="{{ expense.rejection_reason }}">{{ expense.rejection_reason[:30] }}{% if expense.rejection_reason|length > 30 %}...{% endif %}</small>
+                            {% endif %}
                         </td>
-                        <td>
+                        <td class="no-print">
                             <div class="btn-group btn-group-sm">
                                 <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
                                    class="btn btn-outline-primary" title="Edit">
@@ -208,11 +240,11 @@
                                 <button class="btn btn-outline-info" onclick="duplicateExpense({{ expense.id }}, '{{ expense.description[:30] }}')" title="Duplicate for this month">
                                     <i class="fas fa-copy"></i>
                                 </button>
-                                {% if expense.status == 'pending' and current_user.role in ['admin', 'manager'] %}
+                                {% if expense.status == 'pending' and (current_user.role in ['admin', 'manager'] or current_user.is_global_admin) %}
                                 <button class="btn btn-outline-success" onclick="approveExpense({{ expense.id }})" title="Approve">
                                     <i class="fas fa-check"></i>
                                 </button>
-                                <button class="btn btn-outline-danger" onclick="rejectExpense({{ expense.id }})" title="Reject">
+                                <button class="btn btn-outline-danger" onclick="showRejectModal({{ expense.id }})" title="Reject">
                                     <i class="fas fa-times"></i>
                                 </button>
                                 {% endif %}
@@ -221,7 +253,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="9" class="text-center py-5">
+                        <td colspan="10" class="text-center py-5">
                             <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
                             <p class="text-muted">No expenses found</p>
                             <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary">
@@ -253,19 +285,52 @@
         </ul>
     </nav>
     {% endif %}
+
+    {{ print_footer() }}
+</div>
+
+<!-- Rejection Reason Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-times-circle text-danger me-2"></i>Reject Expense</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label">Reason for rejection (optional)</label>
+                <textarea id="rejectionReason" class="form-control" rows="3" placeholder="Enter reason..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmReject()">
+                    <i class="fas fa-times me-1"></i>Reject
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+{{ export_script() }}
 <script>
+// Page-specific keyboard shortcuts
+window.pageShortcuts = [
+    {key: 'F2', label: 'Add New Expense', action: function() { window.location.href = '{{ url_for("expenses.add_expense") }}'; }},
+    {key: 'F3', label: 'Focus Search', action: function() { var s = document.querySelector('input[name="search"]'); if (s) { s.focus(); s.select(); } }}
+];
+
+var rejectExpenseId = null;
+
 function duplicateExpense(id, desc) {
-    if (confirm(`Duplicate "${desc}" with today's date?\nYou can update the amount on the next screen.`)) {
-        const form = document.createElement('form');
+    if (confirm('Duplicate "' + desc + '" with today\'s date?\nYou can update the amount on the next screen.')) {
+        var form = document.createElement('form');
         form.method = 'POST';
-        form.action = `/expenses/duplicate/${id}`;
-        const csrf = document.querySelector('meta[name="csrf-token"]');
+        form.action = '/expenses/duplicate/' + id;
+        var csrf = document.querySelector('meta[name="csrf-token"]');
         if (csrf) {
-            const input = document.createElement('input');
+            var input = document.createElement('input');
             input.type = 'hidden';
             input.name = 'csrf_token';
             input.value = csrf.content;
@@ -278,18 +343,94 @@ function duplicateExpense(id, desc) {
 
 function approveExpense(id) {
     if (confirm('Approve this expense?')) {
-        $.post(`/expenses/approve/${id}`, function(response) {
+        $.post('/expenses/approve/' + id, function(response) {
             if (response.success) location.reload();
         });
     }
 }
 
-function rejectExpense(id) {
-    if (confirm('Reject this expense?')) {
-        $.post(`/expenses/reject/${id}`, function(response) {
+function showRejectModal(id) {
+    rejectExpenseId = id;
+    document.getElementById('rejectionReason').value = '';
+    new bootstrap.Modal(document.getElementById('rejectModal')).show();
+}
+
+function confirmReject() {
+    var reason = document.getElementById('rejectionReason').value;
+    $.ajax({
+        url: '/expenses/reject/' + rejectExpenseId,
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({reason: reason}),
+        success: function(response) {
             if (response.success) location.reload();
-        });
+        }
+    });
+}
+
+// Bulk operations
+function toggleAll(el) {
+    document.querySelectorAll('.bulk-check').forEach(function(cb) { cb.checked = el.checked; });
+    updateBulkBar();
+}
+
+function updateBulkBar() {
+    var checked = document.querySelectorAll('.bulk-check:checked');
+    var bar = document.getElementById('bulkBar');
+    if (bar) {
+        if (checked.length > 0) {
+            bar.classList.add('active');
+            document.getElementById('bulkCount').textContent = checked.length;
+        } else {
+            bar.classList.remove('active');
+        }
     }
+}
+
+function bulkAction(action) {
+    var ids = [];
+    document.querySelectorAll('.bulk-check:checked').forEach(function(cb) { ids.push(parseInt(cb.value)); });
+    if (!ids.length) return;
+
+    var msg = action === 'approve' ? 'Approve ' + ids.length + ' expenses?' : 'Reject ' + ids.length + ' expenses?';
+    if (!confirm(msg)) return;
+
+    $.ajax({
+        url: '/expenses/bulk-action',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ids: ids, action: action}),
+        success: function(response) {
+            if (response.success) location.reload();
+            else alert(response.error || 'Error processing request');
+        }
+    });
+}
+
+// CSV Export
+function exportExpenseCSV() {
+    var table = document.getElementById('expenseTable');
+    if (!table) return;
+    var csv = [];
+    var rows = table.querySelectorAll('tr');
+    for (var i = 0; i < rows.length; i++) {
+        var cols = rows[i].querySelectorAll('td, th');
+        var rowData = [];
+        for (var j = 0; j < cols.length; j++) {
+            if (cols[j].classList.contains('no-print')) continue;
+            var text = cols[j].innerText.replace(/\s+/g, ' ').trim();
+            rowData.push('"' + text.replace(/"/g, '""') + '"');
+        }
+        if (rowData.length > 0) csv.push(rowData.join(','));
+    }
+    var blob = new Blob(['\uFEFF' + csv.join('\n')], {type: 'text/csv;charset=utf-8;'});
+    var url = window.URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'expenses_' + new Date().toISOString().slice(0,10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
 </script>
 {% endblock %}

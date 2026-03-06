@@ -191,6 +191,9 @@ def create_app(config_name='default'):
     from app.routes.developer import bp as developer_bp
     app.register_blueprint(developer_bp, url_prefix='/developer')
 
+    from app.routes.search import bp as search_bp
+    app.register_blueprint(search_bp)  # url_prefix is in blueprint (/api)
+
     # Register main routes
     @app.route('/')
     def index():

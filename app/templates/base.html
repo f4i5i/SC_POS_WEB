@@ -2095,6 +2095,13 @@
                             </span>
                         </li>
                         {% endif %}
+                        <!-- Search / Command Palette -->
+                        <li class="nav-item me-2">
+                            <a class="nav-link" href="#" onclick="openCommandPalette(); return false;" title="Search (Ctrl+K)">
+                                <i class="fas fa-search"></i>
+                                <span class="d-none d-lg-inline ms-1 small text-muted" style="font-size: 0.7rem; opacity: 0.7;">Ctrl+K</span>
+                            </a>
+                        </li>
                         <!-- Theme Switcher -->
                         <li class="nav-item dropdown me-2">
                             <a class="nav-link dropdown-toggle" href="#" id="themeDropdown" role="button" data-bs-toggle="dropdown">
@@ -2504,6 +2511,240 @@
             }
         }
     });
+    </script>
+
+    <!-- Command Palette Overlay -->
+    <div id="cmdPalette" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:9999;">
+        <div id="cmdBackdrop" style="position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(2px);" onclick="closeCommandPalette()"></div>
+        <div style="position:relative; max-width:560px; margin:80px auto 0; background:var(--card-bg, #fff); border-radius:12px; box-shadow:0 16px 70px rgba(0,0,0,0.3); overflow:hidden; border:1px solid var(--border-color, #e5e7eb);">
+            <div style="display:flex; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border-color, #e5e7eb);">
+                <i class="fas fa-search" style="color:var(--text-muted, #6b7280); margin-right:10px;"></i>
+                <input type="text" id="cmdInput" placeholder="Search pages, products, customers, suppliers..."
+                    style="flex:1; border:none; outline:none; font-size:15px; background:transparent; color:var(--text-primary, #111);"
+                    autocomplete="off" spellcheck="false">
+                <kbd style="background:var(--bg-secondary, #f3f4f6); border:1px solid var(--border-color, #d1d5db); border-radius:4px; padding:2px 6px; font-size:11px; color:var(--text-muted, #6b7280);">ESC</kbd>
+            </div>
+            <div id="cmdResults" style="max-height:380px; overflow-y:auto; padding:8px 0;">
+                <div id="cmdEmpty" style="text-align:center; padding:30px 16px; color:var(--text-muted, #9ca3af);">
+                    <i class="fas fa-search fa-2x" style="margin-bottom:8px; opacity:0.3;"></i>
+                    <p style="margin:0; font-size:13px;">Type to search...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var cmdOpen = false;
+        var cmdIndex = -1;
+        var debounceTimer = null;
+
+        window.openCommandPalette = function() {
+            var palette = document.getElementById('cmdPalette');
+            palette.style.display = 'block';
+            cmdOpen = true;
+            cmdIndex = -1;
+            var input = document.getElementById('cmdInput');
+            input.value = '';
+            input.focus();
+            document.getElementById('cmdResults').innerHTML =
+                '<div id="cmdEmpty" style="text-align:center; padding:30px 16px; color:var(--text-muted, #9ca3af);">' +
+                '<i class="fas fa-search fa-2x" style="margin-bottom:8px; opacity:0.3;"></i>' +
+                '<p style="margin:0; font-size:13px;">Type to search...</p></div>';
+        };
+
+        window.closeCommandPalette = function() {
+            document.getElementById('cmdPalette').style.display = 'none';
+            cmdOpen = false;
+            cmdIndex = -1;
+        };
+
+        // Global Ctrl+K handler
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                if (cmdOpen) closeCommandPalette();
+                else openCommandPalette();
+                return;
+            }
+            if (e.key === 'Escape' && cmdOpen) {
+                e.preventDefault();
+                closeCommandPalette();
+                return;
+            }
+        });
+
+        // Input handler with debounce
+        document.getElementById('cmdInput').addEventListener('input', function() {
+            var q = this.value.trim();
+            clearTimeout(debounceTimer);
+            if (!q) {
+                document.getElementById('cmdResults').innerHTML =
+                    '<div style="text-align:center; padding:30px 16px; color:var(--text-muted, #9ca3af);">' +
+                    '<i class="fas fa-search fa-2x" style="margin-bottom:8px; opacity:0.3;"></i>' +
+                    '<p style="margin:0; font-size:13px;">Type to search...</p></div>';
+                cmdIndex = -1;
+                return;
+            }
+            debounceTimer = setTimeout(function() { doSearch(q); }, 150);
+        });
+
+        // Keyboard navigation in results
+        document.getElementById('cmdInput').addEventListener('keydown', function(e) {
+            var items = document.querySelectorAll('.cmd-item');
+            if (!items.length) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                cmdIndex = Math.min(cmdIndex + 1, items.length - 1);
+                highlightItem(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                cmdIndex = Math.max(cmdIndex - 1, 0);
+                highlightItem(items);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (cmdIndex >= 0 && items[cmdIndex]) {
+                    window.location.href = items[cmdIndex].dataset.url;
+                } else if (items.length > 0) {
+                    window.location.href = items[0].dataset.url;
+                }
+            }
+        });
+
+        function highlightItem(items) {
+            items.forEach(function(el, i) {
+                el.style.background = i === cmdIndex ? 'var(--primary-color, #6366F1)' : '';
+                el.style.color = i === cmdIndex ? '#fff' : '';
+                el.querySelector('.cmd-subtitle') && (el.querySelector('.cmd-subtitle').style.color = i === cmdIndex ? 'rgba(255,255,255,0.7)' : '');
+                if (i === cmdIndex) el.scrollIntoView({block: 'nearest'});
+            });
+        }
+
+        function doSearch(q) {
+            fetch('/api/search?q=' + encodeURIComponent(q))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    cmdIndex = -1;
+                    var html = '';
+                    var sections = [
+                        {key: 'pages', label: 'Pages', icon: 'fas fa-compass'},
+                        {key: 'products', label: 'Products', icon: 'fas fa-box'},
+                        {key: 'customers', label: 'Customers', icon: 'fas fa-users'},
+                        {key: 'suppliers', label: 'Suppliers', icon: 'fas fa-truck'}
+                    ];
+                    var hasResults = false;
+
+                    sections.forEach(function(sec) {
+                        var items = data[sec.key];
+                        if (!items || !items.length) return;
+                        hasResults = true;
+                        html += '<div style="padding:4px 16px 2px; font-size:11px; font-weight:600; color:var(--text-muted, #9ca3af); text-transform:uppercase; letter-spacing:0.5px;">' + sec.label + '</div>';
+                        items.forEach(function(item) {
+                            html += '<div class="cmd-item" data-url="' + item.url + '" ' +
+                                'style="display:flex; align-items:center; padding:8px 16px; cursor:pointer; transition:background 0.1s;" ' +
+                                'onmouseover="this.style.background=\'var(--bg-secondary, #f3f4f6)\'" ' +
+                                'onmouseout="this.style.background=\'\'" ' +
+                                'onclick="window.location.href=\'' + item.url + '\'">' +
+                                '<i class="' + (item.icon || sec.icon) + '" style="width:20px; text-align:center; margin-right:10px; color:var(--text-muted, #6b7280); font-size:13px;"></i>' +
+                                '<div style="flex:1; min-width:0;">' +
+                                '<div style="font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escHtml(item.name) + '</div>' +
+                                (item.subtitle ? '<div class="cmd-subtitle" style="font-size:11px; color:var(--text-muted, #9ca3af);">' + escHtml(item.subtitle) + '</div>' : '') +
+                                '</div>' +
+                                '</div>';
+                        });
+                    });
+
+                    if (!hasResults) {
+                        html = '<div style="text-align:center; padding:30px 16px; color:var(--text-muted, #9ca3af);">' +
+                            '<i class="fas fa-search fa-2x" style="margin-bottom:8px; opacity:0.3;"></i>' +
+                            '<p style="margin:0; font-size:13px;">No results for "' + escHtml(q) + '"</p></div>';
+                    }
+
+                    document.getElementById('cmdResults').innerHTML = html;
+                })
+                .catch(function() {});
+        }
+
+        function escHtml(s) {
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+    })();
+    </script>
+
+    <!-- Keyboard Shortcuts Help Overlay -->
+    <div id="shortcutsHelp" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:9998;">
+        <div style="position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5);" onclick="document.getElementById('shortcutsHelp').style.display='none'"></div>
+        <div style="position:relative; max-width:420px; margin:80px auto 0; background:var(--card-bg, #fff); border-radius:12px; box-shadow:0 16px 70px rgba(0,0,0,0.3); overflow:hidden; border:1px solid var(--border-color, #e5e7eb); padding:20px;">
+            <h5 style="margin:0 0 16px; font-size:15px; font-weight:600;">
+                <i class="fas fa-keyboard me-2" style="color:var(--primary-color, #6366F1);"></i>Keyboard Shortcuts
+            </h5>
+            <div style="font-size:13px;">
+                <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border-color, #e5e7eb);">
+                    <span>Search / Command Palette</span>
+                    <kbd style="background:var(--bg-secondary, #f3f4f6); border:1px solid var(--border-color, #d1d5db); border-radius:4px; padding:1px 6px; font-size:11px;">Ctrl+K</kbd>
+                </div>
+                <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border-color, #e5e7eb);">
+                    <span>Show this help</span>
+                    <kbd style="background:var(--bg-secondary, #f3f4f6); border:1px solid var(--border-color, #d1d5db); border-radius:4px; padding:1px 6px; font-size:11px;">?</kbd>
+                </div>
+                <div id="pageShortcuts"></div>
+            </div>
+            <div style="text-align:center; margin-top:12px;">
+                <small style="color:var(--text-muted, #9ca3af);">Press ESC to close</small>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Global ? key for shortcuts help + page-specific F-keys
+    (function() {
+        // Register page shortcuts (templates add to this)
+        window.pageShortcuts = window.pageShortcuts || [];
+
+        document.addEventListener('keydown', function(e) {
+            var tag = e.target.tagName;
+            var isInput = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable);
+
+            // ? key (when not in input)
+            if (e.key === '?' && !isInput) {
+                e.preventDefault();
+                var help = document.getElementById('shortcutsHelp');
+                if (help.style.display === 'none') {
+                    // Render page-specific shortcuts
+                    var html = '';
+                    (window.pageShortcuts || []).forEach(function(s) {
+                        html += '<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border-color, #e5e7eb);">' +
+                            '<span>' + s.label + '</span>' +
+                            '<kbd style="background:var(--bg-secondary, #f3f4f6); border:1px solid var(--border-color, #d1d5db); border-radius:4px; padding:1px 6px; font-size:11px;">' + s.key + '</kbd>' +
+                            '</div>';
+                    });
+                    document.getElementById('pageShortcuts').innerHTML = html;
+                    help.style.display = 'block';
+                } else {
+                    help.style.display = 'none';
+                }
+                return;
+            }
+
+            // ESC closes shortcuts help
+            if (e.key === 'Escape' && document.getElementById('shortcutsHelp').style.display !== 'none') {
+                document.getElementById('shortcutsHelp').style.display = 'none';
+            }
+
+            // Process page shortcuts (F-keys)
+            if (!isInput || e.key.startsWith('F')) {
+                (window.pageShortcuts || []).forEach(function(s) {
+                    if (e.key === s.key) {
+                        e.preventDefault();
+                        s.action();
+                    }
+                });
+            }
+        });
+    })();
     </script>
 
     {% block extra_js %}{% endblock %}

@@ -780,6 +780,12 @@
 
 {% block extra_js %}
 <script>
+// Page-specific keyboard shortcuts
+window.pageShortcuts = [
+    {key: 'F2', label: 'Add New Product', action: function() { window.location.href = '{{ url_for("inventory.add_product") }}'; }},
+    {key: 'F3', label: 'Focus Search', action: function() { var s = document.querySelector('input[name="search"]'); if (s) { s.focus(); s.select(); } }}
+];
+
 $(document).ready(function() {
     // Auto-submit search after typing
     let searchTimeout;
