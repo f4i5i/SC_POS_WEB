@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% from "reports/_print_styles.html" import report_buttons, export_script %}
+{% from "reports/_print_styles.html" import print_header, print_footer, signature_area, report_buttons, export_script %}
 
 {% block title %}Profit & Loss Report - {{ business_name }}{% endblock %}
 
 {% block extra_css %}
+{% include "reports/_print_styles.html" %}
 <style>
     .period-btn {
         border-radius: 20px;
@@ -82,216 +83,32 @@
         margin-right: 1rem;
     }
 
-    /* Print Header - Hidden on screen */
-    .print-header {
-        display: none;
-    }
-
-    /* Print Styles */
+    /* P&L specific print overrides */
     @media print {
-        /* Hide screen-only elements */
-        .sidebar, .navbar, .no-print, .btn, .period-btn,
-        .btn-group, form, .card-header .btn, .stat-card .icon,
-        .change-badge, canvas, .profit-health-indicator {
+        /* Hide sidebar column on print — P&L shows full-width statement */
+        .col-lg-4.print-hide-sidebar,
+        .col-lg-4:has(.profit-health-indicator) {
             display: none !important;
         }
+        .col-lg-8 { width: 100% !important; max-width: 100% !important; flex: 0 0 100% !important; }
 
-        /* Reset page */
-        body {
-            background: white !important;
-            font-size: 11pt;
-            color: #000 !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }
+        /* P&L Table styling for print */
+        .pnl-table { width: 100%; border-collapse: collapse; }
+        .pnl-table td { padding: 5px 8px !important; border-bottom: 1px solid #ccc !important; font-size: 9pt; }
+        .pnl-table .section-header { background: #e9ecef !important; font-weight: bold; }
+        .pnl-table .total-row { background: #d4edda !important; font-weight: bold; }
+        .pnl-table .total-row.negative { background: #f8d7da !important; }
 
-        .container-fluid {
-            padding: 0 !important;
-            max-width: 100% !important;
-        }
-
-        /* Show print header */
-        .print-header {
-            display: block !important;
-            text-align: center;
-            border-bottom: 3px double #000;
-            padding-bottom: 15px;
-            margin-bottom: 20px;
-        }
-
-        .print-header .business-name {
-            font-size: 24pt;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-
-        .print-header .report-title {
-            font-size: 16pt;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-
-        .print-header .report-period {
-            font-size: 12pt;
-            color: #333;
-        }
-
-        .print-header .report-meta {
-            font-size: 9pt;
-            color: #666;
-            margin-top: 10px;
-        }
-
-        /* Hide regular header */
-        .page-header-regular {
-            display: none !important;
-        }
-
-        /* Cards styling for print */
-        .card {
-            border: 1px solid #ddd !important;
-            box-shadow: none !important;
-            break-inside: avoid;
-            page-break-inside: avoid;
-        }
-
-        .card-header {
-            background: #f5f5f5 !important;
-            border-bottom: 1px solid #ddd !important;
-            padding: 10px 15px !important;
-        }
-
-        /* Stat cards for print */
-        .stat-card {
-            border: 1px solid #ddd !important;
-            padding: 10px !important;
-            box-shadow: none !important;
-        }
-
-        .stat-card .value {
-            font-size: 14pt !important;
-            color: #000 !important;
-        }
-
-        .stat-card .text-muted {
-            color: #333 !important;
-            font-size: 9pt;
-        }
-
-        /* P&L Table styling */
-        .pnl-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .pnl-table td {
-            padding: 8px 12px !important;
-            border-bottom: 1px solid #ddd !important;
-        }
-
-        .pnl-table .section-header {
-            background: #e9ecef !important;
-            font-weight: bold;
-        }
-
-        .pnl-table .total-row {
-            background: #d4edda !important;
-            font-weight: bold;
-        }
-
-        .pnl-table .total-row.negative {
-            background: #f8d7da !important;
-        }
-
-        /* Colors for print */
-        .text-success { color: #198754 !important; }
-        .text-danger { color: #dc3545 !important; }
-        .text-primary { color: #0d6efd !important; }
-        .text-warning { color: #856404 !important; }
-        .text-info { color: #0dcaf0 !important; }
-
-        /* Layout adjustments */
-        .col-lg-8 { width: 100% !important; max-width: 100% !important; }
-        .col-lg-4 { display: none !important; }
-
-        .row { display: block !important; }
-
-        /* Page breaks */
-        .page-break-before { page-break-before: always; }
-        .page-break-after { page-break-after: always; }
-
-        /* Top products table */
-        .table thead { background: #e9ecef !important; }
-        .table th, .table td {
-            padding: 6px 10px !important;
-            border: 1px solid #ddd !important;
-        }
-
-        /* Footer */
-        .print-footer {
-            display: block !important;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            text-align: center;
-            font-size: 8pt;
-            color: #666;
-            border-top: 1px solid #ddd;
-            padding-top: 5px;
-        }
-
-        /* Badge styling for print */
-        .badge {
-            border: 1px solid #000 !important;
-            color: #000 !important;
-            background: #fff !important;
-        }
-
-        /* Show print summary */
-        .print-summary {
-            display: block !important;
-        }
-
-        /* Signature area */
-        .signature-area {
-            display: flex !important;
-            justify-content: space-between;
-            margin-top: 50px;
-            padding-top: 20px;
-        }
-
-        .signature-box {
-            width: 200px;
-            text-align: center;
-        }
-
-        .signature-line {
-            border-top: 1px solid #000;
-            margin-top: 50px;
-            padding-top: 5px;
-        }
+        /* Hide decorative icons and profit health */
+        .stat-card .icon, .change-badge, .profit-health-indicator { display: none !important; }
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
-    <!-- Print Header (Only visible when printing) -->
-    <div class="print-header">
-        <div class="business-name">{{ business_name or 'Sunnat Collection' }}</div>
-        <div class="report-title">PROFIT & LOSS STATEMENT</div>
-        <div class="report-period">{{ period_label }}</div>
-        {% if user_location %}
-        <div class="report-meta">Location: {{ user_location.name }}</div>
-        {% endif %}
-        <div class="report-meta">Generated: {{ now().strftime('%B %d, %Y at %I:%M %p') if now else '' }}</div>
-    </div>
-
-    <!-- Print Footer -->
-    <div class="print-footer" style="display: none;">
-        This is a computer-generated document. No signature required.
-    </div>
+    <!-- Print Header & Footer (via centralized macros) -->
+    {{ print_header('Profit & Loss Statement', period_label, user_location) }}
 
     <!-- Regular Header (Hidden on print) -->
     <div class="d-flex justify-content-between align-items-center mb-4 page-header-regular no-print">
@@ -766,8 +583,8 @@
             {% endif %}
         </div>
 
-        <!-- Right Sidebar -->
-        <div class="col-lg-4">
+        <!-- Right Sidebar (hidden on print) -->
+        <div class="col-lg-4 print-hide-sidebar">
             <!-- Summary Card -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
@@ -869,18 +686,8 @@
         </div>
     </div>
 
-    <!-- Signature Area (Only for print) -->
-    <div class="signature-area" style="display: none;">
-        <div class="signature-box">
-            <div class="signature-line">Prepared By</div>
-        </div>
-        <div class="signature-box">
-            <div class="signature-line">Reviewed By</div>
-        </div>
-        <div class="signature-box">
-            <div class="signature-line">Approved By</div>
-        </div>
-    </div>
+    {{ signature_area() }}
+    {{ print_footer() }}
 </div>
 {% endblock %}
 

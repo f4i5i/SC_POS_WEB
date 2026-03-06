@@ -1,19 +1,17 @@
 {% extends "base.html" %}
-{% from "reports/_print_styles.html" import print_footer, report_buttons, export_script %}
+{% from "reports/_print_styles.html" import print_header, print_footer, report_buttons, export_script %}
 
 {% block title %}Inventory Cross-Check - {{ business_name }}{% endblock %}
 
 {% block extra_css %}
+{% include "reports/_print_styles.html" %}
 <style>
+    /* Inventory crosscheck specific print overrides */
     @media print {
-        .no-print { display: none !important; }
-        .card { border: none !important; box-shadow: none !important; }
-        .card-header { background: none !important; border-bottom: 2px solid #333 !important; }
         @page { size: A4 landscape; margin: 8mm; }
-        body { font-size: 11px; }
-        .table th, .table td { padding: 4px 6px !important; font-size: 10px; }
+        body { font-size: 9pt; }
+        .table th, .table td { padding: 4px 6px !important; font-size: 8pt; }
         .physical-count-col { min-width: 60px; }
-        .container-fluid { padding: 0 !important; }
     }
     .physical-count-col {
         background: #fff9e6 !important;
@@ -36,16 +34,7 @@
         font-size: 0.85rem;
         vertical-align: middle;
     }
-    .print-header {
-        display: none;
-    }
-    @media print {
-        .print-header {
-            display: block;
-            text-align: center;
-            margin-bottom: 15px;
-        }
-    }
+    /* print-header visibility handled by centralized _print_styles.html */
     .qty-zero { color: #adb5bd; }
     .summary-badge {
         display: inline-block;
@@ -58,16 +47,7 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="print-header">
-        <h2>{{ business_name }} - Inventory Cross-Check Sheet</h2>
-        <p>Generated: {{ print_date.strftime('%Y-%m-%d %H:%M') }} |
-           {% if selected_locations|length == 1 %}
-               Location: {{ selected_locations[0].name }}
-           {% else %}
-               All Locations
-           {% endif %}
-        </p>
-    </div>
+    {{ print_header('Inventory Cross-Check Sheet', print_date.strftime('%Y-%m-%d %H:%M'), selected_locations[0] if selected_locations|length == 1 else None) }}
 
     <!-- Filters -->
     <div class="card mb-3 no-print">

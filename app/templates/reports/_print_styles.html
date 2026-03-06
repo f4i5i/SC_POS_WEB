@@ -51,53 +51,53 @@
     .print-header {
         display: block !important;
         text-align: center;
-        border-bottom: 3px double #000;
-        padding-bottom: 15px;
-        margin-bottom: 20px;
+        border-bottom: 2px double #000;
+        padding-bottom: 8px;
+        margin-bottom: 12px;
     }
 
     .print-header .business-name {
-        font-size: 22pt;
+        font-size: 16pt;
         font-weight: bold;
-        margin-bottom: 5px;
-        letter-spacing: 1px;
+        margin-bottom: 3px;
+        letter-spacing: 0.5px;
     }
 
     .print-header .business-tagline {
-        font-size: 10pt;
+        font-size: 8pt;
         color: #666;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
 
     .print-header .report-title {
-        font-size: 14pt;
+        font-size: 11pt;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 2px;
-        margin-bottom: 5px;
-        padding: 5px 0;
+        letter-spacing: 1.5px;
+        margin-bottom: 3px;
+        padding: 4px 0;
         border-top: 1px solid #ccc;
         border-bottom: 1px solid #ccc;
     }
 
     .print-header .report-period {
-        font-size: 11pt;
+        font-size: 9pt;
         color: #333;
-        margin-top: 10px;
+        margin-top: 6px;
     }
 
     .print-header .report-meta {
-        font-size: 9pt;
+        font-size: 8pt;
         color: #666;
-        margin-top: 5px;
+        margin-top: 3px;
     }
 
     .print-footer {
         display: block !important;
-        margin-top: 30px;
-        padding-top: 10px;
+        margin-top: 15px;
+        padding-top: 6px;
         border-top: 1px solid #ccc;
-        font-size: 8pt;
+        font-size: 7pt;
         color: #666;
         text-align: center;
     }
@@ -116,21 +116,46 @@
     .card {
         border: 1px solid #ccc !important;
         box-shadow: none !important;
+        margin-bottom: 8px !important;
+        border-radius: 0 !important;
+    }
+
+    /* Only prevent page-break on small cards (stat/summary cards).
+       Cards containing tables MUST be allowed to break across pages
+       to avoid huge blank gaps. */
+    .card:not(:has(.table)):not(:has(.table-responsive)):not(.print-break-ok) {
         break-inside: avoid;
         page-break-inside: avoid;
-        margin-bottom: 15px !important;
+    }
+
+    /* Explicit class to allow page breaks inside a card */
+    .card.print-break-ok {
+        break-inside: auto !important;
+        page-break-inside: auto !important;
     }
 
     .card-header {
         background: #f0f0f0 !important;
         border-bottom: 1px solid #ccc !important;
-        padding: 8px 12px !important;
+        padding: 4px 8px !important;
         font-weight: 600;
+        font-size: 9pt !important;
     }
 
     .card-body {
-        padding: 10px 12px !important;
+        padding: 6px 8px !important;
     }
+
+    /* Tables should flow smoothly across pages */
+    .table-responsive, .table {
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+    }
+
+    /* Keep table header rows with at least some data */
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
+    tr { page-break-inside: avoid; }
 
     /* Table styling for print */
     .table {
@@ -225,30 +250,95 @@
     .text-info { color: #0dcaf0 !important; }
     .text-muted { color: #666 !important; }
 
-    /* Layout adjustments */
+    /* Typography: scale all headings down for print */
+    h1 { font-size: 14pt !important; }
+    h2 { font-size: 12pt !important; }
+    h3 { font-size: 11pt !important; }
+    h4 { font-size: 10pt !important; }
+    h5 { font-size: 9pt !important; }
+    h6 { font-size: 8pt !important; }
+    p { font-size: 9pt !important; }
+
+    /* Hide ALL decorative icons in print */
+    .card-body > i[class*="fa-"],
+    .card-body i.fa-2x,
+    .card-body i.fa-3x,
+    .card-body i.fa-4x,
+    h2 > i, h3 > i, h4 > i, h5 > i,
+    .stat-card i, .stat-value + i,
+    .card-body > .text-center > i[class*="fa-"] {
+        display: none !important;
+    }
+
+    /* Layout adjustments — NO !important on display so .no-print can override */
     .row {
-        display: block !important;
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+    /* Column widths for print — NO !important on display
+       so .no-print { display: none !important } always wins */
+    .col-md-2, .col-lg-2 {
+        width: 16% !important;
+        display: inline-block;
+        vertical-align: top;
+    }
+
+    .col-md-3, .col-lg-3 {
+        width: 24% !important;
+        display: inline-block;
+        vertical-align: top;
+    }
+
+    .col-md-4 {
+        width: 32% !important;
+        display: inline-block;
+        vertical-align: top;
+    }
+
+    /* col-lg-4 used as sidebar: stack full width under main content */
+    .col-lg-4 {
+        width: 100% !important;
+        display: block;
+    }
+
+    .col-md-5, .col-lg-5 {
+        width: 40% !important;
+        display: inline-block;
+        vertical-align: top;
     }
 
     .col-md-6, .col-lg-6 {
         width: 49% !important;
-        display: inline-block !important;
+        display: inline-block;
         vertical-align: top;
     }
 
-    .col-md-4, .col-lg-4 {
-        width: 32% !important;
-        display: inline-block !important;
+    .col-md-7, .col-lg-7 {
+        width: 57% !important;
+        display: inline-block;
         vertical-align: top;
     }
 
-    .col-md-8, .col-lg-8 {
+    /* Large columns (8+) stack to full width for readability.
+       Data tables need the full page width on A4. */
+    .col-md-8, .col-lg-8,
+    .col-md-9, .col-lg-9,
+    .col-md-10, .col-lg-10 {
+        width: 100% !important;
+        display: block;
+    }
+
+    .col-md-12, .col-lg-12, .col-12 {
         width: 100% !important;
     }
 
-    .col-12 {
-        width: 100% !important;
-    }
+    /* Remove padding/gaps on grid for tighter print */
+    .g-3, .g-4 { gap: 8px !important; }
+    .mb-4 { margin-bottom: 10px !important; }
+    .mb-3 { margin-bottom: 8px !important; }
+    .py-4 { padding-top: 0 !important; padding-bottom: 0 !important; }
+    .py-3 { padding-top: 4px !important; padding-bottom: 4px !important; }
 
     /* Hide sidebar column on print */
     .print-hide-sidebar {
@@ -289,24 +379,47 @@
         font-size: 9pt;
     }
 
-    /* Stat cards for print */
+    /* Stat cards for print — compact inline boxes */
     .stat-card, .summary-card {
-        border: 1px solid #ccc !important;
-        padding: 8px !important;
+        border: 1px solid #999 !important;
+        padding: 6px 8px !important;
         text-align: center;
         box-shadow: none !important;
-    }
-
-    .stat-card .icon,
-    .stat-card i.fa-3x,
-    .stat-card i.fa-4x {
-        display: none !important;
-    }
-
-    .stat-card .value,
-    .stat-card h3 {
-        font-size: 12pt !important;
+        background: #fff !important;
         color: #000 !important;
+        border-radius: 0 !important;
+    }
+
+    .stat-card *, .summary-card * {
+        color: #000 !important;
+    }
+
+    .stat-card .stat-value,
+    .stat-card h2, .stat-card h3, .stat-card h4 {
+        font-size: 11pt !important;
+        font-weight: 700 !important;
+        color: #000 !important;
+        margin: 0 !important;
+    }
+
+    .stat-card small, .stat-card p,
+    .stat-card div:not(.stat-value) {
+        font-size: 7pt !important;
+        color: #333 !important;
+    }
+
+    /* Summary cards in report content areas */
+    .card-body h2, .card-body h3, .card-body h4 {
+        font-size: 10pt !important;
+    }
+
+    .card-body .text-center h4 {
+        font-size: 10pt !important;
+        margin-bottom: 0 !important;
+    }
+
+    .card-body .text-center small {
+        font-size: 7pt !important;
     }
 
     /* Page setup */
@@ -333,7 +446,7 @@
     {% if location %}
     <div class="report-meta">Location: {{ location.name }}</div>
     {% endif %}
-    <div class="report-meta">Generated: {{ now().strftime('%B %d, %Y at %I:%M %p') if now else '' }}</div>
+    <div class="report-meta">Generated: <script>document.currentScript.parentElement.append(new Date().toLocaleString('en-US', {year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'2-digit'}))</script></div>
 </div>
 {% endmacro %}
 
