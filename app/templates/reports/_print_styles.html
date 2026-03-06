@@ -359,3 +359,67 @@
     </div>
 </div>
 {% endmacro %}
+
+{# Report Action Buttons Macro #}
+{% macro report_buttons(back_url=None, csv_filename='report') %}
+<div class="no-print">
+    <button onclick="window.print()" class="btn btn-outline-primary btn-sm">
+        <i class="fas fa-print"></i> Print
+    </button>
+    <button onclick="exportReportCSV('{{ csv_filename }}')" class="btn btn-outline-success btn-sm ms-1">
+        <i class="fas fa-file-csv"></i> CSV
+    </button>
+    {% if back_url %}
+    <a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm ms-1">
+        <i class="fas fa-arrow-left"></i> Back
+    </a>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{# Universal CSV Export Script - include once per page #}
+{% macro export_script() %}
+<script>
+function exportReportCSV(filename) {
+    // Find the main data table(s) on the page
+    var tables = document.querySelectorAll('table.table');
+    if (!tables.length) {
+        alert('No data table found to export.');
+        return;
+    }
+    var csv = [];
+    // Use the largest table (most rows) as primary
+    var table = tables[0];
+    var maxRows = 0;
+    for (var t = 0; t < tables.length; t++) {
+        if (tables[t].rows.length > maxRows) {
+            maxRows = tables[t].rows.length;
+            table = tables[t];
+        }
+    }
+    var rows = table.querySelectorAll('tr');
+    for (var i = 0; i < rows.length; i++) {
+        var cols = rows[i].querySelectorAll('td, th');
+        var rowData = [];
+        for (var j = 0; j < cols.length; j++) {
+            // Get text, clean up whitespace, escape quotes
+            var text = cols[j].innerText.replace(/\s+/g, ' ').trim();
+            rowData.push('"' + text.replace(/"/g, '""') + '"');
+        }
+        if (rowData.length > 0) {
+            csv.push(rowData.join(','));
+        }
+    }
+    var csvContent = '\uFEFF' + csv.join('\n');  // BOM for Excel
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var url = window.URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename + '_' + new Date().toISOString().slice(0,10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+</script>
+{% endmacro %}

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "reports/_print_styles.html" import print_header, print_footer, signature_area %}
+{% from "reports/_print_styles.html" import print_header, print_footer, signature_area, report_buttons, export_script %}
 
 {% block title %}Customer Analysis - {{ business_name }}{% endblock %}
 
@@ -30,6 +30,7 @@
             <button onclick="window.print()" class="btn btn-outline-primary">
                 <i class="fas fa-print"></i> Print
             </button>
+            <button onclick="exportReportCSV('customer_analysis')" class="btn btn-outline-success ms-1"><i class="fas fa-file-csv"></i> CSV</button>
             <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2">
                 <i class="fas fa-arrow-left"></i> Back
             </a>
@@ -40,18 +41,18 @@
     <div class="card border-0 shadow-sm mb-4 no-print">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">Start Date</label>
-                    <input type="date" name="start_date" class="form-control" value="{{ start_date.strftime('%Y-%m-%d') }}">
+                    <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date.strftime('%Y-%m-%d') }}">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">End Date</label>
-                    <input type="date" name="end_date" class="form-control" value="{{ end_date.strftime('%Y-%m-%d') }}">
+                    <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date.strftime('%Y-%m-%d') }}">
                 </div>
                 {% if current_user.is_global_admin and locations is defined %}
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">Location</label>
-                    <select name="location_id" class="form-select">
+                    <select name="location_id" class="form-select form-select-sm">
                         <option value="">All Locations</option>
                         {% for loc in locations %}
                         <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
@@ -60,7 +61,21 @@
                 </div>
                 {% endif %}
                 <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i>Apply</button>
+                    <label class="form-label">Search</label>
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Name or phone..." value="{{ search or '' }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Sort By</label>
+                    <select name="sort_by" class="form-select form-select-sm">
+                        <option value="total_spent" {% if sort_by == 'total_spent' %}selected{% endif %}>Total Spent</option>
+                        <option value="visit_count" {% if sort_by == 'visit_count' %}selected{% endif %}>Visit Count</option>
+                        <option value="name_asc" {% if sort_by == 'name_asc' %}selected{% endif %}>Name A-Z</option>
+                        <option value="last_visit" {% if sort_by == 'last_visit' %}selected{% endif %}>Last Visit</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1"><i class="fas fa-filter me-1"></i>Apply</button>
+                    <a href="{{ url_for('reports.customer_analysis') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
                 </div>
             </form>
         </div>
@@ -106,10 +121,13 @@
         <div class="col-md-8">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">
-                        <i class="fas fa-crown text-warning no-print"></i>
-                        Top 20 Customers
-                    </h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-crown text-warning no-print"></i>
+                            Top Customers
+                        </h5>
+                        <span class="text-muted small">Showing <strong>{{ top_customers|length }}</strong> items</span>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -236,6 +254,7 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ export_script() }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 const tierData = {{ tier_breakdown | tojson }};

@@ -504,7 +504,7 @@ def spot_check():
         products.append({
             'id': ls.product_id,
             'name': ls.product.name,
-            'sku': ls.product.sku,
+            'sku': ls.product.code,
             'barcode': ls.product.barcode,
             'system_qty': float(ls.quantity or 0),
             'unit': ls.product.unit or 'pcs',
@@ -540,7 +540,7 @@ def spot_check():
             raw_materials.append({
                 'id': rms.raw_material_id,
                 'name': rms.raw_material.name,
-                'sku': rms.raw_material.sku,
+                'sku': rms.raw_material.code if hasattr(rms.raw_material, 'code') else '',
                 'system_qty': float(rms.quantity or 0),
                 'unit': rms.raw_material.unit or 'kg',
                 'cost': float(rms.raw_material.cost_per_unit or 0)

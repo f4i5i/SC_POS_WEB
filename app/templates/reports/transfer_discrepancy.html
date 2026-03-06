@@ -1,49 +1,82 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, report_buttons, export_script %}
 
 {% block title %}Transfer Discrepancy Report - {{ business_name }}{% endblock %}
 
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+<style>
+@media print {
+    @page { size: A4 landscape; }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    {{ print_header('TRANSFER DISCREPANCY', '', user_location if user_location is defined else None) }}
+
+    <div class="d-flex justify-content-between align-items-center mb-4 page-header-regular no-print">
         <div>
             <h2><i class="fas fa-exclamation-triangle text-warning me-2"></i>Transfer Discrepancy Report</h2>
             <p class="text-muted mb-0">Track variances between dispatched and received quantities</p>
         </div>
-        <div class="d-flex gap-2">
-            <button onclick="window.print()" class="btn btn-outline-secondary">
-                <i class="fas fa-print me-2"></i>Print
-            </button>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-primary">
-                <i class="fas fa-arrow-left me-2"></i>Back
-            </a>
-        </div>
+        {{ report_buttons(url_for('reports.index'), 'transfer_discrepancy') }}
     </div>
 
     <!-- Filters -->
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 no-print">
         <div class="card-body">
             <form method="GET" class="row g-3">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">From Date</label>
-                    <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
+                    <input type="date" name="from_date" class="form-control form-control-sm" value="{{ from_date }}">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">To Date</label>
-                    <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+                    <input type="date" name="to_date" class="form-control form-control-sm" value="{{ to_date }}">
                 </div>
-                <div class="col-md-3">
-                    <div class="form-check mt-4">
+                <div class="col-md-2">
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select form-select-sm">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>
+                            {{ loc.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Search</label>
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Transfer # or product..." value="{{ search }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Sort By</label>
+                    <select name="sort_by" class="form-select form-select-sm">
+                        <option value="">Default</option>
+                        <option value="date_desc" {% if sort_by == 'date_desc' %}selected{% endif %}>Date (New-Old)</option>
+                        <option value="date_asc" {% if sort_by == 'date_asc' %}selected{% endif %}>Date (Old-New)</option>
+                        <option value="variance_desc" {% if sort_by == 'variance_desc' %}selected{% endif %}>Variance (High-Low)</option>
+                        <option value="value_desc" {% if sort_by == 'value_desc' %}selected{% endif %}>Value (High-Low)</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-check mt-2">
                         <input type="checkbox" class="form-check-input" name="discrepancies_only" value="true"
                                id="discrepancies_only" {% if show_only_discrepancies %}checked{% endif %}>
-                        <label class="form-check-label" for="discrepancies_only">
-                            Show only transfers with discrepancies
+                        <label class="form-check-label small" for="discrepancies_only">
+                            Discrepancies only
                         </label>
                     </div>
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-filter me-2"></i>Apply Filter
-                    </button>
+                    <div class="d-flex gap-1 mt-1">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="fas fa-filter me-1"></i>Apply
+                        </button>
+                        <a href="{{ url_for('reports.transfer_discrepancy') }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-times me-1"></i>Clear
+                        </a>
+                    </div>
                 </div>
             </form>
         </div>
@@ -168,6 +201,8 @@
         </div>
     </div>
     {% endif %}
+
+    {{ print_footer() }}
 </div>
 
 <style>
@@ -178,4 +213,8 @@
     .main-content { margin-left: 0 !important; padding: 0 !important; }
 }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+{{ export_script() }}
 {% endblock %}

@@ -197,7 +197,7 @@ def batch_list():
         query = query.join(Product).filter(
             or_(
                 Product.name.ilike(f'%{search}%'),
-                Product.sku.ilike(f'%{search}%'),
+                Product.code.ilike(f'%{search}%'),
                 ProductBatch.batch_number.ilike(f'%{search}%')
             )
         )

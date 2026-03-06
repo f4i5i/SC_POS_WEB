@@ -1,17 +1,49 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, report_buttons, export_script %}
 
 {% block title %}Supplier Payables Aging - {{ business_name }}{% endblock %}
 
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
+    {{ print_header('SUPPLIER PAYABLES AGING', '', user_location if user_location is defined else None) }}
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2><i class="fas fa-clock text-warning me-2"></i>Supplier Payables Aging</h2>
             <p class="text-muted mb-0">{{ supplier_count }} suppliers with outstanding balances</p>
         </div>
-        <div>
-            <button onclick="window.print()" class="btn btn-outline-primary"><i class="fas fa-print"></i> Print</button>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2"><i class="fas fa-arrow-left"></i> Back</a>
+        {{ report_buttons(url_for('reports.index'), 'supplier_aging') }}
+    </div>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4 no-print">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label">Search Supplier</label>
+                    <input type="text" name="search" class="form-control form-control-sm" value="{{ search }}" placeholder="Supplier name...">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Sort By</label>
+                    <select name="sort_by" class="form-select form-select-sm">
+                        <option value="total_due" {% if sort_by == 'total_due' %}selected{% endif %}>Total Due</option>
+                        <option value="overdue" {% if sort_by == 'overdue' %}selected{% endif %}>Overdue Amount</option>
+                        <option value="name_asc" {% if sort_by == 'name_asc' %}selected{% endif %}>Name A-Z</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <i class="fas fa-filter me-2"></i>Apply
+                    </button>
+                </div>
+                <div class="col-md-2">
+                    <a href="{{ url_for('financial_reports.supplier_aging') }}" class="btn btn-outline-secondary btn-sm w-100">Clear</a>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -139,5 +171,11 @@
         <p class="text-muted">No outstanding balances found</p>
     </div>
     {% endif %}
+
+    {{ print_footer() }}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{{ export_script() }}
 {% endblock %}

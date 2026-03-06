@@ -46,6 +46,18 @@ def dead_stock():
     include_zero_stock = request.args.get('include_zero', 'false') == 'true'
     min_value = request.args.get('min_value', 0, type=float)
     category_id = request.args.get('category_id', type=int)
+    location_id = request.args.get('location_id', type=int)
+    sort_by = request.args.get('sort_by', 'value_desc')
+    search = request.args.get('search', '').strip()
+
+    # Location filter for admin
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    effective_location_id = None
+    if not current_user.is_global_admin:
+        if current_user.location_id:
+            effective_location_id = current_user.location_id
+    elif location_id:
+        effective_location_id = location_id
 
     cutoff_date = date.today() - timedelta(days=days)
 
@@ -59,22 +71,25 @@ def dead_stock():
         Sale.sale_date >= cutoff_date
     )
 
-    if location and not current_user.is_global_admin:
-        subquery = subquery.filter(Sale.location_id == location.id)
+    if effective_location_id:
+        subquery = subquery.filter(Sale.location_id == effective_location_id)
 
     subquery = subquery.group_by(SaleItem.product_id).subquery()
 
     # Get products with stock
+    loc_join_condition = [LocationStock.product_id == Product.id]
+    if effective_location_id:
+        loc_join_condition.append(LocationStock.location_id == effective_location_id)
+    elif location:
+        loc_join_condition.append(LocationStock.location_id == location.id)
+
     query = db.session.query(
         Product,
         func.coalesce(LocationStock.quantity, 0).label('stock_qty'),
         subquery.c.last_sale_date,
         func.coalesce(subquery.c.total_sold, 0).label('recent_sales')
     ).outerjoin(
-        LocationStock, and_(
-            LocationStock.product_id == Product.id,
-            LocationStock.location_id == location.id if location else True
-        )
+        LocationStock, and_(*loc_join_condition)
     ).outerjoin(
         subquery, Product.id == subquery.c.product_id
     ).filter(
@@ -94,6 +109,13 @@ def dead_stock():
 
     if category_id:
         query = query.filter(Product.category_id == category_id)
+
+    if search:
+        query = query.filter(or_(
+            Product.name.ilike(f'%{search}%'),
+            Product.code.ilike(f'%{search}%'),
+            Product.barcode.ilike(f'%{search}%')
+        ))
 
     results = query.all()
 
@@ -129,8 +151,15 @@ def dead_stock():
             total_dead_stock_value += value
             total_dead_stock_units += stock_qty
 
-    # Sort by value descending
-    dead_stock_items.sort(key=lambda x: x['stock_value'], reverse=True)
+    # Sort
+    sort_options = {
+        'value_desc': (lambda x: x['stock_value'], True),
+        'days_desc': (lambda x: x['days_since_sale'] or 0, True),
+        'name_asc': (lambda x: (x['product'].name or '').lower(), False),
+        'quantity_desc': (lambda x: x['stock_qty'], True),
+    }
+    sort_key, sort_reverse = sort_options.get(sort_by, sort_options['value_desc'])
+    dead_stock_items.sort(key=sort_key, reverse=sort_reverse)
 
     categories = Category.query.order_by(Category.name).all()
 
@@ -143,7 +172,11 @@ def dead_stock():
                          category_id=category_id,
                          include_zero_stock=include_zero_stock,
                          min_value=min_value,
-                         location=location)
+                         location=location,
+                         locations=locations,
+                         selected_location_id=effective_location_id,
+                         sort_by=sort_by,
+                         search=search)
 
 
 # ============================================================================
@@ -372,6 +405,17 @@ def profit_margin():
     to_date = request.args.get('to_date')
     category_id = request.args.get('category_id', type=int)
     group_by = request.args.get('group_by', 'product')  # product, category
+    location_id = request.args.get('location_id', type=int)
+    search = request.args.get('search', '').strip()
+    sort_by = request.args.get('sort_by', 'profit_desc')
+
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    effective_location_id = None
+    if not current_user.is_global_admin:
+        if current_user.location_id:
+            effective_location_id = current_user.location_id
+    elif location_id:
+        effective_location_id = location_id
 
     if not from_date:
         from_date = (date.today() - timedelta(days=30)).strftime('%Y-%m-%d')
@@ -386,10 +430,15 @@ def profit_margin():
         Sale.sale_date < end_date,
         Sale.status == 'completed'
     ]
-    if location and not current_user.is_global_admin:
-        base_filter.append(Sale.location_id == location.id)
+    if effective_location_id:
+        base_filter.append(Sale.location_id == effective_location_id)
     if category_id:
         base_filter.append(Product.category_id == category_id)
+    if search:
+        if group_by == 'category':
+            base_filter.append(Category.name.ilike(f'%{search}%'))
+        else:
+            base_filter.append(or_(Product.name.ilike(f'%{search}%'), Product.barcode.ilike(f'%{search}%')))
 
     if group_by == 'category':
         # Group by category
@@ -439,8 +488,16 @@ def profit_margin():
         total_cost += cost
         total_profit += profit
 
-    # Sort by profit descending
-    margin_data.sort(key=lambda x: x['profit'], reverse=True)
+    # Sort
+    sort_options = {
+        'margin_desc': (lambda x: x['margin_pct'], True),
+        'margin_asc': (lambda x: x['margin_pct'], False),
+        'revenue_desc': (lambda x: x['revenue'], True),
+        'profit_desc': (lambda x: x['profit'], True),
+        'name_asc': (lambda x: (x['name'] or '').lower(), False),
+    }
+    sort_key, sort_reverse = sort_options.get(sort_by, sort_options['profit_desc'])
+    margin_data.sort(key=sort_key, reverse=sort_reverse)
 
     overall_margin = (total_profit / total_revenue * 100) if total_revenue else Decimal('0')
 
@@ -467,7 +524,11 @@ def profit_margin():
                          low_margin=low_margin,
                          categories=categories,
                          category_id=category_id,
-                         location=location)
+                         location=location,
+                         locations=locations,
+                         selected_location_id=effective_location_id,
+                         sort_by=sort_by,
+                         search=search)
 
 
 # ============================================================================
@@ -480,6 +541,15 @@ def profit_margin():
 def exceptions_dashboard():
     """Exception reports dashboard - unusual activities requiring attention"""
     location = get_current_location()
+    location_id = request.args.get('location_id', type=int)
+
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    effective_location_id = None
+    if not current_user.is_global_admin:
+        if current_user.location_id:
+            effective_location_id = current_user.location_id
+    elif location_id:
+        effective_location_id = location_id
 
     from_date = request.args.get('from_date')
     to_date = request.args.get('to_date')
@@ -493,8 +563,8 @@ def exceptions_dashboard():
     end_date = datetime.strptime(to_date, '%Y-%m-%d') + timedelta(days=1)
 
     location_filter = []
-    if location and not current_user.is_global_admin:
-        location_filter = [Sale.location_id == location.id]
+    if effective_location_id:
+        location_filter = [Sale.location_id == effective_location_id]
 
     exceptions = []
 
@@ -648,7 +718,9 @@ def exceptions_dashboard():
                          to_date=to_date,
                          exceptions=exceptions,
                          summary=summary,
-                         location=location)
+                         location=location,
+                         locations=locations,
+                         selected_location_id=effective_location_id)
 
 
 # ============================================================================
@@ -663,6 +735,9 @@ def production_cost():
     from_date = request.args.get('from_date')
     to_date = request.args.get('to_date')
     location_id = request.args.get('location_id', type=int)
+    recipe_id = request.args.get('recipe_id', type=int)
+    sort_by = request.args.get('sort_by', 'variance_desc')
+    search = request.args.get('search', '').strip()
 
     if not from_date:
         from_date = (date.today() - timedelta(days=30)).strftime('%Y-%m-%d')
@@ -688,8 +763,13 @@ def production_cost():
     ]
     if effective_location_id:
         order_filter.append(ProductionOrder.location_id == effective_location_id)
+    if recipe_id:
+        order_filter.append(ProductionOrder.recipe_id == recipe_id)
 
     orders = ProductionOrder.query.filter(*order_filter).all()
+
+    # Get all recipes for filter dropdown
+    all_recipes = Recipe.query.order_by(Recipe.name).all()
 
     production_data = []
     total_recipe_cost = Decimal('0')
@@ -768,6 +848,19 @@ def production_cost():
         total_actual_cost += actual_total
         total_units_produced += qty_produced
 
+    # Filter by search (product name)
+    if search:
+        production_data = [d for d in production_data if search.lower() in d['product_name'].lower()]
+
+    # Sort production_data
+    sort_options = {
+        'variance_desc': (lambda x: abs(x['variance']), True),
+        'cost_desc': (lambda x: x['actual_total'], True),
+        'name_asc': (lambda x: (x['product_name'] or '').lower(), False),
+    }
+    sort_key, sort_reverse = sort_options.get(sort_by, sort_options['variance_desc'])
+    production_data.sort(key=sort_key, reverse=sort_reverse)
+
     # Sort materials by total cost descending
     material_list = sorted(material_totals.values(), key=lambda x: x['total_cost'], reverse=True)
 
@@ -781,7 +874,11 @@ def production_cost():
                          total_variance=float(total_actual_cost - total_recipe_cost),
                          total_units_produced=total_units_produced,
                          locations=locations,
-                         selected_location_id=effective_location_id)
+                         selected_location_id=effective_location_id,
+                         all_recipes=all_recipes,
+                         recipe_id=recipe_id,
+                         sort_by=sort_by,
+                         search=search)
 
 
 # ============================================================================
@@ -900,7 +997,13 @@ def tax_liability():
 @permission_required(Permissions.REPORT_VIEW_FINANCIAL)
 def supplier_aging():
     """Supplier payables aging — 0-30, 31-60, 60+ day buckets"""
-    suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.name).all()
+    search = request.args.get('search', '').strip()
+    sort_by = request.args.get('sort_by', 'total_due_desc')
+
+    supplier_query = Supplier.query.filter_by(is_active=True)
+    if search:
+        supplier_query = supplier_query.filter(Supplier.name.ilike(f'%{search}%'))
+    suppliers = supplier_query.order_by(Supplier.name).all()
 
     today = date.today()
     aging_data = []
@@ -965,13 +1068,21 @@ def supplier_aging():
         totals['over_90'] += over90
         totals['total'] += balance
 
-    # Sort by total outstanding descending
-    aging_data.sort(key=lambda x: x['total'], reverse=True)
+    # Sort
+    sort_options = {
+        'total_due_desc': (lambda x: x['total'], True),
+        'overdue_desc': (lambda x: x['over_90'] + x['days_90'], True),
+        'name_asc': (lambda x: (x['supplier_name'] or '').lower(), False),
+    }
+    sort_key, sort_reverse = sort_options.get(sort_by, sort_options['total_due_desc'])
+    aging_data.sort(key=sort_key, reverse=sort_reverse)
 
     return render_template('financial_reports/supplier_aging.html',
                          aging_data=aging_data,
                          totals={k: float(v) for k, v in totals.items()},
-                         supplier_count=len(aging_data))
+                         supplier_count=len(aging_data),
+                         sort_by=sort_by,
+                         search=search)
 
 
 # ============================================================================
@@ -1030,7 +1141,7 @@ def inventory_shrinkage():
 
     damage_movements = db.session.query(
         Product.name.label('product_name'),
-        Product.sku.label('product_code'),
+        Product.code.label('product_code'),
         func.sum(func.abs(StockMovement.quantity)).label('damaged_qty'),
         func.sum(func.abs(StockMovement.quantity) * Product.cost_price).label('damage_value')
     ).join(Product, StockMovement.product_id == Product.id).filter(
@@ -1070,24 +1181,36 @@ def cost_history():
     """Product cost history — track cost changes and margin erosion"""
     product_id = request.args.get('product_id', type=int)
     category_id = request.args.get('category_id', type=int)
+    from_date = request.args.get('from_date')
+    to_date = request.args.get('to_date')
+    sort_by = request.args.get('sort_by', 'date_desc')
 
     categories = Category.query.order_by(Category.name).all()
+
+    # Date filters
+    date_filter = []
+    if from_date:
+        date_filter.append(ProductCostHistory.effective_date >= datetime.strptime(from_date, '%Y-%m-%d').date())
+    if to_date:
+        date_filter.append(ProductCostHistory.effective_date <= datetime.strptime(to_date, '%Y-%m-%d').date())
 
     # Products with cost history
     product_filter = [Product.is_active == True]
     if category_id:
         product_filter.append(Product.category_id == category_id)
 
+    history_join_filter = [ProductCostHistory.product_id == Product.id]
+
     products_with_history = db.session.query(
         Product.id,
         Product.name,
-        Product.sku,
+        Product.code,
         Product.cost_price,
         Product.selling_price,
         func.count(ProductCostHistory.id).label('change_count')
     ).outerjoin(
-        ProductCostHistory, ProductCostHistory.product_id == Product.id
-    ).filter(*product_filter).group_by(Product.id).having(
+        ProductCostHistory, and_(*history_join_filter)
+    ).filter(*product_filter, *date_filter).group_by(Product.id).having(
         func.count(ProductCostHistory.id) > 0
     ).order_by(func.count(ProductCostHistory.id).desc()).all()
 
@@ -1097,9 +1220,18 @@ def cost_history():
     if product_id:
         selected_product = Product.query.get(product_id)
         if selected_product:
-            history_entries = ProductCostHistory.query.filter_by(
+            history_query = ProductCostHistory.query.filter_by(
                 product_id=product_id
-            ).order_by(ProductCostHistory.effective_date.desc()).all()
+            )
+            if from_date:
+                history_query = history_query.filter(
+                    ProductCostHistory.effective_date >= datetime.strptime(from_date, '%Y-%m-%d').date()
+                )
+            if to_date:
+                history_query = history_query.filter(
+                    ProductCostHistory.effective_date <= datetime.strptime(to_date, '%Y-%m-%d').date()
+                )
+            history_entries = history_query.order_by(ProductCostHistory.effective_date.desc()).all()
 
     # Summary: products with biggest cost increases
     margin_erosion = []
@@ -1116,7 +1248,7 @@ def cost_history():
                 margin_change = current_margin - old_margin
                 margin_erosion.append({
                     'product_name': p.name,
-                    'product_code': p.sku,
+                    'product_code': p.code,
                     'old_cost': float(oldest.landed_cost),
                     'current_cost': float(p.cost_price),
                     'selling_price': float(p.selling_price),
@@ -1126,7 +1258,14 @@ def cost_history():
                     'change_count': p.change_count
                 })
 
-    margin_erosion.sort(key=lambda x: x['margin_change'])  # worst erosion first
+    # Sort margin_erosion
+    sort_options = {
+        'date_desc': (lambda x: x['change_count'], True),  # most changes = most recent activity
+        'change_pct_desc': (lambda x: abs(x['margin_change']), True),
+        'name_asc': (lambda x: (x['product_name'] or '').lower(), False),
+    }
+    sort_key, sort_reverse = sort_options.get(sort_by, sort_options['date_desc'])
+    margin_erosion.sort(key=sort_key, reverse=sort_reverse)
 
     return render_template('financial_reports/cost_history.html',
                          products_with_history=products_with_history,
@@ -1135,7 +1274,10 @@ def cost_history():
                          margin_erosion=margin_erosion,
                          categories=categories,
                          category_id=category_id,
-                         product_id=product_id)
+                         product_id=product_id,
+                         sort_by=sort_by,
+                         from_date=from_date,
+                         to_date=to_date)
 
 
 # ============================================================================
@@ -1148,11 +1290,22 @@ def cost_history():
 def gift_voucher_liability():
     """Gift voucher liability — outstanding balances, redemptions, expired"""
     status_filter = request.args.get('status', '')
+    search = request.args.get('search', '').strip()
+    sort_by = request.args.get('sort_by', 'date_desc')
 
     # All vouchers
     query = GiftVoucher.query
     if status_filter:
         query = query.filter(GiftVoucher.status == status_filter)
+
+    if search:
+        search_lower = f'%{search.lower()}%'
+        query = query.filter(
+            db.or_(
+                GiftVoucher.code.ilike(search_lower),
+                GiftVoucher.recipient_name.ilike(search_lower)
+            )
+        )
 
     vouchers = query.order_by(GiftVoucher.created_at.desc()).all()
 
@@ -1181,6 +1334,17 @@ def gift_voucher_liability():
         GiftVoucherTransaction.processed_at.desc()
     ).limit(50).all()
 
+    # Sort vouchers
+    sort_options = {
+        'date_desc': (lambda x: x.created_at or datetime.min, True),
+        'date_asc': (lambda x: x.created_at or datetime.min, False),
+        'balance_desc': (lambda x: float(x.current_balance or 0), True),
+        'balance_asc': (lambda x: float(x.current_balance or 0), False),
+        'value_desc': (lambda x: float(x.initial_value or 0), True),
+    }
+    sort_key, sort_reverse = sort_options.get(sort_by, sort_options['date_desc'])
+    vouchers = sorted(vouchers, key=sort_key, reverse=sort_reverse)
+
     return render_template('financial_reports/gift_voucher_liability.html',
                          vouchers=vouchers,
                          recent_txns=recent_txns,
@@ -1190,7 +1354,9 @@ def gift_voucher_liability():
                          total_expired=float(total_expired),
                          active_count=active_count,
                          expired_count=expired_count,
-                         status_filter=status_filter)
+                         status_filter=status_filter,
+                         search=search,
+                         sort_by=sort_by)
 
 
 # ============================================================================
@@ -1202,6 +1368,9 @@ def gift_voucher_liability():
 @permission_required(Permissions.REPORT_VIEW_FINANCIAL)
 def ap_ar_balance():
     """Accounts Payable vs Accounts Receivable balance sheet"""
+    search = request.args.get('search', '').strip()
+    sort_by = request.args.get('sort_by', 'total_desc')
+    view_filter = request.args.get('view', '')  # 'ar', 'ap', or '' for both
 
     # ── ACCOUNTS RECEIVABLE (money owed TO us) ──
     # 1. Customer due payments
@@ -1255,7 +1424,32 @@ def ap_ar_balance():
          'overdue': float(v['overdue']), 'total': float(v['total'])}
         for k, v in ar_by_customer.items()
     ]
-    ar_customers.sort(key=lambda x: x['total'], reverse=True)
+
+    # Search filter
+    if search:
+        search_lower = search.lower()
+        ar_customers = [c for c in ar_customers if search_lower in c['name'].lower()]
+        suppliers_with_balance = [s for s in suppliers_with_balance
+                                 if search_lower in (s.name or '').lower()]
+
+    # Sort AR customers
+    ar_sort_options = {
+        'total_desc': (lambda x: x['total'], True),
+        'total_asc': (lambda x: x['total'], False),
+        'overdue_desc': (lambda x: x['overdue'], True),
+        'name_asc': (lambda x: x['name'].lower(), False),
+    }
+    ar_sort_key, ar_sort_reverse = ar_sort_options.get(sort_by, ar_sort_options['total_desc'])
+    ar_customers.sort(key=ar_sort_key, reverse=ar_sort_reverse)
+
+    # Sort AP suppliers
+    ap_sort_options = {
+        'total_desc': (lambda x: float(x.current_balance or 0), True),
+        'total_asc': (lambda x: float(x.current_balance or 0), False),
+        'name_asc': (lambda x: (x.name or '').lower(), False),
+    }
+    ap_sort_key, ap_sort_reverse = ap_sort_options.get(sort_by, ap_sort_options['total_desc'])
+    suppliers_with_balance = sorted(suppliers_with_balance, key=ap_sort_key, reverse=ap_sort_reverse)
 
     return render_template('financial_reports/ap_ar_balance.html',
                          total_ar=float(total_ar),
@@ -1265,7 +1459,10 @@ def ap_ar_balance():
                          total_ap=float(total_ap),
                          suppliers=suppliers_with_balance,
                          voucher_liability=float(voucher_liability),
-                         net_position=float(net_position))
+                         net_position=float(net_position),
+                         search=search,
+                         sort_by=sort_by,
+                         view_filter=view_filter)
 
 
 # ============================================================================
@@ -1280,6 +1477,8 @@ def cashier_audit():
     from_date = request.args.get('from_date')
     to_date = request.args.get('to_date')
     location_id = request.args.get('location_id', type=int)
+    user_id = request.args.get('user_id', type=int)
+    sort_by = request.args.get('sort_by', 'variance_desc')
 
     if not from_date:
         from_date = (date.today() - timedelta(days=30)).strftime('%Y-%m-%d')
@@ -1403,16 +1602,31 @@ def cashier_audit():
         if row.changed_by in cashier_data:
             cashier_data[row.changed_by]['price_change_count'] = row.count or 0
 
-    cashier_list = sorted(cashier_data.values(),
-                         key=lambda x: x['discount_total'] + x['void_total'] + x['refund_total'],
-                         reverse=True)
+    # Filter by specific user if requested
+    if user_id and user_id in cashier_data:
+        cashier_data = {user_id: cashier_data[user_id]}
+
+    # Sort
+    sort_options = {
+        'revenue_desc': (lambda x: x['total_sales'], True),
+        'variance_desc': (lambda x: x['discount_total'] + x['void_total'] + x['refund_total'], True),
+        'name_asc': (lambda x: (x['user_name'] or '').lower(), False),
+    }
+    sort_key, sort_reverse = sort_options.get(sort_by, sort_options['variance_desc'])
+    cashier_list = sorted(cashier_data.values(), key=sort_key, reverse=sort_reverse)
+
+    # Get all users for the filter dropdown
+    all_cashiers = User.query.filter(User.is_active == True).order_by(User.username).all()
 
     return render_template('financial_reports/cashier_audit.html',
                          from_date=from_date,
                          to_date=to_date,
                          cashier_list=cashier_list,
                          locations=locations,
-                         selected_location_id=effective_location_id)
+                         selected_location_id=effective_location_id,
+                         user_id=user_id,
+                         sort_by=sort_by,
+                         all_cashiers=all_cashiers)
 
 
 # ============================================================================
@@ -1426,6 +1640,16 @@ def promotion_roi():
     """Promotion ROI — discount cost vs revenue driven per promotion"""
     from_date = request.args.get('from_date')
     to_date = request.args.get('to_date')
+    location_id = request.args.get('location_id', type=int)
+    sort_by = request.args.get('sort_by', 'roi_desc')
+
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    effective_location_id = None
+    if not current_user.is_global_admin:
+        if current_user.location_id:
+            effective_location_id = current_user.location_id
+    elif location_id:
+        effective_location_id = location_id
 
     if not from_date:
         from_date = (date.today() - timedelta(days=90)).strftime('%Y-%m-%d')
@@ -1460,9 +1684,12 @@ def promotion_roi():
         sale_ids = [u.sale_id for u in usages if u.sale_id]
         revenue = Decimal('0')
         if sale_ids:
+            rev_filter = [Sale.id.in_(sale_ids)]
+            if effective_location_id:
+                rev_filter.append(Sale.location_id == effective_location_id)
             revenue = db.session.query(
                 func.coalesce(func.sum(Sale.total), 0)
-            ).filter(Sale.id.in_(sale_ids)).scalar() or Decimal('0')
+            ).filter(*rev_filter).scalar() or Decimal('0')
 
         roi = float((revenue - Decimal(str(discount_total))) / Decimal(str(discount_total)) * 100) if discount_total else 0
 
@@ -1484,8 +1711,14 @@ def promotion_roi():
         total_discount_given += Decimal(str(discount_total))
         total_revenue_driven += revenue
 
-    # Sort by ROI descending
-    promo_data.sort(key=lambda x: x['roi'], reverse=True)
+    # Sort
+    sort_options = {
+        'roi_desc': (lambda x: x['roi'], True),
+        'discount_desc': (lambda x: x['discount_total'], True),
+        'revenue_desc': (lambda x: x['revenue_driven'], True),
+    }
+    sort_key, sort_reverse = sort_options.get(sort_by, sort_options['roi_desc'])
+    promo_data.sort(key=sort_key, reverse=sort_reverse)
 
     overall_roi = float((total_revenue_driven - total_discount_given) / total_discount_given * 100) if total_discount_given else 0
 
@@ -1495,4 +1728,7 @@ def promotion_roi():
                          promo_data=promo_data,
                          total_discount_given=float(total_discount_given),
                          total_revenue_driven=float(total_revenue_driven),
-                         overall_roi=overall_roi)
+                         overall_roi=overall_roi,
+                         locations=locations,
+                         selected_location_id=effective_location_id,
+                         sort_by=sort_by)

@@ -1,22 +1,22 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, report_buttons, export_script %}
 
 {% block title %}Stock Valuation Report - {{ business_name }}{% endblock %}
 
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    {{ print_header('STOCK VALUATION BY LOCATION', '', user_location if user_location is defined else None) }}
+
+    <div class="d-flex justify-content-between align-items-center mb-4 page-header-regular no-print">
         <div>
             <h2><i class="fas fa-warehouse text-primary me-2"></i>Stock Valuation Report</h2>
             <p class="text-muted mb-0">Current stock worth across all locations</p>
         </div>
-        <div class="d-flex gap-2">
-            <button onclick="window.print()" class="btn btn-outline-secondary">
-                <i class="fas fa-print me-2"></i>Print
-            </button>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-primary">
-                <i class="fas fa-arrow-left me-2"></i>Back to Reports
-            </a>
-        </div>
+        {{ report_buttons(url_for('reports.index'), 'stock_valuation') }}
     </div>
 
     <!-- Grand Summary Cards -->
@@ -209,6 +209,60 @@
                         Stock Details: {{ selected_location.name }}
                     </h5>
                     <span class="badge bg-primary">{{ location_stock_details|length }} Products</span>
+                </div>
+                <!-- Search, Sort & Filter -->
+                <div class="card-body border-bottom py-3">
+                    <form method="GET" class="row g-2 align-items-end">
+                        <input type="hidden" name="location_id" value="{{ selected_location_id }}">
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1">Category</label>
+                            <select name="category_id" class="form-select form-select-sm">
+                                <option value="">All Categories</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}" {% if selected_category_id == cat.id %}selected{% endif %}>
+                                    {{ cat.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1">Search</label>
+                            <input type="text" name="search" class="form-control form-control-sm" placeholder="Product name or code..." value="{{ search }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1">Sort By</label>
+                            <select name="sort_by" class="form-select form-select-sm">
+                                <option value="">Default</option>
+                                <option value="name_asc" {% if sort_by == 'name_asc' %}selected{% endif %}>Name (A-Z)</option>
+                                <option value="name_desc" {% if sort_by == 'name_desc' %}selected{% endif %}>Name (Z-A)</option>
+                                <option value="cost_value_desc" {% if sort_by == 'cost_value_desc' %}selected{% endif %}>Cost Value (High-Low)</option>
+                                <option value="selling_value_desc" {% if sort_by == 'selling_value_desc' %}selected{% endif %}>Selling Value (High-Low)</option>
+                                <option value="profit_desc" {% if sort_by == 'profit_desc' %}selected{% endif %}>Profit (High-Low)</option>
+                                <option value="quantity_desc" {% if sort_by == 'quantity_desc' %}selected{% endif %}>Quantity (High-Low)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-sm">
+                                <i class="fas fa-filter me-1"></i>Apply
+                            </button>
+                            <a href="{{ url_for('reports.stock_valuation', location_id=selected_location_id) }}" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-times me-1"></i>Clear
+                            </a>
+                        </div>
+                    </form>
+                    {% if search or sort_by or selected_category_id %}
+                    <div class="mt-2">
+                        {% if search %}
+                        <span class="badge bg-info text-dark me-1"><i class="fas fa-search me-1"></i>{{ search }}</span>
+                        {% endif %}
+                        {% if selected_category_id %}
+                        <span class="badge bg-info text-dark me-1"><i class="fas fa-tag me-1"></i>Category filtered</span>
+                        {% endif %}
+                        {% if sort_by %}
+                        <span class="badge bg-info text-dark me-1"><i class="fas fa-sort me-1"></i>{{ sort_by|replace('_', ' ')|title }}</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="card-body p-0">
                     {% if location_stock_details %}
@@ -404,6 +458,8 @@
             {% endif %}
         </div>
     </div>
+
+    {{ print_footer() }}
 </div>
 
 <style>
@@ -414,4 +470,8 @@
     .main-content { margin-left: 0 !important; padding: 0 !important; }
 }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+{{ export_script() }}
 {% endblock %}

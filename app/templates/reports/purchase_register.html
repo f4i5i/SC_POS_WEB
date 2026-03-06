@@ -1,39 +1,55 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, report_buttons, export_script %}
 
 {% block title %}Purchase Register - {{ business_name }}{% endblock %}
 
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+<style>
+@media print {
+    @page { size: A4 landscape; }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    {{ print_header('PURCHASE REGISTER', '', user_location if user_location is defined else None) }}
+
+    <div class="d-flex justify-content-between align-items-center mb-4 page-header-regular no-print">
         <div>
             <h2><i class="fas fa-file-invoice-dollar text-primary me-2"></i>Purchase Register</h2>
             <p class="text-muted mb-0">All purchases with payment status and reconciliation</p>
         </div>
-        <div class="d-flex gap-2">
-            <button onclick="window.print()" class="btn btn-outline-secondary">
-                <i class="fas fa-print me-2"></i>Print
-            </button>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-primary">
-                <i class="fas fa-arrow-left me-2"></i>Back
-            </a>
-        </div>
+        {{ report_buttons(url_for('reports.index'), 'purchase_register') }}
     </div>
 
     <!-- Filters -->
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 no-print">
         <div class="card-body">
-            <form method="GET" class="row g-3">
+            <form method="GET" class="row g-3 align-items-end">
                 <div class="col-md-2">
                     <label class="form-label">From Date</label>
-                    <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
+                    <input type="date" name="from_date" class="form-control form-control-sm" value="{{ from_date }}">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">To Date</label>
-                    <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+                    <input type="date" name="to_date" class="form-control form-control-sm" value="{{ to_date }}">
                 </div>
-                <div class="col-md-3">
+                {% if current_user.is_global_admin and locations is defined %}
+                <div class="col-md-2">
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select form-select-sm">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="col-md-2">
                     <label class="form-label">Supplier</label>
-                    <select name="supplier_id" class="form-select">
+                    <select name="supplier_id" class="form-select form-select-sm">
                         <option value="">All Suppliers</option>
                         {% for supplier in suppliers %}
                         <option value="{{ supplier.id }}" {% if selected_supplier_id == supplier.id %}selected{% endif %}>
@@ -44,17 +60,29 @@
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Payment Status</label>
-                    <select name="payment_status" class="form-select">
+                    <select name="payment_status" class="form-select form-select-sm">
                         <option value="">All</option>
                         <option value="unpaid" {% if selected_payment_status == 'unpaid' %}selected{% endif %}>Unpaid</option>
                         <option value="partial" {% if selected_payment_status == 'partial' %}selected{% endif %}>Partial</option>
                         <option value="paid" {% if selected_payment_status == 'paid' %}selected{% endif %}>Paid</option>
                     </select>
                 </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-filter me-2"></i>Apply Filter
-                    </button>
+                <div class="col-md-2">
+                    <label class="form-label">Search</label>
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="PO number..." value="{{ search or '' }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Sort By</label>
+                    <select name="sort_by" class="form-select form-select-sm">
+                        <option value="date_desc" {% if sort_by == 'date_desc' %}selected{% endif %}>Date New-Old</option>
+                        <option value="date_asc" {% if sort_by == 'date_asc' %}selected{% endif %}>Date Old-New</option>
+                        <option value="amount_desc" {% if sort_by == 'amount_desc' %}selected{% endif %}>Amount High-Low</option>
+                        <option value="supplier_asc" {% if sort_by == 'supplier_asc' %}selected{% endif %}>Supplier A-Z</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1"><i class="fas fa-filter me-1"></i>Apply</button>
+                    <a href="{{ url_for('reports.purchase_register') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
                 </div>
             </form>
         </div>
@@ -115,7 +143,10 @@
     <!-- Purchase List -->
     <div class="card shadow-sm">
         <div class="card-header bg-white">
-            <h5 class="mb-0"><i class="fas fa-list me-2"></i>Purchase Orders</h5>
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Purchase Orders</h5>
+                <span class="text-muted small">Showing <strong>{{ purchases|length }}</strong> items</span>
+            </div>
         </div>
         <div class="card-body p-0">
             {% if purchases %}
@@ -192,6 +223,8 @@
             {% endif %}
         </div>
     </div>
+
+    {{ print_footer() }}
 </div>
 
 <style>
@@ -202,4 +235,8 @@
     .main-content { margin-left: 0 !important; padding: 0 !important; }
 }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+{{ export_script() }}
 {% endblock %}

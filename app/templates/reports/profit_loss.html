@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import report_buttons, export_script %}
 
 {% block title %}Profit & Loss Report - {{ business_name }}{% endblock %}
 
@@ -310,7 +311,8 @@
             <button onclick="window.print()" class="btn btn-outline-primary me-2">
                 <i class="fas fa-print"></i> Print
             </button>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
+            <button onclick="exportReportCSV('profit_loss')" class="btn btn-outline-success btn-sm ms-1"><i class="fas fa-file-csv"></i> CSV</button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-1">
                 <i class="fas fa-arrow-left"></i> Back
             </a>
         </div>
@@ -883,6 +885,7 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ export_script() }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 {% if period in ['weekly', 'monthly', 'custom'] and daily_data %}

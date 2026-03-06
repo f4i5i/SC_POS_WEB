@@ -1,48 +1,105 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, report_buttons, export_script %}
 
 {% block title %}Batch Costing Report - {{ business_name }}{% endblock %}
 
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+<style>
+@media print {
+    @page { size: A4 landscape; }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
+    {{ print_header('BATCH COSTING REPORT', '', user_location if user_location is defined else None) }}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2><i class="fas fa-calculator text-primary me-2"></i>Batch Costing Report</h2>
             <p class="text-muted mb-0">Detailed cost analysis per production batch</p>
         </div>
-        <a href="{{ url_for('production.index') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-2"></i>Back to Production
-        </a>
+        {{ report_buttons(url_for('production.index'), 'batch_costing') }}
     </div>
 
     <!-- Filters -->
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 no-print">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">From Date</label>
-                    <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
+                    <input type="date" name="from_date" class="form-control form-control-sm" value="{{ from_date }}">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">To Date</label>
-                    <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+                    <input type="date" name="to_date" class="form-control form-control-sm" value="{{ to_date }}">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">Recipe</label>
-                    <select name="recipe_id" class="form-select">
+                    <select name="recipe_id" class="form-select form-select-sm">
                         <option value="">All Recipes</option>
                         {% for recipe in recipes %}
                         <option value="{{ recipe.id }}" {% if recipe.id == recipe_id %}selected{% endif %}>{{ recipe.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
+                {% if current_user.is_global_admin and locations is defined %}
                 <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-filter me-2"></i>Apply
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select form-select-sm">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="col-md-2">
+                    <label class="form-label">Search</label>
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Recipe or order#..." value="{{ search }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Sort By</label>
+                    <select name="sort_by" class="form-select form-select-sm">
+                        <option value="date_desc" {% if sort_by == 'date_desc' %}selected{% endif %}>Date (New-Old)</option>
+                        <option value="date_asc" {% if sort_by == 'date_asc' %}selected{% endif %}>Date (Old-New)</option>
+                        <option value="cost_desc" {% if sort_by == 'cost_desc' %}selected{% endif %}>Total Cost (High-Low)</option>
+                        <option value="unit_cost_desc" {% if sort_by == 'unit_cost_desc' %}selected{% endif %}>Unit Cost (High-Low)</option>
+                        <option value="material_desc" {% if sort_by == 'material_desc' %}selected{% endif %}>Material Cost (High-Low)</option>
+                        <option value="recipe_asc" {% if sort_by == 'recipe_asc' %}selected{% endif %}>Recipe (A-Z)</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+                        <i class="fas fa-filter me-1"></i>Apply
                     </button>
+                    <a href="{{ url_for('production_reports.batch_costing') }}" class="btn btn-outline-secondary btn-sm flex-grow-1">
+                        <i class="fas fa-times me-1"></i>Clear
+                    </a>
                 </div>
             </form>
         </div>
     </div>
+
+    <!-- Active Filter Badges -->
+    {% if search or sort_by != 'date_desc' %}
+    <div class="mb-3">
+        {% if search %}
+        <span class="badge bg-info text-dark me-1"><i class="fas fa-search me-1"></i>Search: "{{ search }}"</span>
+        {% endif %}
+        {% if sort_by and sort_by != 'date_desc' %}
+        <span class="badge bg-secondary me-1"><i class="fas fa-sort me-1"></i>Sort:
+            {% if sort_by == 'date_asc' %}Date (Old-New)
+            {% elif sort_by == 'cost_desc' %}Total Cost (High-Low)
+            {% elif sort_by == 'unit_cost_desc' %}Unit Cost (High-Low)
+            {% elif sort_by == 'material_desc' %}Material Cost (High-Low)
+            {% elif sort_by == 'recipe_asc' %}Recipe (A-Z)
+            {% endif %}
+        </span>
+        {% endif %}
+    </div>
+    {% endif %}
 
     <!-- Summary Cards -->
     <div class="row mb-4">
@@ -137,7 +194,7 @@
                             <td><code>{{ item.order.order_number }}</code></td>
                             <td>{{ item.order.recipe.name if item.order.recipe else '-' }}</td>
                             <td>{{ item.order.completed_at.strftime('%d/%m/%Y') if item.order.completed_at else '-' }}</td>
-                            <td class="text-end">{{ (item.order.actual_quantity or item.order.planned_quantity)|int }}</td>
+                            <td class="text-end">{{ (item.order.quantity_produced or item.order.quantity_ordered)|int }}</td>
                             <td class="text-end">{{ format_currency(item.cost_breakdown.material_cost) }}</td>
                             <td class="text-end">{{ format_currency(item.cost_breakdown.labor_cost) }}</td>
                             <td class="text-end">{{ format_currency(item.cost_breakdown.overhead_cost) }}</td>
@@ -178,6 +235,7 @@
         </div>
     </div>
     {% endif %}
+    {{ print_footer() }}
 </div>
 
 {% if cost_trend %}
@@ -235,4 +293,8 @@ new Chart(document.getElementById('costTrendChart'), {
 });
 </script>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{{ export_script() }}
 {% endblock %}

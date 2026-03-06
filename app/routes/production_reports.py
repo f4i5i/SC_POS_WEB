@@ -30,6 +30,17 @@ def yield_variance():
     from_date = request.args.get('from_date')
     to_date = request.args.get('to_date')
     recipe_id = request.args.get('recipe_id', type=int)
+    location_id = request.args.get('location_id', type=int)
+    search = request.args.get('search', '').strip()
+    sort_by = request.args.get('sort_by', 'date_desc')
+
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    effective_location_id = None
+    if not current_user.is_global_admin:
+        if location and location.id:
+            effective_location_id = location.id
+    elif location_id:
+        effective_location_id = location_id
 
     if not from_date:
         from_date = (date.today() - timedelta(days=30)).strftime('%Y-%m-%d')
@@ -46,8 +57,8 @@ def yield_variance():
         ProductionOrder.created_at < end_date
     )
 
-    if location and not current_user.is_global_admin:
-        query = query.filter(ProductionOrder.location_id == location.id)
+    if effective_location_id:
+        query = query.filter(ProductionOrder.location_id == effective_location_id)
 
     if recipe_id:
         query = query.filter(ProductionOrder.recipe_id == recipe_id)
@@ -64,17 +75,18 @@ def yield_variance():
     for order in orders:
         # Expected output from recipe
         recipe = order.recipe
-        expected_qty = Decimal(str(order.planned_quantity or 0))
+        expected_qty = Decimal(str(order.quantity_ordered or 0))
 
         # Actual output
-        actual_qty = Decimal(str(order.actual_quantity or order.planned_quantity or 0))
+        actual_qty = Decimal(str(order.quantity_produced or order.quantity_ordered or 0))
 
         # Variance
         variance_qty = actual_qty - expected_qty
         variance_pct = ((variance_qty / expected_qty) * 100) if expected_qty > 0 else Decimal('0')
 
-        # Cost of variance
-        unit_cost = order.unit_cost or Decimal('0')
+        # Cost of variance - calculate from recipe product cost
+        product = order.product
+        unit_cost = Decimal(str(product.cost_price or 0)) if product else Decimal('0')
         variance_cost = variance_qty * unit_cost
 
         # Material consumption variance
@@ -119,6 +131,26 @@ def yield_variance():
 
     recipes = Recipe.query.filter_by(is_active=True).order_by(Recipe.name).all()
 
+    # Search filter
+    if search:
+        search_lower = search.lower()
+        variance_data = [v for v in variance_data
+                        if (v['recipe'] and search_lower in v['recipe'].name.lower()) or
+                           (v['order'].order_number and search_lower in v['order'].order_number.lower())]
+
+    # Sort
+    sort_options = {
+        'date_desc': lambda x: x['order'].created_at or datetime.min,
+        'date_asc': lambda x: x['order'].created_at or datetime.min,
+        'variance_desc': lambda x: abs(float(x['variance_pct'])),
+        'variance_cost_desc': lambda x: abs(float(x['variance_cost'])),
+        'recipe_asc': lambda x: (x['recipe'].name if x['recipe'] else '').lower(),
+        'expected_desc': lambda x: float(x['expected_qty']),
+    }
+    if sort_by in sort_options:
+        reverse = not sort_by.endswith('_asc')
+        variance_data.sort(key=sort_options[sort_by], reverse=reverse)
+
     return render_template('production_reports/yield_variance.html',
                          variance_data=variance_data,
                          total_expected=total_expected,
@@ -131,7 +163,11 @@ def yield_variance():
                          recipe_id=recipe_id,
                          from_date=from_date,
                          to_date=to_date,
-                         location=location)
+                         location=location,
+                         locations=locations,
+                         selected_location_id=effective_location_id,
+                         search=search,
+                         sort_by=sort_by)
 
 
 def calculate_material_variance(order):
@@ -155,13 +191,18 @@ def calculate_material_variance(order):
             ).first()
 
             if ingredient:
-                # Calculate expected quantity based on order quantity
-                expected_qty = (Decimal(str(ingredient.quantity)) *
-                              Decimal(str(order.planned_quantity or 1)))
-                actual_qty = consumption.quantity
+                # Calculate expected quantity based on order quantity and ingredient percentage
+                # percentage is the % of the recipe's output that this ingredient represents
+                pct = Decimal(str(ingredient.percentage or 0)) / Decimal('100')
+                recipe_output = Decimal(str(order.recipe.output_size_ml or 0)) if order.recipe else Decimal('0')
+                qty_ordered = Decimal(str(order.quantity_ordered or 1))
+                expected_qty = pct * recipe_output * qty_ordered
+                actual_qty = consumption.quantity_consumed or Decimal('0')
 
                 variance_qty = actual_qty - expected_qty
-                variance_cost = variance_qty * (consumption.unit_cost or Decimal('0'))
+                # Use raw material cost as proxy for variance cost
+                material_cost = consumption.raw_material.cost_per_unit if consumption.raw_material else Decimal('0')
+                variance_cost = variance_qty * (material_cost or Decimal('0'))
 
                 variance['items'].append({
                     'material': consumption.raw_material,
@@ -190,6 +231,17 @@ def batch_costing():
     from_date = request.args.get('from_date')
     to_date = request.args.get('to_date')
     recipe_id = request.args.get('recipe_id', type=int)
+    location_id = request.args.get('location_id', type=int)
+    search = request.args.get('search', '').strip()
+    sort_by = request.args.get('sort_by', 'date_desc')
+
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    effective_location_id = None
+    if not current_user.is_global_admin:
+        if location and location.id:
+            effective_location_id = location.id
+    elif location_id:
+        effective_location_id = location_id
 
     if not from_date:
         from_date = (date.today() - timedelta(days=30)).strftime('%Y-%m-%d')
@@ -206,8 +258,8 @@ def batch_costing():
         ProductionOrder.created_at < end_date
     )
 
-    if location and not current_user.is_global_admin:
-        query = query.filter(ProductionOrder.location_id == location.id)
+    if effective_location_id:
+        query = query.filter(ProductionOrder.location_id == effective_location_id)
 
     if recipe_id:
         query = query.filter(ProductionOrder.recipe_id == recipe_id)
@@ -233,7 +285,7 @@ def batch_costing():
         total_labor_cost += cost_breakdown['labor_cost']
         total_overhead += cost_breakdown['overhead_cost']
         total_cost += cost_breakdown['total_cost']
-        total_units += Decimal(str(order.actual_quantity or order.planned_quantity or 0))
+        total_units += Decimal(str(order.quantity_produced or order.quantity_ordered or 0))
 
     # Average cost per unit
     avg_unit_cost = total_cost / total_units if total_units > 0 else Decimal('0')
@@ -244,8 +296,8 @@ def batch_costing():
     while current_date < end_date.date():
         day_orders = [o for o in orders
                      if o.completed_at and o.completed_at.date() == current_date]
-        day_cost = sum(float(o.total_cost or 0) for o in day_orders)
-        day_units = sum(float(o.actual_quantity or o.planned_quantity or 0) for o in day_orders)
+        day_cost = sum(float(calculate_batch_cost(o)['total_cost']) for o in day_orders) if day_orders else 0
+        day_units = sum(float(o.quantity_produced or o.quantity_ordered or 0) for o in day_orders)
 
         cost_trend.append({
             'date': current_date.isoformat(),
@@ -256,6 +308,26 @@ def batch_costing():
         current_date += timedelta(days=1)
 
     recipes = Recipe.query.filter_by(is_active=True).order_by(Recipe.name).all()
+
+    # Search filter
+    if search:
+        search_lower = search.lower()
+        batch_costs = [b for b in batch_costs
+                      if (b['order'].recipe and search_lower in b['order'].recipe.name.lower()) or
+                         (b['order'].order_number and search_lower in b['order'].order_number.lower())]
+
+    # Sort
+    sort_options = {
+        'date_desc': lambda x: x['order'].created_at or datetime.min,
+        'date_asc': lambda x: x['order'].created_at or datetime.min,
+        'cost_desc': lambda x: float(x['cost_breakdown']['total_cost']),
+        'unit_cost_desc': lambda x: float(x['cost_breakdown']['unit_cost']),
+        'material_desc': lambda x: float(x['cost_breakdown']['material_cost']),
+        'recipe_asc': lambda x: (x['order'].recipe.name if x['order'].recipe else '').lower(),
+    }
+    if sort_by in sort_options:
+        reverse = not sort_by.endswith('_asc')
+        batch_costs.sort(key=sort_options[sort_by], reverse=reverse)
 
     return render_template('production_reports/batch_costing.html',
                          batch_costs=batch_costs,
@@ -270,7 +342,11 @@ def batch_costing():
                          recipe_id=recipe_id,
                          from_date=from_date,
                          to_date=to_date,
-                         location=location)
+                         location=location,
+                         locations=locations,
+                         selected_location_id=effective_location_id,
+                         search=search,
+                         sort_by=sort_by)
 
 
 def calculate_batch_cost(order):
@@ -290,17 +366,19 @@ def calculate_batch_cost(order):
     ).all()
 
     for c in consumptions:
-        material_total = (c.quantity or Decimal('0')) * (c.unit_cost or Decimal('0'))
+        qty = c.quantity_consumed or Decimal('0')
+        unit_cost = c.raw_material.cost_per_unit if c.raw_material else Decimal('0')
+        material_total = qty * (unit_cost or Decimal('0'))
         cost['materials'].append({
             'material': c.raw_material,
-            'quantity': c.quantity,
-            'unit_cost': c.unit_cost,
+            'quantity': qty,
+            'unit_cost': unit_cost,
             'total_cost': material_total
         })
         cost['material_cost'] += material_total
 
-    # Labor cost (if recorded)
-    cost['labor_cost'] = order.labor_cost or Decimal('0')
+    # Labor cost (if recorded - field may not exist)
+    cost['labor_cost'] = getattr(order, 'labor_cost', None) or Decimal('0')
 
     # Overhead cost (percentage of material cost, default 10%)
     overhead_rate = Decimal('0.10')  # Can be made configurable
@@ -310,7 +388,7 @@ def calculate_batch_cost(order):
     cost['total_cost'] = cost['material_cost'] + cost['labor_cost'] + cost['overhead_cost']
 
     # Unit cost
-    units = Decimal(str(order.actual_quantity or order.planned_quantity or 1))
+    units = Decimal(str(order.quantity_produced or order.quantity_ordered or 1))
     cost['unit_cost'] = cost['total_cost'] / units if units > 0 else Decimal('0')
 
     return cost
@@ -355,8 +433,8 @@ def api_yield_summary():
 
     orders = query.all()
 
-    total_expected = sum(float(o.planned_quantity or 0) for o in orders)
-    total_actual = sum(float(o.actual_quantity or o.planned_quantity or 0) for o in orders)
+    total_expected = sum(float(o.quantity_ordered or 0) for o in orders)
+    total_actual = sum(float(o.quantity_produced or o.quantity_ordered or 0) for o in orders)
 
     variance = total_actual - total_expected
     variance_pct = (variance / total_expected * 100) if total_expected > 0 else 0
@@ -391,8 +469,8 @@ def api_cost_summary():
 
     orders = query.all()
 
-    total_cost = sum(float(o.total_cost or 0) for o in orders)
-    total_units = sum(float(o.actual_quantity or o.planned_quantity or 0) for o in orders)
+    total_cost = sum(float(calculate_batch_cost(o)['total_cost']) for o in orders)
+    total_units = sum(float(o.quantity_produced or o.quantity_ordered or 0) for o in orders)
 
     avg_cost = total_cost / total_units if total_units > 0 else 0
 

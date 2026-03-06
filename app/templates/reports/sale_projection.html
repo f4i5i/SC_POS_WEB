@@ -1,11 +1,18 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, report_buttons, export_script %}
 
 {% block title %}Sale Projection - {{ business_name }}{% endblock %}
 
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
+    {{ print_header('SALE PROJECTION', '', user_location if user_location is defined else None) }}
+
     <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 page-header-regular no-print">
         <div>
             <h2 class="mb-1">
                 <i class="fas fa-chart-line text-primary"></i>
@@ -18,24 +25,17 @@
                 {% endif %}
             </p>
         </div>
-        <div>
-            <button onclick="window.print()" class="btn btn-outline-primary">
-                <i class="fas fa-print"></i> Print
-            </button>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2">
-                <i class="fas fa-arrow-left"></i> Back
-            </a>
-        </div>
+        {{ report_buttons(url_for('reports.index'), 'sale_projection') }}
     </div>
 
     <!-- Filters -->
-    <div class="card border-0 shadow-sm mb-4">
+    <div class="card border-0 shadow-sm mb-4 no-print">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
                 {% if current_user.is_global_admin %}
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">Location</label>
-                    <select name="location_id" class="form-select">
+                    <select name="location_id" class="form-select form-select-sm">
                         <option value="">All Locations</option>
                         {% for loc in locations %}
                         <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
@@ -43,25 +43,40 @@
                     </select>
                 </div>
                 {% endif %}
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">Category</label>
-                    <select name="category_id" class="form-select">
+                    <select name="category_id" class="form-select form-select-sm">
                         <option value="">All Categories</option>
                         {% for cat in categories %}
                         <option value="{{ cat.id }}" {% if selected_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">Lookback Period</label>
-                    <select name="lookback_days" class="form-select">
+                    <select name="lookback_days" class="form-select form-select-sm">
                         {% for days in [7, 14, 30, 60, 90] %}
                         <option value="{{ days }}" {% if lookback_days == days %}selected{% endif %}>Last {{ days }} days</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i>Apply</button>
+                    <label class="form-label">Search</label>
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Product name/code..." value="{{ search or '' }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Sort By</label>
+                    <select name="sort_by" class="form-select form-select-sm">
+                        <option value="days_remaining" {% if sort_by == 'days_remaining' %}selected{% endif %}>Days Remaining</option>
+                        <option value="revenue" {% if sort_by == 'revenue' %}selected{% endif %}>Revenue</option>
+                        <option value="profit" {% if sort_by == 'profit' %}selected{% endif %}>Profit</option>
+                        <option value="stock" {% if sort_by == 'stock' %}selected{% endif %}>Stock</option>
+                        <option value="name_asc" {% if sort_by == 'name_asc' %}selected{% endif %}>Name A-Z</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1"><i class="fas fa-filter me-1"></i>Apply</button>
+                    <a href="{{ url_for('reports.sale_projection') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
                 </div>
             </form>
         </div>
@@ -103,10 +118,13 @@
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">
-                        <i class="fas fa-table text-primary"></i>
-                        Stock Projection by Product
-                    </h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table text-primary"></i>
+                            Stock Projection by Product
+                        </h5>
+                        <span class="text-muted small">Showing <strong>{{ product_data|length }}</strong> items</span>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -220,10 +238,13 @@
             </div>
         </div>
     </div>
+
+    {{ print_footer() }}
 </div>
 {% endblock %}
 
 {% block extra_js %}
+{{ export_script() }}
 {% if top_by_revenue %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>

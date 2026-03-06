@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "reports/_print_styles.html" import print_header, print_footer, signature_area %}
+{% from "reports/_print_styles.html" import print_header, print_footer, signature_area, report_buttons, export_script %}
 
 {% block title %}Monthly Report - {{ business_name }}{% endblock %}
 
@@ -44,6 +44,7 @@
             <button onclick="window.print()" class="btn btn-outline-primary ms-2">
                 <i class="fas fa-print"></i> Print
             </button>
+            <button onclick="exportReportCSV('monthly_report')" class="btn btn-outline-success ms-1"><i class="fas fa-file-csv"></i> CSV</button>
             <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2">
                 <i class="fas fa-arrow-left"></i> Back
             </a>
@@ -196,6 +197,7 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ export_script() }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 // Category Sales Chart

@@ -1,21 +1,26 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, report_buttons, export_script %}
 
 {% block title %}Cash Flow Report - {{ business_name }}{% endblock %}
 
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
+    {{ print_header('CASH FLOW REPORT', '', user_location if user_location is defined else None) }}
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2><i class="fas fa-money-bill-wave text-success me-2"></i>Cash Flow Report</h2>
             <p class="text-muted mb-0">Track inflows and outflows of cash</p>
         </div>
-        <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-2"></i>Back to Reports
-        </a>
+        {{ report_buttons(url_for('reports.index'), 'cash_flow') }}
     </div>
 
     <!-- Filters -->
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 no-print">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
                 <div class="col-md-3">
@@ -260,6 +265,7 @@
             </div>
         </div>
     </div>
+    {{ print_footer() }}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -368,4 +374,9 @@ function exportTable() {
     a.click();
 }
 </script>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ export_script() }}
 {% endblock %}

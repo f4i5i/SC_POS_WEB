@@ -1,26 +1,31 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, report_buttons, export_script %}
 
 {% block title %}Stock Movement Audit Trail - {{ business_name }}{% endblock %}
 
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+<style>
+@media print {
+    @page { size: A4 landscape; }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    {{ print_header('STOCK MOVEMENT AUDIT', '', user_location if user_location is defined else None) }}
+
+    <div class="d-flex justify-content-between align-items-center mb-4 page-header-regular no-print">
         <div>
             <h2><i class="fas fa-history text-primary me-2"></i>Stock Movement Audit Trail</h2>
             <p class="text-muted mb-0">Complete history of all stock changes</p>
         </div>
-        <div class="d-flex gap-2">
-            <button onclick="window.print()" class="btn btn-outline-secondary">
-                <i class="fas fa-print me-2"></i>Print
-            </button>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-primary">
-                <i class="fas fa-arrow-left me-2"></i>Back
-            </a>
-        </div>
+        {{ report_buttons(url_for('reports.index'), 'stock_movement_audit') }}
     </div>
 
     <!-- Filters -->
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 no-print">
         <div class="card-body">
             <form method="GET" class="row g-3">
                 <div class="col-md-2">
@@ -64,10 +69,28 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-1 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary w-100">
+                <div class="col-md-2">
+                    <label class="form-label">Search</label>
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Product name or reference..." value="{{ search }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Sort By</label>
+                    <select name="sort_by" class="form-select form-select-sm">
+                        <option value="">Default</option>
+                        <option value="date_desc" {% if sort_by == 'date_desc' %}selected{% endif %}>Date (New-Old)</option>
+                        <option value="date_asc" {% if sort_by == 'date_asc' %}selected{% endif %}>Date (Old-New)</option>
+                        <option value="quantity_desc" {% if sort_by == 'quantity_desc' %}selected{% endif %}>Quantity (High-Low)</option>
+                        <option value="product_asc" {% if sort_by == 'product_asc' %}selected{% endif %}>Product (A-Z)</option>
+                        <option value="type_asc" {% if sort_by == 'type_asc' %}selected{% endif %}>Type (A-Z)</option>
+                    </select>
+                </div>
+                <div class="col-md-1 d-flex align-items-end gap-1">
+                    <button type="submit" class="btn btn-primary btn-sm">
                         <i class="fas fa-filter"></i>
                     </button>
+                    <a href="{{ url_for('reports.stock_movement_audit') }}" class="btn btn-outline-secondary btn-sm" title="Clear filters">
+                        <i class="fas fa-times"></i>
+                    </a>
                 </div>
             </form>
         </div>
@@ -190,6 +213,8 @@
             {% endif %}
         </div>
     </div>
+
+    {{ print_footer() }}
 </div>
 
 <style>
@@ -201,4 +226,8 @@
     .table-sm td, .table-sm th { padding: 0.2rem !important; font-size: 0.75rem !important; }
 }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+{{ export_script() }}
 {% endblock %}

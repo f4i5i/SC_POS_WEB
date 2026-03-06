@@ -1,36 +1,40 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, report_buttons, export_script %}
 
 {% block title %}Product Cost History - {{ business_name }}{% endblock %}
 
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
+    {{ print_header('COST HISTORY & MARGIN EROSION', '', user_location if user_location is defined else None) }}
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2><i class="fas fa-history text-primary me-2"></i>Product Cost History & Margin Erosion</h2>
             <p class="text-muted mb-0">Track cost changes and their impact on margins</p>
         </div>
-        <div>
-            <button onclick="window.print()" class="btn btn-outline-primary"><i class="fas fa-print"></i> Print</button>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2"><i class="fas fa-arrow-left"></i> Back</a>
-        </div>
+        {{ report_buttons(url_for('reports.index'), 'cost_history') }}
     </div>
 
     <!-- Filters -->
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 no-print">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">Category</label>
-                    <select name="category_id" class="form-select">
+                    <select name="category_id" class="form-select form-select-sm">
                         <option value="">All Categories</option>
                         {% for cat in categories %}
                         <option value="{{ cat.id }}" {% if category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">Product</label>
-                    <select name="product_id" class="form-select">
+                    <select name="product_id" class="form-select form-select-sm">
                         <option value="">Select Product</option>
                         {% for p in products_with_history %}
                         <option value="{{ p.id }}" {% if product_id == p.id %}selected{% endif %}>{{ p.name }}</option>
@@ -38,7 +42,26 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i>Apply</button>
+                    <label class="form-label">From Date</label>
+                    <input type="date" name="from_date" class="form-control form-control-sm" value="{{ from_date }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control form-control-sm" value="{{ to_date }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Sort By</label>
+                    <select name="sort_by" class="form-select form-select-sm">
+                        <option value="date_desc" {% if sort_by == 'date_desc' %}selected{% endif %}>Date Newest</option>
+                        <option value="cost_change" {% if sort_by == 'cost_change' %}selected{% endif %}>Cost Change %</option>
+                        <option value="name_asc" {% if sort_by == 'name_asc' %}selected{% endif %}>Name A-Z</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-filter me-1"></i>Apply</button>
+                </div>
+                <div class="col-md-2">
+                    <a href="{{ url_for('financial_reports.cost_history') }}" class="btn btn-outline-secondary btn-sm w-100">Clear</a>
                 </div>
             </form>
         </div>
@@ -140,5 +163,11 @@
         </div>
         {% endif %}
     </div>
+
+    {{ print_footer() }}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{{ export_script() }}
 {% endblock %}

@@ -1,34 +1,60 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, report_buttons, export_script %}
 
 {% block title %}Promotion ROI Report - {{ business_name }}{% endblock %}
 
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
+    {{ print_header('PROMOTION ROI ANALYSIS', '', user_location if user_location is defined else None) }}
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2><i class="fas fa-bullhorn text-primary me-2"></i>Promotion ROI Analysis</h2>
             <p class="text-muted mb-0">Discount cost vs revenue driven per promotion</p>
         </div>
-        <div>
-            <button onclick="window.print()" class="btn btn-outline-primary"><i class="fas fa-print"></i> Print</button>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2"><i class="fas fa-arrow-left"></i> Back</a>
-        </div>
+        {{ report_buttons(url_for('reports.index'), 'promotion_roi') }}
     </div>
 
     <!-- Filters -->
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 no-print">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label">From Date</label>
-                    <input type="date" name="from_date" class="form-control" value="{{ from_date }}">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">To Date</label>
-                    <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
+                    <input type="date" name="from_date" class="form-control form-control-sm" value="{{ from_date }}">
                 </div>
                 <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i>Apply</button>
+                    <label class="form-label">To Date</label>
+                    <input type="date" name="to_date" class="form-control form-control-sm" value="{{ to_date }}">
+                </div>
+                {% if current_user.is_global_admin %}
+                <div class="col-md-2">
+                    <label class="form-label">Location</label>
+                    <select name="location_id" class="form-select form-select-sm">
+                        <option value="">All Locations</option>
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="col-md-2">
+                    <label class="form-label">Sort By</label>
+                    <select name="sort_by" class="form-select form-select-sm">
+                        <option value="roi" {% if sort_by == 'roi' %}selected{% endif %}>ROI</option>
+                        <option value="discount" {% if sort_by == 'discount' %}selected{% endif %}>Discount Given</option>
+                        <option value="revenue" {% if sort_by == 'revenue' %}selected{% endif %}>Revenue Driven</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-filter me-1"></i>Apply</button>
+                </div>
+                <div class="col-md-2">
+                    <a href="{{ url_for('financial_reports.promotion_roi') }}" class="btn btn-outline-secondary btn-sm w-100">Clear</a>
                 </div>
             </form>
         </div>
@@ -138,5 +164,11 @@
         <p class="text-muted">Try adjusting the date range or create promotions first</p>
     </div>
     {% endif %}
+
+    {{ print_footer() }}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{{ export_script() }}
 {% endblock %}

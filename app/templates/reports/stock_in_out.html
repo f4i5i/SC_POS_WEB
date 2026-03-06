@@ -1,11 +1,18 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, report_buttons, export_script %}
 
 {% block title %}Stock In/Out Comparison - {{ business_name }}{% endblock %}
 
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
+    {{ print_header('STOCK IN/OUT COMPARISON', '', user_location if user_location is defined else None) }}
+
     <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 page-header-regular no-print">
         <div>
             <h2 class="mb-1">
                 <i class="fas fa-exchange-alt text-primary"></i>
@@ -15,32 +22,25 @@
                 {{ from_date.strftime('%B %d, %Y') }} - {{ to_date.strftime('%B %d, %Y') }}
             </p>
         </div>
-        <div>
-            <button onclick="window.print()" class="btn btn-outline-primary">
-                <i class="fas fa-print"></i> Print
-            </button>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary ms-2">
-                <i class="fas fa-arrow-left"></i> Back
-            </a>
-        </div>
+        {{ report_buttons(url_for('reports.index'), 'stock_in_out') }}
     </div>
 
     <!-- Filters -->
-    <div class="card border-0 shadow-sm mb-4">
+    <div class="card border-0 shadow-sm mb-4 no-print">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
                 <div class="col-md-2">
                     <label class="form-label">From Date</label>
-                    <input type="date" name="from_date" class="form-control" value="{{ from_date.strftime('%Y-%m-%d') }}">
+                    <input type="date" name="from_date" class="form-control form-control-sm" value="{{ from_date.strftime('%Y-%m-%d') }}">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">To Date</label>
-                    <input type="date" name="to_date" class="form-control" value="{{ to_date.strftime('%Y-%m-%d') }}">
+                    <input type="date" name="to_date" class="form-control form-control-sm" value="{{ to_date.strftime('%Y-%m-%d') }}">
                 </div>
                 {% if current_user.is_global_admin %}
                 <div class="col-md-2">
                     <label class="form-label">Location</label>
-                    <select name="location_id" class="form-select">
+                    <select name="location_id" class="form-select form-select-sm">
                         <option value="">All Locations</option>
                         {% for loc in locations %}
                         <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
@@ -50,7 +50,7 @@
                 {% endif %}
                 <div class="col-md-2">
                     <label class="form-label">Category</label>
-                    <select name="category_id" class="form-select">
+                    <select name="category_id" class="form-select form-select-sm">
                         <option value="">All Categories</option>
                         {% for cat in categories %}
                         <option value="{{ cat.id }}" {% if selected_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
@@ -59,13 +59,27 @@
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">View</label>
-                    <select name="view" class="form-select">
+                    <select name="view" class="form-select form-select-sm">
                         <option value="summary" {% if view_mode == 'summary' %}selected{% endif %}>Summary (In/Out)</option>
                         <option value="detailed" {% if view_mode == 'detailed' %}selected{% endif %}>Detailed Breakdown</option>
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i>Apply</button>
+                    <label class="form-label">Search</label>
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Product name/code..." value="{{ search or '' }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Sort By</label>
+                    <select name="sort_by" class="form-select form-select-sm">
+                        <option value="name_asc" {% if sort_by == 'name_asc' %}selected{% endif %}>Name A-Z</option>
+                        <option value="net_change" {% if sort_by == 'net_change' %}selected{% endif %}>Net Change</option>
+                        <option value="purchase_desc" {% if sort_by == 'purchase_desc' %}selected{% endif %}>Purchase High-Low</option>
+                        <option value="sale_desc" {% if sort_by == 'sale_desc' %}selected{% endif %}>Sale High-Low</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1"><i class="fas fa-filter me-1"></i>Apply</button>
+                    <a href="{{ url_for('reports.stock_in_out') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
                 </div>
             </form>
         </div>
@@ -116,13 +130,16 @@
     <!-- Data Table -->
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white py-3">
-            <h5 class="mb-0">
-                {% if view_mode == 'detailed' %}
-                <i class="fas fa-table text-primary"></i> Detailed Movement Breakdown
-                {% else %}
-                <i class="fas fa-exchange-alt text-primary"></i> Stock In vs Stock Out
-                {% endif %}
-            </h5>
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    {% if view_mode == 'detailed' %}
+                    <i class="fas fa-table text-primary"></i> Detailed Movement Breakdown
+                    {% else %}
+                    <i class="fas fa-exchange-alt text-primary"></i> Stock In vs Stock Out
+                    {% endif %}
+                </h5>
+                <span class="text-muted small">Showing <strong>{{ product_data|length }}</strong> items</span>
+            </div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -232,5 +249,11 @@
         <p class="text-muted">Try adjusting the date range or filters</p>
     </div>
     {% endif %}
+
+    {{ print_footer() }}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{{ export_script() }}
 {% endblock %}

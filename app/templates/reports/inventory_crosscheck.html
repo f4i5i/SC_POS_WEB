@@ -1,0 +1,426 @@
+{% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_footer, report_buttons, export_script %}
+
+{% block title %}Inventory Cross-Check - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media print {
+        .no-print { display: none !important; }
+        .card { border: none !important; box-shadow: none !important; }
+        .card-header { background: none !important; border-bottom: 2px solid #333 !important; }
+        @page { size: A4 landscape; margin: 8mm; }
+        body { font-size: 11px; }
+        .table th, .table td { padding: 4px 6px !important; font-size: 10px; }
+        .physical-count-col { min-width: 60px; }
+        .container-fluid { padding: 0 !important; }
+    }
+    .physical-count-col {
+        background: #fff9e6 !important;
+        min-width: 70px;
+    }
+    .diff-col {
+        background: #f0f8ff !important;
+        min-width: 60px;
+    }
+    .category-row {
+        background: #e9ecef !important;
+        font-weight: 600;
+    }
+    .table-crosscheck th {
+        font-size: 0.8rem;
+        vertical-align: middle;
+        text-align: center;
+    }
+    .table-crosscheck td {
+        font-size: 0.85rem;
+        vertical-align: middle;
+    }
+    .print-header {
+        display: none;
+    }
+    @media print {
+        .print-header {
+            display: block;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+    }
+    .qty-zero { color: #adb5bd; }
+    .summary-badge {
+        display: inline-block;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="print-header">
+        <h2>{{ business_name }} - Inventory Cross-Check Sheet</h2>
+        <p>Generated: {{ print_date.strftime('%Y-%m-%d %H:%M') }} |
+           {% if selected_locations|length == 1 %}
+               Location: {{ selected_locations[0].name }}
+           {% else %}
+               All Locations
+           {% endif %}
+        </p>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-3 no-print">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-clipboard-check text-primary"></i> Inventory Cross-Check Report
+            </h5>
+            <div class="d-flex gap-2">
+                <button onclick="window.print()" class="btn btn-success btn-sm">
+                    <i class="fas fa-print"></i> Print
+                </button>
+                <button onclick="exportReportCSV('inventory_crosscheck')" class="btn btn-outline-success btn-sm"><i class="fas fa-file-csv"></i> CSV</button>
+                <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+            </div>
+        </div>
+        <div class="card-body py-2">
+            <form method="GET">
+                <div class="row g-2 align-items-end">
+                    {% if current_user.is_global_admin %}
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1">Location</label>
+                        <select name="location_id" class="form-select form-select-sm">
+                            <option value="">All Locations</option>
+                            {% for loc in locations %}
+                            <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }} ({{ loc.location_type|capitalize }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1">Category</label>
+                        <select name="category_id" class="form-select form-select-sm">
+                            <option value="">All Categories</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.id }}" {% if selected_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1">Stock Status</label>
+                        <select name="stock_filter" class="form-select form-select-sm">
+                            <option value="">All Stock</option>
+                            <option value="in_stock" {% if stock_filter == 'in_stock' %}selected{% endif %}>In Stock Only</option>
+                            <option value="out_of_stock" {% if stock_filter == 'out_of_stock' %}selected{% endif %}>Out of Stock Only</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1">Sort By</label>
+                        <select name="sort_by" class="form-select form-select-sm">
+                            <option value="category" {% if sort_by == 'category' %}selected{% endif %}>Category</option>
+                            <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Name (A-Z)</option>
+                            <option value="code" {% if sort_by == 'code' %}selected{% endif %}>Code</option>
+                            <option value="stock_desc" {% if sort_by == 'stock_desc' %}selected{% endif %}>Stock (High-Low)</option>
+                            <option value="stock_asc" {% if sort_by == 'stock_asc' %}selected{% endif %}>Stock (Low-High)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label form-label-sm mb-1">Search Product</label>
+                        <input type="text" name="search" class="form-control form-control-sm"
+                               placeholder="Name, code, or barcode..." value="{{ search }}">
+                    </div>
+                </div>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-md-2">
+                        <div class="form-check mt-1">
+                            <input class="form-check-input" type="checkbox" name="show_raw" value="1"
+                                   id="showRaw" {% if show_raw %}checked{% endif %}>
+                            <label class="form-check-label small" for="showRaw">Include Raw Materials</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary btn-sm w-100">
+                            <i class="fas fa-filter"></i> Apply
+                        </button>
+                    </div>
+                    <div class="col-md-2">
+                        <a href="{{ url_for('reports.inventory_crosscheck') }}" class="btn btn-outline-secondary btn-sm w-100">
+                            <i class="fas fa-times"></i> Clear
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body py-2">
+                    <div class="fs-4 fw-bold text-primary">{{ product_data|length }}</div>
+                    <small class="text-muted">Products</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body py-2">
+                    <div class="fs-4 fw-bold text-success">{{ "{:,}".format(grand_total_system) }}</div>
+                    <small class="text-muted">Total System Units</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body py-2">
+                    <div class="fs-4 fw-bold text-info">{{ selected_locations|length }}</div>
+                    <small class="text-muted">Locations</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body py-2">
+                    <div class="fs-4 fw-bold text-secondary">{{ print_date.strftime('%d %b %Y') }}</div>
+                    <small class="text-muted">Count Date</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Filters & Count -->
+    <div class="d-flex justify-content-between align-items-center mb-2 no-print">
+        <div>
+            <span class="text-muted small">Showing <strong>{{ product_data|length }}</strong> products</span>
+            {% if search %}<span class="badge bg-info ms-1">Search: {{ search }}</span>{% endif %}
+            {% if stock_filter %}<span class="badge bg-secondary ms-1">{{ stock_filter|replace('_', ' ')|capitalize }}</span>{% endif %}
+            {% if selected_category_id %}<span class="badge bg-primary ms-1">Category filtered</span>{% endif %}
+        </div>
+    </div>
+
+    <!-- Products Table -->
+    <div class="card mb-4">
+        <div class="card-header bg-dark text-white py-2">
+            <i class="fas fa-box"></i> Finished Products
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm table-crosscheck mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th rowspan="2" style="width: 40px;">#</th>
+                            <th rowspan="2" style="width: 80px;">Code</th>
+                            <th rowspan="2">Product Name</th>
+                            <th rowspan="2" style="width: 80px;">Barcode</th>
+                            {% for loc in selected_locations %}
+                            <th colspan="3" class="text-center" style="border-left: 2px solid #adb5bd;">
+                                {{ loc.name }}
+                            </th>
+                            {% endfor %}
+                            <th rowspan="2" class="text-center" style="width: 60px; border-left: 2px solid #333;">
+                                Total<br>System
+                            </th>
+                        </tr>
+                        <tr>
+                            {% for loc in selected_locations %}
+                            <th class="text-center" style="width: 60px; border-left: 2px solid #adb5bd;">System</th>
+                            <th class="text-center physical-count-col">Physical</th>
+                            <th class="text-center diff-col" style="width: 50px;">Diff</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set current_cat = namespace(name='') %}
+                        {% for item in product_data %}
+                            {% if sort_by == 'category' and item.category_name != current_cat.name %}
+                                {% set current_cat.name = item.category_name %}
+                                <tr class="category-row">
+                                    <td colspan="{{ 4 + (selected_locations|length * 3) + 1 }}">
+                                        <i class="fas fa-tag me-1"></i> {{ current_cat.name }}
+                                    </td>
+                                </tr>
+                            {% endif %}
+                            <tr>
+                                <td class="text-center text-muted">{{ loop.index }}</td>
+                                <td><small>{{ item.product.code }}</small></td>
+                                <td>{{ item.product.name }}</td>
+                                <td><small>{{ item.product.barcode or '-' }}</small></td>
+                                {% for loc in selected_locations %}
+                                {% set qty = item.loc_stocks.get(loc.id, 0) %}
+                                <td class="text-center {% if qty == 0 %}qty-zero{% endif %}" style="border-left: 2px solid #adb5bd;">
+                                    {{ qty }}
+                                </td>
+                                <td class="text-center physical-count-col">&nbsp;</td>
+                                <td class="text-center diff-col">&nbsp;</td>
+                                {% endfor %}
+                                <td class="text-center fw-bold" style="border-left: 2px solid #333;">
+                                    {{ item.location_total }}
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="{{ 4 + (selected_locations|length * 3) + 1 }}" class="text-center py-4 text-muted">
+                                    No products found.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if product_data %}
+                    <tfoot>
+                        <tr class="table-dark fw-bold">
+                            <td colspan="4" class="text-end">TOTAL</td>
+                            {% for loc in selected_locations %}
+                            {% set loc_total = namespace(val=0) %}
+                            {% for item in product_data %}
+                                {% set loc_total.val = loc_total.val + item.loc_stocks.get(loc.id, 0) %}
+                            {% endfor %}
+                            <td class="text-center" style="border-left: 2px solid #adb5bd;">{{ loc_total.val }}</td>
+                            <td class="text-center physical-count-col">&nbsp;</td>
+                            <td class="text-center diff-col">&nbsp;</td>
+                            {% endfor %}
+                            <td class="text-center" style="border-left: 2px solid #333;">{{ grand_total_system }}</td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Raw Materials Table -->
+    {% if show_raw and raw_data %}
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark py-2">
+            <i class="fas fa-flask"></i> Raw Materials
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm table-crosscheck mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th rowspan="2" style="width: 40px;">#</th>
+                            <th rowspan="2" style="width: 80px;">Code</th>
+                            <th rowspan="2">Material Name</th>
+                            <th rowspan="2" style="width: 60px;">Unit</th>
+                            {% for loc in selected_locations %}
+                            <th colspan="3" class="text-center" style="border-left: 2px solid #adb5bd;">
+                                {{ loc.name }}
+                            </th>
+                            {% endfor %}
+                            <th rowspan="2" class="text-center" style="width: 60px; border-left: 2px solid #333;">
+                                Total<br>System
+                            </th>
+                        </tr>
+                        <tr>
+                            {% for loc in selected_locations %}
+                            <th class="text-center" style="width: 60px; border-left: 2px solid #adb5bd;">System</th>
+                            <th class="text-center physical-count-col">Physical</th>
+                            <th class="text-center diff-col" style="width: 50px;">Diff</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set current_cat = namespace(name='') %}
+                        {% for item in raw_data %}
+                            {% if item.category_name != current_cat.name %}
+                                {% set current_cat.name = item.category_name %}
+                                <tr class="category-row">
+                                    <td colspan="{{ 4 + (selected_locations|length * 3) + 1 }}">
+                                        <i class="fas fa-flask me-1"></i> {{ current_cat.name }}
+                                    </td>
+                                </tr>
+                            {% endif %}
+                            <tr>
+                                <td class="text-center text-muted">{{ loop.index }}</td>
+                                <td><small>{{ item.material.code }}</small></td>
+                                <td>{{ item.material.name }}</td>
+                                <td class="text-center"><small>{{ item.unit }}</small></td>
+                                {% for loc in selected_locations %}
+                                {% set qty = item.loc_stocks.get(loc.id, 0) %}
+                                <td class="text-center {% if qty == 0 %}qty-zero{% endif %}" style="border-left: 2px solid #adb5bd;">
+                                    {{ "%.1f"|format(qty) if qty != qty|int else qty|int }}
+                                </td>
+                                <td class="text-center physical-count-col">&nbsp;</td>
+                                <td class="text-center diff-col">&nbsp;</td>
+                                {% endfor %}
+                                <td class="text-center fw-bold" style="border-left: 2px solid #333;">
+                                    {{ "%.1f"|format(item.location_total) if item.location_total != item.location_total|int else item.location_total|int }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if raw_data %}
+                    <tfoot>
+                        <tr class="table-dark fw-bold">
+                            <td colspan="4" class="text-end">TOTAL</td>
+                            {% for loc in selected_locations %}
+                            {% set loc_total = namespace(val=0) %}
+                            {% for item in raw_data %}
+                                {% set loc_total.val = loc_total.val + item.loc_stocks.get(loc.id, 0) %}
+                            {% endfor %}
+                            <td class="text-center" style="border-left: 2px solid #adb5bd;">
+                                {{ "%.1f"|format(loc_total.val) if loc_total.val != loc_total.val|int else loc_total.val|int }}
+                            </td>
+                            <td class="text-center physical-count-col">&nbsp;</td>
+                            <td class="text-center diff-col">&nbsp;</td>
+                            {% endfor %}
+                            <td class="text-center" style="border-left: 2px solid #333;">
+                                {{ "%.1f"|format(raw_grand_total) if raw_grand_total != raw_grand_total|int else raw_grand_total|int }}
+                            </td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Signature Section (visible on print) -->
+    <div class="card mt-3">
+        <div class="card-body py-3">
+            <div class="row">
+                <div class="col-4 text-center">
+                    <div style="border-top: 1px solid #333; margin-top: 40px; padding-top: 5px;">
+                        <small>Counted By</small>
+                    </div>
+                </div>
+                <div class="col-4 text-center">
+                    <div style="border-top: 1px solid #333; margin-top: 40px; padding-top: 5px;">
+                        <small>Verified By</small>
+                    </div>
+                </div>
+                <div class="col-4 text-center">
+                    <div style="border-top: 1px solid #333; margin-top: 40px; padding-top: 5px;">
+                        <small>Date & Time</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instructions (no-print) -->
+    <div class="card mt-3 no-print">
+        <div class="card-body">
+            <h6><i class="fas fa-info-circle text-info"></i> How to use this report</h6>
+            <ol class="mb-0 small">
+                <li>Print this report using the <strong>Print</strong> button above</li>
+                <li>Walk through each location and physically count every product</li>
+                <li>Write the actual count in the <strong>Physical</strong> column (yellow)</li>
+                <li>Calculate <strong>Diff = Physical - System</strong> in the blue column</li>
+                <li>Investigate any differences (theft, spoilage, data entry errors)</li>
+                <li>Use <strong>Stock Adjustment</strong> in Inventory to correct the system</li>
+            </ol>
+        </div>
+    </div>
+</div>
+
+{{ print_footer() }}
+{% endblock %}
+
+{% block extra_js %}
+{{ export_script() }}
+{% endblock %}

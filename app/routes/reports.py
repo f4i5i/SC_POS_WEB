@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, send_file, curre
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_, or_, extract, case
-from app.models import db, Sale, SaleItem, Product, Customer, StockMovement, Location, LocationStock, ProductionOrder, RawMaterialStock, RawMaterial, RawMaterialMovement, RawMaterialCategory, PurchaseOrder, PurchaseOrderItem, StockTransfer, StockTransferItem, DayClose, Recipe
+from app.models import db, Sale, SaleItem, Product, Customer, StockMovement, Location, LocationStock, ProductionOrder, RawMaterialStock, RawMaterial, RawMaterialMovement, RawMaterialCategory, PurchaseOrder, PurchaseOrderItem, StockTransfer, StockTransferItem, DayClose, Recipe, Category
 from app.utils.helpers import has_permission
 from app.utils.permissions import permission_required, Permissions
 from app.utils.pdf_utils import generate_daily_report, generate_sales_report
@@ -475,7 +475,35 @@ def custom_report():
 @permission_required(Permissions.REPORT_VIEW_INVENTORY)
 def inventory_valuation():
     """Stock valuation report with cost breakdown"""
-    products = Product.query.filter_by(is_active=True).all()
+    from app.models import Category
+    from app.utils.location_context import get_current_location
+
+    user_location = get_current_location()
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    categories = Category.query.order_by(Category.name).all()
+
+    # Filters
+    location_id = request.args.get('location_id', type=int)
+    category_id = request.args.get('category_id', type=int)
+    search = request.args.get('search', '').strip()
+    sort_by = request.args.get('sort_by', 'name_asc')
+    stock_filter = request.args.get('stock_filter', '')
+
+    if current_user.is_global_admin:
+        effective_location_id = location_id
+    elif user_location:
+        effective_location_id = user_location.id
+    else:
+        effective_location_id = None
+
+    product_query = Product.query.filter_by(is_active=True)
+    if category_id:
+        product_query = product_query.filter_by(category_id=category_id)
+    if search:
+        product_query = product_query.filter(
+            db.or_(Product.name.ilike(f'%{search}%'), Product.code.ilike(f'%{search}%'))
+        )
+    products = product_query.all()
 
     # Build product data with cost breakdown
     product_data = []
@@ -488,7 +516,12 @@ def inventory_valuation():
     total_selling_value = 0
 
     for p in products:
-        qty = float(p.quantity or 0)
+        # Use location-specific stock if location selected
+        if effective_location_id:
+            ls = LocationStock.query.filter_by(product_id=p.id, location_id=effective_location_id).first()
+            qty = float(ls.quantity if ls else 0)
+        else:
+            qty = float(p.quantity or 0)
         base_cost = float(p.base_cost or 0)
         packaging_cost = float(p.packaging_cost or 0)
         delivery_cost = float(p.delivery_cost or 0)
@@ -539,6 +572,27 @@ def inventory_valuation():
 
     potential_profit = total_selling_value - total_cost_value
 
+    # Apply stock filter
+    if stock_filter == 'in_stock':
+        product_data = [d for d in product_data if d['quantity'] and d['quantity'] > 0]
+    elif stock_filter == 'out_of_stock':
+        product_data = [d for d in product_data if not d['quantity'] or d['quantity'] == 0]
+
+    # Sort
+    val_sort_options = {
+        'name_asc': lambda x: x['product'].name.lower(),
+        'name_desc': lambda x: x['product'].name.lower(),
+        'cost_value_desc': lambda x: -x['cost_value'],
+        'cost_value_asc': lambda x: x['cost_value'],
+        'selling_value_desc': lambda x: -x['selling_value'],
+        'profit_desc': lambda x: -x['profit'],
+        'profit_asc': lambda x: x['profit'],
+        'quantity_desc': lambda x: -(x['quantity'] or 0),
+        'quantity_asc': lambda x: (x['quantity'] or 0),
+    }
+    sort_fn = val_sort_options.get(sort_by, val_sort_options['name_asc'])
+    product_data.sort(key=sort_fn, reverse=(sort_by == 'name_desc'))
+
     return render_template('reports/inventory_valuation.html',
                          products=products,
                          product_data=product_data,
@@ -549,7 +603,15 @@ def inventory_valuation():
                          total_kiosk_value=total_kiosk_value,
                          total_cost_value=total_cost_value,
                          total_selling_value=total_selling_value,
-                         potential_profit=potential_profit)
+                         potential_profit=potential_profit,
+                         locations=locations,
+                         categories=categories,
+                         selected_location_id=location_id,
+                         selected_category_id=category_id,
+                         user_location=user_location,
+                         search=search,
+                         sort_by=sort_by,
+                         stock_filter=stock_filter)
 
 
 @bp.route('/export-daily-pdf')
@@ -572,6 +634,9 @@ def employee_performance():
     # Location filter support
     location_id = request.args.get('location_id', type=int)
     locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+
+    sort_by = request.args.get('sort_by', 'revenue_desc')
+    search = request.args.get('search', '').strip()
 
     # Get date range from request or default to current month
     start_date_str = request.args.get('start_date')
@@ -642,6 +707,21 @@ def employee_performance():
         for emp in employee_stats
     ]
 
+    # Apply search filter
+    if search:
+        employee_stats_serializable = [e for e in employee_stats_serializable
+                                       if search.lower() in e['full_name'].lower()]
+
+    # Apply sorting
+    emp_sort_options = {
+        'revenue_desc': lambda x: -x['total_revenue'],
+        'revenue_asc': lambda x: x['total_revenue'],
+        'sales_count_desc': lambda x: -x['total_sales'],
+        'name_asc': lambda x: x['full_name'].lower(),
+    }
+    sort_fn = emp_sort_options.get(sort_by, emp_sort_options['revenue_desc'])
+    employee_stats_serializable.sort(key=sort_fn)
+
     return render_template('reports/employee_performance.html',
                          start_date=start_date,
                          end_date=end_date,
@@ -650,7 +730,9 @@ def employee_performance():
                          total_sales_count=total_sales_count,
                          user_location=user_location,
                          locations=locations,
-                         selected_location_id=location_id)
+                         selected_location_id=location_id,
+                         sort_by=sort_by,
+                         search=search)
 
 
 @bp.route('/product-performance')
@@ -658,11 +740,18 @@ def employee_performance():
 @permission_required(Permissions.REPORT_VIEW_SALES)
 def product_performance():
     """Product performance analysis - filtered by location"""
-    from app.models import Location
+    from app.models import Location, Category
 
     # Location filter support
     location_id = request.args.get('location_id', type=int)
     locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+
+    sort_by = request.args.get('sort_by', 'revenue_desc')
+    search = request.args.get('search', '').strip()
+    category_id = request.args.get('category_id', type=int)
+
+    # Get categories for filter
+    categories = Category.query.order_by(Category.name).all()
 
     # Get date range
     start_date_str = request.args.get('start_date')
@@ -696,8 +785,13 @@ def product_performance():
     if effective_location_id:
         base_filter = and_(base_filter, Sale.location_id == effective_location_id)
 
+    # Add category filter to base
+    product_filter = base_filter
+    if category_id:
+        product_filter = and_(product_filter, Product.category_id == category_id)
+
     # Top performing products
-    top_products = db.session.query(
+    top_products_query = db.session.query(
         Product.name,
         Product.code,
         Product.brand,
@@ -709,10 +803,18 @@ def product_performance():
         SaleItem, SaleItem.product_id == Product.id
     ).join(
         Sale, Sale.id == SaleItem.sale_id
-    ).filter(base_filter).group_by(Product.id).order_by(func.sum(SaleItem.subtotal).desc()).limit(20).all()
+    ).filter(product_filter).group_by(Product.id).order_by(func.sum(SaleItem.subtotal).desc()).limit(20).all()
+
+    # Convert to dicts for filtering/sorting
+    top_products = [
+        {'name': p.name, 'code': p.code, 'brand': p.brand,
+         'units_sold': int(p.units_sold or 0), 'revenue': float(p.revenue or 0),
+         'profit': float(p.profit or 0), 'transactions': int(p.transactions or 0)}
+        for p in top_products_query
+    ]
 
     # Worst performing products (sold but low revenue)
-    worst_products = db.session.query(
+    worst_products_query = db.session.query(
         Product.name,
         Product.code,
         Product.brand,
@@ -722,17 +824,42 @@ def product_performance():
         SaleItem, SaleItem.product_id == Product.id
     ).join(
         Sale, Sale.id == SaleItem.sale_id
-    ).filter(base_filter).group_by(Product.id).order_by(func.sum(SaleItem.subtotal).asc()).limit(10).all()
+    ).filter(product_filter).group_by(Product.id).order_by(func.sum(SaleItem.subtotal).asc()).limit(10).all()
+
+    worst_products = [
+        {'name': p.name, 'code': p.code, 'brand': p.brand,
+         'units_sold': int(p.units_sold or 0), 'revenue': float(p.revenue or 0)}
+        for p in worst_products_query
+    ]
 
     # Never sold products - also filter by location
     sold_product_ids = db.session.query(func.distinct(SaleItem.product_id)).join(Sale).filter(
         base_filter
     )
 
-    never_sold = Product.query.filter(
+    never_sold_query = Product.query.filter(
         ~Product.id.in_(sold_product_ids.subquery().select()),
         Product.is_active == True
-    ).limit(20).all()
+    )
+    if category_id:
+        never_sold_query = never_sold_query.filter_by(category_id=category_id)
+    never_sold = never_sold_query.limit(20).all()
+
+    # Apply search filter
+    if search:
+        search_lower = search.lower()
+        top_products = [p for p in top_products if search_lower in p['name'].lower() or search_lower in (p['code'] or '').lower()]
+        worst_products = [p for p in worst_products if search_lower in p['name'].lower() or search_lower in (p['code'] or '').lower()]
+        never_sold = [p for p in never_sold if search_lower in p.name.lower() or search_lower in (p.code or '').lower()]
+
+    # Apply sorting to top_products
+    prod_sort_options = {
+        'quantity_desc': lambda x: -x['units_sold'],
+        'revenue_desc': lambda x: -x['revenue'],
+        'name_asc': lambda x: x['name'].lower(),
+    }
+    sort_fn = prod_sort_options.get(sort_by, prod_sort_options['revenue_desc'])
+    top_products.sort(key=sort_fn)
 
     return render_template('reports/product_performance.html',
                          start_date=start_date,
@@ -742,7 +869,11 @@ def product_performance():
                          never_sold=never_sold,
                          user_location=user_location,
                          locations=locations,
-                         selected_location_id=location_id)
+                         selected_location_id=location_id,
+                         categories=categories,
+                         selected_category_id=category_id,
+                         sort_by=sort_by,
+                         search=search)
 
 
 @bp.route('/sales-by-category')
@@ -1214,6 +1345,9 @@ def customer_analysis():
     location_id = request.args.get('location_id', type=int)
     locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
 
+    sort_by = request.args.get('sort_by', 'total_spent_desc')
+    search = request.args.get('search', '').strip()
+
     # Get date range
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
@@ -1258,7 +1392,40 @@ def customer_analysis():
         func.max(Sale.sale_date).label('last_purchase')
     ).select_from(Customer).join(
         Sale, Sale.customer_id == Customer.id
-    ).filter(base_filter).group_by(Customer.id).order_by(func.sum(Sale.total).desc()).limit(20).all()
+    ).filter(base_filter).group_by(Customer.id).order_by(func.sum(Sale.total).desc()).limit(50).all()
+
+    # Convert to dicts for filtering/sorting
+    top_customers_list = [
+        {
+            'id': c.id, 'name': c.name, 'phone': c.phone,
+            'loyalty_points': c.loyalty_points or 0,
+            'purchases': int(c.purchases or 0),
+            'total_spent': float(c.total_spent or 0),
+            'avg_purchase': float(c.avg_purchase or 0),
+            'last_purchase': c.last_purchase
+        }
+        for c in top_customers
+    ]
+
+    # Apply search filter
+    if search:
+        search_lower = search.lower()
+        top_customers_list = [c for c in top_customers_list
+                              if search_lower in (c['name'] or '').lower() or search_lower in (c['phone'] or '').lower()]
+
+    # Apply sorting
+    cust_sort_options = {
+        'total_spent_desc': lambda x: -x['total_spent'],
+        'visit_count_desc': lambda x: -x['purchases'],
+        'name_asc': lambda x: (x['name'] or '').lower(),
+        'last_visit_desc': lambda x: (datetime.min if x['last_purchase'] is None else
+                                       (x['last_purchase'] if isinstance(x['last_purchase'], datetime) else datetime.combine(x['last_purchase'], datetime.min.time()))),
+    }
+    sort_fn = cust_sort_options.get(sort_by, cust_sort_options['total_spent_desc'])
+    reverse_sort = sort_by == 'last_visit_desc'
+    top_customers_list.sort(key=sort_fn, reverse=reverse_sort)
+
+    top_customers = top_customers_list
 
     # Customer loyalty tier breakdown - use loyalty_points ranges instead of property
     tier_case = case(
@@ -1299,7 +1466,9 @@ def customer_analysis():
                          new_customers=new_customers,
                          user_location=user_location,
                          locations=locations,
-                         selected_location_id=location_id)
+                         selected_location_id=location_id,
+                         sort_by=sort_by,
+                         search=search)
 
 
 @bp.route('/export/<report_type>')
@@ -1439,6 +1608,9 @@ def stock_valuation():
 
     # Get selected location from request
     selected_location_id = request.args.get('location_id', type=int)
+    search = request.args.get('search', '').strip()
+    sort_by = request.args.get('sort_by', 'name_asc')
+    category_id = request.args.get('category_id', type=int)
 
     # Get all locations
     locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
@@ -1532,6 +1704,34 @@ def stock_valuation():
                         'profit': sell_val - cost_val
                     })
 
+    # Filter detail view by category
+    if category_id and location_stock_details:
+        location_stock_details = [d for d in location_stock_details
+                                  if d['product'].category_id == category_id]
+
+    # Search filter for detail view
+    if search and location_stock_details:
+        search_lower = search.lower()
+        location_stock_details = [d for d in location_stock_details
+                                  if search_lower in d['product'].name.lower() or
+                                     search_lower in (d['product'].code or '').lower()]
+
+    # Sort detail view
+    sort_options = {
+        'name_asc': (lambda x: x['product'].name.lower(), False),
+        'name_desc': (lambda x: x['product'].name.lower(), True),
+        'cost_value_desc': (lambda x: x['cost_value'], True),
+        'selling_value_desc': (lambda x: x['selling_value'], True),
+        'profit_desc': (lambda x: x['profit'], True),
+        'quantity_desc': (lambda x: float(x['quantity']), True),
+    }
+    if sort_by in sort_options:
+        sort_key, sort_reverse = sort_options[sort_by]
+        location_stock_details.sort(key=sort_key, reverse=sort_reverse)
+
+    # Get categories for filter dropdown
+    categories = Category.query.order_by(Category.name).all()
+
     # Get production order summary
     production_stats = {
         'total_orders': ProductionOrder.query.count(),
@@ -1563,7 +1763,11 @@ def stock_valuation():
                          grand_total_items=grand_total_items,
                          grand_total_quantity=grand_total_quantity,
                          production_stats=production_stats,
-                         raw_material_value=float(raw_material_value))
+                         raw_material_value=float(raw_material_value),
+                         search=search,
+                         sort_by=sort_by,
+                         categories=categories,
+                         selected_category_id=category_id)
 
 
 @bp.route('/stock-reconciliation')
@@ -1578,6 +1782,8 @@ def stock_reconciliation():
     from_date_str = request.args.get('from_date')
     to_date_str = request.args.get('to_date')
     show_type = request.args.get('show_type', 'all')  # 'all', 'raw_materials', 'products'
+    search = request.args.get('search', '').strip()
+    sort_by = request.args.get('sort_by', 'name_asc')
 
     # Default to current month
     today = date.today()
@@ -1795,6 +2001,35 @@ def stock_reconciliation():
 
     selected_location = Location.query.get(selected_location_id) if selected_location_id else None
 
+    # Search filter
+    if search:
+        search_lower = search.lower()
+        raw_material_data = [d for d in raw_material_data
+                            if search_lower in d['material'].name.lower()]
+        product_data = [d for d in product_data
+                       if search_lower in d['product'].name.lower() or
+                          search_lower in (d['product'].code or '').lower()]
+
+    # Sort
+    sort_options_rm = {
+        'name_asc': (lambda x: x['material'].name.lower(), False),
+        'stock_value_desc': (lambda x: x['stock_value'], True),
+        'stock_desc': (lambda x: x['current_stock'], True),
+        'consumed_desc': (lambda x: x['production_out'], True),
+    }
+    sort_options_prod = {
+        'name_asc': (lambda x: x['product'].name.lower(), False),
+        'stock_value_desc': (lambda x: x['stock_value'], True),
+        'stock_desc': (lambda x: float(x['current_stock']), True),
+        'consumed_desc': (lambda x: x['sales_out'], True),
+    }
+    if sort_by in sort_options_rm:
+        sort_key, sort_reverse = sort_options_rm[sort_by]
+        raw_material_data.sort(key=sort_key, reverse=sort_reverse)
+    if sort_by in sort_options_prod:
+        sort_key, sort_reverse = sort_options_prod[sort_by]
+        product_data.sort(key=sort_key, reverse=sort_reverse)
+
     return render_template('reports/stock_reconciliation.html',
                          locations=locations,
                          selected_location=selected_location,
@@ -1807,7 +2042,9 @@ def stock_reconciliation():
                          total_raw_material_value=total_raw_material_value,
                          total_product_value=total_product_value,
                          purchase_summary=purchase_summary,
-                         production_summary=production_summary)
+                         production_summary=production_summary,
+                         search=search,
+                         sort_by=sort_by)
 
 
 @bp.route('/purchase-register')
@@ -1819,6 +2056,9 @@ def purchase_register():
     to_date_str = request.args.get('to_date')
     payment_status = request.args.get('payment_status')
     supplier_id = request.args.get('supplier_id', type=int)
+    location_id = request.args.get('location_id', type=int)
+    sort_by = request.args.get('sort_by', 'date_desc')
+    search = request.args.get('search', '').strip()
 
     # Default to current month
     today = datetime.now().date()
@@ -1844,7 +2084,28 @@ def purchase_register():
     if supplier_id:
         query = query.filter_by(supplier_id=supplier_id)
 
+    if location_id:
+        query = query.filter_by(receiving_location_id=location_id)
+
     purchases = query.order_by(PurchaseOrder.order_date.desc()).all()
+
+    # Apply search filter (supplier name or PO number)
+    if search:
+        search_lower = search.lower()
+        purchases = [p for p in purchases
+                     if search_lower in (p.po_number or '').lower()
+                     or (p.supplier and search_lower in (p.supplier.name or '').lower())]
+
+    # Apply sorting
+    purchase_sort_options = {
+        'date_desc': lambda x: x.order_date or datetime.min,
+        'date_asc': lambda x: x.order_date or datetime.min,
+        'amount_desc': lambda x: float(x.grand_total_landed or 0),
+        'supplier_asc': lambda x: (x.supplier.name if x.supplier else '').lower(),
+    }
+    sort_fn = purchase_sort_options.get(sort_by, purchase_sort_options['date_desc'])
+    reverse_sort = sort_by in ('date_desc', 'amount_desc')
+    purchases.sort(key=sort_fn, reverse=reverse_sort)
 
     # Calculate totals
     totals = {
@@ -1862,6 +2123,9 @@ def purchase_register():
     from app.models import Supplier
     suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.name).all()
 
+    # Get locations for filter
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+
     return render_template('reports/purchase_register.html',
                          purchases=purchases,
                          totals=totals,
@@ -1869,7 +2133,11 @@ def purchase_register():
                          from_date=from_date,
                          to_date=to_date,
                          selected_payment_status=payment_status,
-                         selected_supplier_id=supplier_id)
+                         selected_supplier_id=supplier_id,
+                         locations=locations,
+                         selected_location_id=location_id,
+                         sort_by=sort_by,
+                         search=search)
 
 
 @bp.route('/stock-movement-audit')
@@ -1882,6 +2150,8 @@ def stock_movement_audit():
     product_id = request.args.get('product_id', type=int)
     location_id = request.args.get('location_id', type=int)
     movement_type = request.args.get('movement_type')
+    search = request.args.get('search', '').strip()
+    sort_by = request.args.get('sort_by', 'date_desc')
 
     # Default to last 7 days
     today = datetime.now()
@@ -1912,6 +2182,24 @@ def stock_movement_audit():
 
     movements = query.order_by(StockMovement.timestamp.desc()).limit(500).all()
 
+    # Search filter
+    if search:
+        search_lower = search.lower()
+        movements = [m for m in movements
+                    if (m.product and search_lower in m.product.name.lower()) or
+                       (m.reference and search_lower in m.reference.lower())]
+
+    # Sort
+    if sort_by == 'date_asc':
+        movements.sort(key=lambda x: x.timestamp or datetime.min)
+    elif sort_by == 'quantity_desc':
+        movements.sort(key=lambda x: abs(x.quantity or 0), reverse=True)
+    elif sort_by == 'product_asc':
+        movements.sort(key=lambda x: (x.product.name if x.product else '').lower())
+    elif sort_by == 'type_asc':
+        movements.sort(key=lambda x: (x.movement_type or '').lower())
+    # else: default date_desc from query
+
     # Calculate summary by type
     summary_by_type = {}
     for m in movements:
@@ -1936,7 +2224,9 @@ def stock_movement_audit():
                          to_date=to_date,
                          selected_product_id=product_id,
                          selected_location_id=location_id,
-                         selected_movement_type=movement_type)
+                         selected_movement_type=movement_type,
+                         search=search,
+                         sort_by=sort_by)
 
 
 @bp.route('/transfer-discrepancy')
@@ -1947,6 +2237,9 @@ def transfer_discrepancy():
     from_date_str = request.args.get('from_date')
     to_date_str = request.args.get('to_date')
     show_only_discrepancies = request.args.get('discrepancies_only', 'false') == 'true'
+    location_id = request.args.get('location_id', type=int)
+    sort_by = request.args.get('sort_by', 'date_desc')
+    search = request.args.get('search', '').strip()
 
     # Default to last 30 days
     today = datetime.now().date()
@@ -1961,11 +2254,17 @@ def transfer_discrepancy():
         to_date = today
 
     # Get completed transfers
-    transfers = StockTransfer.query.filter(
+    transfer_query = StockTransfer.query.filter(
         StockTransfer.created_at >= datetime.combine(from_date, datetime.min.time()),
         StockTransfer.created_at <= datetime.combine(to_date, datetime.max.time()),
         StockTransfer.status == 'received'
-    ).order_by(StockTransfer.created_at.desc()).all()
+    )
+    if location_id:
+        transfer_query = transfer_query.filter(
+            db.or_(StockTransfer.source_location_id == location_id,
+                   StockTransfer.destination_location_id == location_id)
+        )
+    transfers = transfer_query.order_by(StockTransfer.created_at.desc()).all()
 
     # Build discrepancy data
     transfer_data = []
@@ -2003,13 +2302,36 @@ def transfer_discrepancy():
                 'has_discrepancy': transfer_has_discrepancy
             })
 
+    # Apply search filter on product names within transfer items
+    if search:
+        search_lower = search.lower()
+        for td in transfer_data:
+            td['items'] = [item for item in td['items']
+                          if item['product'] and search_lower in item['product'].name.lower()]
+        # Remove transfers with no matching items
+        transfer_data = [td for td in transfer_data if td['items']]
+
+    # Apply sorting
+    if sort_by == 'variance_desc':
+        transfer_data.sort(key=lambda x: sum(abs(item['variance']) for item in x['items']), reverse=True)
+    elif sort_by == 'value_desc':
+        transfer_data.sort(key=lambda x: sum(item['variance_value'] for item in x['items']), reverse=True)
+    # else date_desc is already the default from the query
+
+    # Get locations for filter
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+
     return render_template('reports/transfer_discrepancy.html',
                          transfer_data=transfer_data,
                          total_discrepancies=total_discrepancies,
                          total_discrepancy_value=total_discrepancy_value,
                          from_date=from_date,
                          to_date=to_date,
-                         show_only_discrepancies=show_only_discrepancies)
+                         show_only_discrepancies=show_only_discrepancies,
+                         locations=locations,
+                         selected_location_id=location_id,
+                         sort_by=sort_by,
+                         search=search)
 
 
 @bp.route('/raw-material-stock')
@@ -2024,6 +2346,8 @@ def raw_material_stock():
     selected_category_id = request.args.get('category_id', type=int)
     from_date_str = request.args.get('from_date')
     to_date_str = request.args.get('to_date')
+    search = request.args.get('search', '').strip()
+    sort_by = request.args.get('sort_by', 'name_asc')
 
     # Default to current month
     today = date.today()
@@ -2147,6 +2471,26 @@ def raw_material_stock():
 
     selected_location = Location.query.get(selected_location_id) if selected_location_id else None
 
+    # Search filter
+    if search:
+        search_lower = search.lower()
+        raw_material_data = [d for d in raw_material_data
+                            if search_lower in d['material'].name.lower()]
+
+    # Sort
+    sort_options = {
+        'name_asc': (lambda x: x['material'].name.lower(), False),
+        'name_desc': (lambda x: x['material'].name.lower(), True),
+        'stock_value_desc': (lambda x: x['stock_value'], True),
+        'stock_desc': (lambda x: x['current_stock'], True),
+        'consumed_desc': (lambda x: x['production_out'], True),
+        'purchased_desc': (lambda x: x['purchases_in'], True),
+        'category_asc': (lambda x: x['category'].lower(), False),
+    }
+    if sort_by in sort_options:
+        sort_key, sort_reverse = sort_options[sort_by]
+        raw_material_data.sort(key=sort_key, reverse=sort_reverse)
+
     return render_template('reports/raw_material_stock.html',
                          locations=locations,
                          categories=categories,
@@ -2160,7 +2504,9 @@ def raw_material_stock():
                          total_stock_value=total_stock_value,
                          total_purchased_value=total_purchased_value,
                          total_consumed_value=total_consumed_value,
-                         production_summary=production_summary)
+                         production_summary=production_summary,
+                         search=search,
+                         sort_by=sort_by)
 
 
 @bp.route('/stock-in-out')
@@ -2176,6 +2522,8 @@ def stock_in_out():
     location_id = request.args.get('location_id', type=int)
     category_id = request.args.get('category_id', type=int)
     view_mode = request.args.get('view', 'summary')  # summary or detailed
+    sort_by = request.args.get('sort_by', 'name_asc')
+    search = request.args.get('search', '').strip()
 
     today = datetime.now().date()
     from_date = datetime.strptime(from_date_str, '%Y-%m-%d').date() if from_date_str else today - timedelta(days=30)
@@ -2271,6 +2619,22 @@ def stock_in_out():
 
         product_data.append(item)
 
+    # Apply search filter
+    if search:
+        search_lower = search.lower()
+        product_data = [p for p in product_data
+                       if search_lower in p['product_name'].lower() or search_lower in (p['product_code'] or '').lower()]
+
+    # Apply sorting
+    sio_sort_options = {
+        'name_asc': lambda x: x['product_name'].lower(),
+        'net_change_desc': lambda x: -abs(x['net_change']),
+        'purchase_desc': lambda x: -x.get('purchase', 0),
+        'sale_desc': lambda x: -abs(x.get('sale', 0)),
+    }
+    sort_fn = sio_sort_options.get(sort_by, sio_sort_options['name_asc'])
+    product_data.sort(key=sort_fn)
+
     return render_template('reports/stock_in_out.html',
                          from_date=from_date,
                          to_date=to_date,
@@ -2281,7 +2645,9 @@ def stock_in_out():
                          view_mode=view_mode,
                          product_data=product_data,
                          totals=totals,
-                         movement_types=movement_types)
+                         movement_types=movement_types,
+                         sort_by=sort_by,
+                         search=search)
 
 
 @bp.route('/sale-projection')
@@ -2295,6 +2661,8 @@ def sale_projection():
     location_id = request.args.get('location_id', type=int)
     category_id = request.args.get('category_id', type=int)
     lookback_days = request.args.get('lookback_days', 30, type=int)
+    sort_by = request.args.get('sort_by', 'days_remaining_asc')
+    search = request.args.get('search', '').strip()
 
     locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
     categories = Category.query.order_by(Category.name).all()
@@ -2401,8 +2769,22 @@ def sale_projection():
         total_projected_revenue += projected_revenue
         total_projected_profit += projected_profit
 
-    # Sort by days_remaining ascending (critical first), None values last
-    product_data.sort(key=lambda x: (x['days_remaining'] is None, x['days_remaining'] or 0))
+    # Apply search filter
+    if search:
+        search_lower = search.lower()
+        product_data = [p for p in product_data
+                       if search_lower in p['product_name'].lower() or search_lower in (p['product_code'] or '').lower()]
+
+    # Apply sorting
+    proj_sort_options = {
+        'days_remaining_asc': lambda x: (x['days_remaining'] is None, x['days_remaining'] or 0),
+        'revenue_desc': lambda x: -x['projected_revenue'],
+        'profit_desc': lambda x: -x['projected_profit'],
+        'stock_desc': lambda x: -x['current_stock'],
+        'name_asc': lambda x: x['product_name'].lower(),
+    }
+    sort_fn = proj_sort_options.get(sort_by, proj_sort_options['days_remaining_asc'])
+    product_data.sort(key=sort_fn)
 
     # Top 10 by projected revenue for chart
     top_by_revenue = sorted(product_data, key=lambda x: x['projected_revenue'], reverse=True)[:10]
@@ -2418,4 +2800,770 @@ def sale_projection():
                          total_projected_revenue=total_projected_revenue,
                          total_projected_profit=total_projected_profit,
                          at_risk_count=at_risk_count,
-                         top_by_revenue=top_by_revenue)
+                         top_by_revenue=top_by_revenue,
+                         sort_by=sort_by,
+                         search=search)
+
+
+@bp.route('/inventory-crosscheck')
+@login_required
+@permission_required(Permissions.REPORT_VIEW_INVENTORY)
+def inventory_crosscheck():
+    """Inventory cross-check report for manual physical count verification"""
+    from app.models import Category, RawMaterialCategory
+    from app.utils.location_context import get_current_location
+
+    user_location = get_current_location()
+
+    # Get all active locations
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+
+    # Location filter - admin can pick, others see their own
+    location_id = request.args.get('location_id', type=int)
+    show_raw = request.args.get('show_raw', '0') == '1'
+    category_id = request.args.get('category_id', type=int)
+    search = request.args.get('search', '').strip()
+    stock_filter = request.args.get('stock_filter', '')  # in_stock, out_of_stock, all
+    sort_by = request.args.get('sort_by', 'category')  # category, name, code, stock_desc, stock_asc
+
+    if current_user.is_global_admin and location_id:
+        selected_locations = [Location.query.get(location_id)]
+    elif current_user.is_global_admin:
+        selected_locations = locations
+    elif user_location:
+        selected_locations = [user_location]
+    else:
+        selected_locations = locations
+
+    # ===== FINISHED PRODUCTS =====
+    categories = Category.query.order_by(Category.name).all()
+    product_query = Product.query.filter_by(is_active=True)
+    if category_id:
+        product_query = product_query.filter_by(category_id=category_id)
+    if search:
+        product_query = product_query.filter(
+            db.or_(Product.name.ilike(f'%{search}%'), Product.code.ilike(f'%{search}%'),
+                   Product.barcode.ilike(f'%{search}%'))
+        )
+    products = product_query.order_by(Product.category_id, Product.name).all()
+
+    # Build product data with per-location stock
+    product_data = []
+    grand_total_system = 0
+
+    for product in products:
+        loc_stocks = {}
+        product_total = 0
+
+        for loc in selected_locations:
+            ls = LocationStock.query.filter_by(
+                product_id=product.id,
+                location_id=loc.id
+            ).first()
+            qty = ls.quantity if ls else 0
+            loc_stocks[loc.id] = qty
+            product_total += qty
+
+        # Also include global product quantity
+        global_qty = product.quantity or 0
+
+        product_data.append({
+            'product': product,
+            'category_name': product.category.name if product.category else 'Uncategorized',
+            'loc_stocks': loc_stocks,
+            'location_total': product_total,
+            'global_qty': global_qty,
+        })
+        grand_total_system += product_total
+
+    # Apply stock filter
+    if stock_filter == 'out_of_stock':
+        product_data = [d for d in product_data if d['location_total'] == 0]
+    elif stock_filter == 'in_stock':
+        product_data = [d for d in product_data if d['location_total'] > 0]
+
+    # Apply sort
+    crosscheck_sorts = {
+        'category': lambda x: (x['category_name'].lower(), x['product'].name.lower()),
+        'name': lambda x: x['product'].name.lower(),
+        'code': lambda x: (x['product'].code or '').lower(),
+        'stock_desc': lambda x: -x['location_total'],
+        'stock_asc': lambda x: x['location_total'],
+    }
+    product_data.sort(key=crosscheck_sorts.get(sort_by, crosscheck_sorts['category']))
+
+    # Recalculate grand total after filtering
+    grand_total_system = sum(d['location_total'] for d in product_data)
+
+    # ===== RAW MATERIALS =====
+    raw_data = []
+    raw_grand_total = 0
+
+    if show_raw:
+        raw_materials = RawMaterial.query.filter_by(is_active=True).order_by(
+            RawMaterial.category_id, RawMaterial.name
+        ).all()
+
+        for rm in raw_materials:
+            loc_stocks = {}
+            rm_total = 0
+
+            for loc in selected_locations:
+                rms = RawMaterialStock.query.filter_by(
+                    raw_material_id=rm.id,
+                    location_id=loc.id
+                ).first()
+                qty = float(rms.quantity) if rms else 0
+                loc_stocks[loc.id] = qty
+                rm_total += qty
+
+            raw_data.append({
+                'material': rm,
+                'category_name': rm.category.name if rm.category else 'Uncategorized',
+                'unit': rm.unit,
+                'loc_stocks': loc_stocks,
+                'location_total': rm_total,
+                'global_qty': float(rm.quantity or 0),
+            })
+            raw_grand_total += rm_total
+
+    return render_template('reports/inventory_crosscheck.html',
+                         locations=locations,
+                         categories=categories,
+                         selected_locations=selected_locations,
+                         selected_location_id=location_id,
+                         selected_category_id=category_id,
+                         user_location=user_location,
+                         search=search,
+                         stock_filter=stock_filter,
+                         sort_by=sort_by,
+                         product_data=product_data,
+                         grand_total_system=grand_total_system,
+                         show_raw=show_raw,
+                         raw_data=raw_data,
+                         raw_grand_total=raw_grand_total,
+                         print_date=datetime.now())
+
+
+@bp.route('/inventory-turnover')
+@login_required
+@permission_required(Permissions.REPORT_VIEW_INVENTORY)
+def inventory_turnover():
+    """Inventory turnover analysis - how fast products sell and get replaced"""
+    from app.models import Category
+    from app.utils.location_context import get_current_location
+
+    user_location = get_current_location()
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    categories = Category.query.order_by(Category.name).all()
+
+    # Filters
+    location_id = request.args.get('location_id', type=int)
+    category_id = request.args.get('category_id', type=int)
+    period_days = request.args.get('period', 90, type=int)  # default 90 days
+    speed_filter = request.args.get('speed', '')  # fast, normal, slow, dead
+    sort_by = request.args.get('sort_by', 'turnover_desc')
+    search = request.args.get('search', '').strip()
+    stock_filter = request.args.get('stock_filter', '')  # in_stock, out_of_stock, low_stock
+    min_value = request.args.get('min_value', 0, type=float)
+
+    # Determine effective location
+    if current_user.is_global_admin:
+        effective_location_id = location_id
+    elif user_location:
+        effective_location_id = user_location.id
+    else:
+        effective_location_id = None
+
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=period_days)
+
+    # Get sales quantity per product in period
+    sales_query = db.session.query(
+        SaleItem.product_id,
+        func.sum(SaleItem.quantity).label('units_sold'),
+        func.sum(SaleItem.subtotal).label('revenue'),
+    ).select_from(SaleItem).join(Sale).filter(
+        Sale.sale_date >= start_date,
+        Sale.sale_date <= end_date,
+        Sale.status == 'completed'
+    )
+
+    if effective_location_id:
+        sales_query = sales_query.filter(Sale.location_id == effective_location_id)
+
+    sales_data = {row.product_id: {
+        'units_sold': int(row.units_sold or 0),
+        'revenue': float(row.revenue or 0)
+    } for row in sales_query.group_by(SaleItem.product_id).all()}
+
+    # Get products
+    product_query = Product.query.filter_by(is_active=True)
+    if category_id:
+        product_query = product_query.filter_by(category_id=category_id)
+    if search:
+        product_query = product_query.filter(
+            db.or_(Product.name.ilike(f'%{search}%'), Product.code.ilike(f'%{search}%'),
+                   Product.barcode.ilike(f'%{search}%'))
+        )
+
+    products = product_query.order_by(Product.name).all()
+
+    product_data = []
+    total_stock_value = 0
+    total_cogs = 0
+    turnover_buckets = {'fast': 0, 'normal': 0, 'slow': 0, 'dead': 0}
+
+    for p in products:
+        # Current stock
+        if effective_location_id:
+            ls = LocationStock.query.filter_by(product_id=p.id, location_id=effective_location_id).first()
+            current_stock = ls.quantity if ls else 0
+        else:
+            current_stock = p.quantity or 0
+
+        cost_price = float(p.cost_price or 0)
+        stock_value = current_stock * cost_price
+        total_stock_value += stock_value
+
+        sale_info = sales_data.get(p.id, {'units_sold': 0, 'revenue': 0})
+        units_sold = sale_info['units_sold']
+        cogs = units_sold * cost_price
+        total_cogs += cogs
+
+        # Average inventory = (current stock + estimated start stock) / 2
+        # Estimated start = current + sold (simple approximation)
+        avg_inventory = (current_stock + (current_stock + units_sold)) / 2
+        avg_inventory_value = avg_inventory * cost_price
+
+        # Turnover ratio = COGS / Average Inventory Value
+        if avg_inventory_value > 0:
+            turnover_ratio = cogs / avg_inventory_value
+        else:
+            turnover_ratio = 0
+
+        # Days to sell = period_days / turnover_ratio
+        if turnover_ratio > 0:
+            days_to_sell = period_days / turnover_ratio
+        else:
+            days_to_sell = None  # infinite / no sales
+
+        # Daily sales rate
+        daily_rate = units_sold / period_days if period_days > 0 else 0
+
+        # Days of stock remaining
+        if daily_rate > 0:
+            days_remaining = current_stock / daily_rate
+        else:
+            days_remaining = None
+
+        # Classify speed
+        if units_sold == 0:
+            speed = 'dead'
+            turnover_buckets['dead'] += 1
+        elif turnover_ratio >= 4:
+            speed = 'fast'
+            turnover_buckets['fast'] += 1
+        elif turnover_ratio >= 1:
+            speed = 'normal'
+            turnover_buckets['normal'] += 1
+        else:
+            speed = 'slow'
+            turnover_buckets['slow'] += 1
+
+        product_data.append({
+            'product': p,
+            'category_name': p.category.name if p.category else 'Uncategorized',
+            'current_stock': current_stock,
+            'stock_value': stock_value,
+            'units_sold': units_sold,
+            'revenue': sale_info['revenue'],
+            'cogs': cogs,
+            'turnover_ratio': round(turnover_ratio, 2),
+            'days_to_sell': round(days_to_sell, 1) if days_to_sell else None,
+            'daily_rate': round(daily_rate, 2),
+            'days_remaining': round(days_remaining, 1) if days_remaining else None,
+            'speed': speed,
+        })
+
+    # Apply speed filter
+    if speed_filter:
+        product_data = [d for d in product_data if d['speed'] == speed_filter]
+
+    # Apply stock filter
+    if stock_filter == 'out_of_stock':
+        product_data = [d for d in product_data if d['current_stock'] == 0]
+    elif stock_filter == 'in_stock':
+        product_data = [d for d in product_data if d['current_stock'] > 0]
+    elif stock_filter == 'low_stock':
+        product_data = [d for d in product_data if 0 < d['current_stock'] <= (d['product'].reorder_level or 10)]
+
+    # Apply min stock value filter
+    if min_value > 0:
+        product_data = [d for d in product_data if d['stock_value'] >= min_value]
+
+    # Sort
+    sort_options = {
+        'turnover_desc': lambda x: (-x['turnover_ratio'], x['product'].name),
+        'turnover_asc': lambda x: (x['turnover_ratio'], x['product'].name),
+        'revenue_desc': lambda x: -x['revenue'],
+        'revenue_asc': lambda x: x['revenue'],
+        'stock_value_desc': lambda x: -x['stock_value'],
+        'stock_value_asc': lambda x: x['stock_value'],
+        'units_sold_desc': lambda x: -x['units_sold'],
+        'units_sold_asc': lambda x: x['units_sold'],
+        'days_remaining_asc': lambda x: (x['days_remaining'] is None, x['days_remaining'] or 0),
+        'days_remaining_desc': lambda x: (x['days_remaining'] is not None, -(x['days_remaining'] or 0)),
+        'daily_rate_desc': lambda x: -x['daily_rate'],
+        'name_asc': lambda x: x['product'].name.lower(),
+        'name_desc': lambda x: x['product'].name.lower(),
+        'category_asc': lambda x: (x['category_name'].lower(), x['product'].name.lower()),
+    }
+    sort_fn = sort_options.get(sort_by, sort_options['turnover_desc'])
+    reverse = sort_by == 'name_desc'
+    product_data.sort(key=sort_fn, reverse=reverse)
+
+    # Overall turnover
+    overall_turnover = total_cogs / total_stock_value if total_stock_value > 0 else 0
+
+    return render_template('reports/inventory_turnover.html',
+                         locations=locations,
+                         categories=categories,
+                         selected_location_id=location_id,
+                         selected_category_id=category_id,
+                         user_location=user_location,
+                         period_days=period_days,
+                         speed_filter=speed_filter,
+                         sort_by=sort_by,
+                         search=search,
+                         stock_filter=stock_filter,
+                         min_value=min_value,
+                         product_data=product_data,
+                         total_stock_value=total_stock_value,
+                         total_cogs=total_cogs,
+                         overall_turnover=round(overall_turnover, 2),
+                         turnover_buckets=turnover_buckets,
+                         start_date=start_date,
+                         end_date=end_date)
+
+
+@bp.route('/abc-analysis')
+@login_required
+@permission_required(Permissions.REPORT_VIEW_INVENTORY)
+def abc_analysis():
+    """ABC Analysis - classify products by revenue contribution"""
+    from app.models import Category
+    from app.utils.location_context import get_current_location
+
+    user_location = get_current_location()
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+    categories = Category.query.order_by(Category.name).all()
+
+    # Filters
+    location_id = request.args.get('location_id', type=int)
+    period_days = request.args.get('period', 90, type=int)
+    category_id = request.args.get('category_id', type=int)
+    class_filter = request.args.get('class_filter', '')  # A, B, C
+    search = request.args.get('search', '').strip()
+    sort_by = request.args.get('sort_by', 'revenue_desc')
+    show_zero = request.args.get('show_zero', '1') == '1'
+
+    if current_user.is_global_admin:
+        effective_location_id = location_id
+    elif user_location:
+        effective_location_id = user_location.id
+    else:
+        effective_location_id = None
+
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=period_days)
+
+    # Sales revenue per product
+    sales_query = db.session.query(
+        SaleItem.product_id,
+        func.sum(SaleItem.quantity).label('units_sold'),
+        func.sum(SaleItem.subtotal).label('revenue'),
+        func.count(func.distinct(Sale.id)).label('transaction_count'),
+    ).select_from(SaleItem).join(Sale).filter(
+        Sale.sale_date >= start_date,
+        Sale.sale_date <= end_date,
+        Sale.status == 'completed'
+    )
+
+    if effective_location_id:
+        sales_query = sales_query.filter(Sale.location_id == effective_location_id)
+
+    sales_rows = sales_query.group_by(SaleItem.product_id).all()
+
+    # Build product list with revenue
+    product_list = []
+    total_revenue = 0
+
+    for row in sales_rows:
+        product = Product.query.get(row.product_id)
+        if not product or not product.is_active:
+            continue
+        if category_id and product.category_id != category_id:
+            continue
+        if search and search.lower() not in product.name.lower() and search.lower() not in (product.code or '').lower():
+            continue
+
+        revenue = float(row.revenue or 0)
+        units = int(row.units_sold or 0)
+        cost_price = float(product.cost_price or 0)
+
+        # Current stock
+        if effective_location_id:
+            ls = LocationStock.query.filter_by(product_id=product.id, location_id=effective_location_id).first()
+            current_stock = ls.quantity if ls else 0
+        else:
+            current_stock = product.quantity or 0
+
+        stock_value = current_stock * cost_price
+
+        product_list.append({
+            'product': product,
+            'category_name': product.category.name if product.category else 'Uncategorized',
+            'revenue': revenue,
+            'units_sold': units,
+            'transactions': int(row.transaction_count or 0),
+            'current_stock': current_stock,
+            'stock_value': stock_value,
+            'cost_price': cost_price,
+            'profit': revenue - (units * cost_price),
+        })
+        total_revenue += revenue
+
+    # Also add products with zero sales
+    if show_zero:
+        sold_product_ids = {row.product_id for row in sales_rows}
+        zero_query = Product.query.filter(Product.is_active == True)
+        if sold_product_ids:
+            zero_query = zero_query.filter(~Product.id.in_(sold_product_ids))
+        if category_id:
+            zero_query = zero_query.filter_by(category_id=category_id)
+        if search:
+            zero_query = zero_query.filter(
+                db.or_(Product.name.ilike(f'%{search}%'), Product.code.ilike(f'%{search}%'))
+            )
+        zero_sale_products = zero_query.all()
+    else:
+        zero_sale_products = []
+
+    for product in zero_sale_products:
+        cost_price = float(product.cost_price or 0)
+        if effective_location_id:
+            ls = LocationStock.query.filter_by(product_id=product.id, location_id=effective_location_id).first()
+            current_stock = ls.quantity if ls else 0
+        else:
+            current_stock = product.quantity or 0
+
+        product_list.append({
+            'product': product,
+            'category_name': product.category.name if product.category else 'Uncategorized',
+            'revenue': 0,
+            'units_sold': 0,
+            'transactions': 0,
+            'current_stock': current_stock,
+            'stock_value': current_stock * cost_price,
+            'cost_price': cost_price,
+            'profit': 0,
+        })
+
+    # Sort by revenue descending
+    product_list.sort(key=lambda x: -x['revenue'])
+
+    # Assign ABC class based on cumulative revenue
+    cumulative = 0
+    for item in product_list:
+        if total_revenue > 0:
+            cumulative += item['revenue']
+            pct = (cumulative / total_revenue) * 100
+            item['cumulative_pct'] = round(pct, 1)
+            item['revenue_pct'] = round((item['revenue'] / total_revenue) * 100, 1)
+
+            if pct <= 80:
+                item['abc_class'] = 'A'
+            elif pct <= 95:
+                item['abc_class'] = 'B'
+            else:
+                item['abc_class'] = 'C'
+        else:
+            item['cumulative_pct'] = 0
+            item['revenue_pct'] = 0
+            item['abc_class'] = 'C'
+
+    # Summary by class (before filtering by class)
+    class_summary = {}
+    for cls in ['A', 'B', 'C']:
+        items = [i for i in product_list if i['abc_class'] == cls]
+        class_summary[cls] = {
+            'count': len(items),
+            'revenue': sum(i['revenue'] for i in items),
+            'units': sum(i['units_sold'] for i in items),
+            'stock_value': sum(i['stock_value'] for i in items),
+            'profit': sum(i['profit'] for i in items),
+            'pct_items': round(len(items) / len(product_list) * 100, 1) if product_list else 0,
+            'pct_revenue': round(sum(i['revenue'] for i in items) / total_revenue * 100, 1) if total_revenue > 0 else 0,
+        }
+
+    # Apply class filter after summary calculation
+    if class_filter:
+        product_list = [i for i in product_list if i['abc_class'] == class_filter]
+
+    # Apply sort (ABC always starts sorted by revenue desc for classification, but user can re-sort)
+    abc_sort_options = {
+        'revenue_desc': lambda x: -x['revenue'],
+        'revenue_asc': lambda x: x['revenue'],
+        'units_desc': lambda x: -x['units_sold'],
+        'units_asc': lambda x: x['units_sold'],
+        'stock_value_desc': lambda x: -x['stock_value'],
+        'stock_value_asc': lambda x: x['stock_value'],
+        'profit_desc': lambda x: -x['profit'],
+        'profit_asc': lambda x: x['profit'],
+        'name_asc': lambda x: x['product'].name.lower(),
+        'name_desc': lambda x: x['product'].name.lower(),
+        'transactions_desc': lambda x: -x['transactions'],
+        'category_asc': lambda x: (x['category_name'].lower(), x['product'].name.lower()),
+    }
+    sort_fn = abc_sort_options.get(sort_by, abc_sort_options['revenue_desc'])
+    reverse = sort_by == 'name_desc'
+    product_list.sort(key=sort_fn, reverse=reverse)
+
+    return render_template('reports/abc_analysis.html',
+                         locations=locations,
+                         categories=categories,
+                         selected_location_id=location_id,
+                         selected_category_id=category_id,
+                         user_location=user_location,
+                         period_days=period_days,
+                         class_filter=class_filter,
+                         search=search,
+                         sort_by=sort_by,
+                         show_zero=show_zero,
+                         product_list=product_list,
+                         total_revenue=total_revenue,
+                         class_summary=class_summary,
+                         start_date=start_date,
+                         end_date=end_date)
+
+
+@bp.route('/stock-accuracy-trend')
+@login_required
+@permission_required(Permissions.REPORT_VIEW_INVENTORY)
+def stock_accuracy_trend():
+    """Stock accuracy trend from spot check data over time"""
+    from app.models import InventorySpotCheck, InventorySpotCheckItem
+    from app.utils.location_context import get_current_location
+
+    user_location = get_current_location()
+    locations = Location.query.filter_by(is_active=True).order_by(Location.name).all()
+
+    # Filters
+    location_id = request.args.get('location_id', type=int)
+    period_days = request.args.get('period', 180, type=int)  # 6 months default
+    group_by = request.args.get('group_by', 'week')  # week or month
+    check_type = request.args.get('check_type', '')  # daily, weekly, fortnightly, monthly, random
+    status_filter = request.args.get('status_filter', '')  # completed, approved
+    sort_worst = request.args.get('sort_worst', 'value_desc')  # value_desc, rate_desc, count_desc
+
+    if current_user.is_global_admin:
+        effective_location_id = location_id
+    elif user_location:
+        effective_location_id = user_location.id
+    else:
+        effective_location_id = None
+
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=period_days)
+
+    # Get spot checks in period
+    status_list = [status_filter] if status_filter else ['completed', 'approved']
+    checks_query = InventorySpotCheck.query.filter(
+        InventorySpotCheck.check_date >= start_date.date(),
+        InventorySpotCheck.check_date <= end_date.date(),
+        InventorySpotCheck.status.in_(status_list)
+    )
+
+    if effective_location_id:
+        checks_query = checks_query.filter(InventorySpotCheck.location_id == effective_location_id)
+    if check_type:
+        checks_query = checks_query.filter(InventorySpotCheck.check_type == check_type)
+
+    checks = checks_query.order_by(InventorySpotCheck.check_date).all()
+
+    # ===== Trend data by period =====
+    from collections import defaultdict
+    trend_data = defaultdict(lambda: {
+        'total_checked': 0, 'total_matched': 0, 'total_variance': 0,
+        'checks_count': 0, 'variance_value': 0
+    })
+
+    for check in checks:
+        if group_by == 'month':
+            period_key = check.check_date.strftime('%Y-%m')
+            period_label = check.check_date.strftime('%b %Y')
+        else:
+            # Week: use ISO week
+            iso = check.check_date.isocalendar()
+            period_key = f'{iso[0]}-W{iso[1]:02d}'
+            period_label = period_key
+
+        trend_data[period_key]['label'] = period_label
+        trend_data[period_key]['total_checked'] += check.total_items_checked or 0
+        trend_data[period_key]['total_matched'] += check.items_matched or 0
+        trend_data[period_key]['total_variance'] += check.items_variance or 0
+        trend_data[period_key]['checks_count'] += 1
+        trend_data[period_key]['variance_value'] += float(check.total_variance_value or 0)
+
+    # Calculate accuracy percentages
+    trend_list = []
+    for key in sorted(trend_data.keys()):
+        d = trend_data[key]
+        accuracy = (d['total_matched'] / d['total_checked'] * 100) if d['total_checked'] > 0 else 100
+        trend_list.append({
+            'period': key,
+            'label': d['label'],
+            'total_checked': d['total_checked'],
+            'total_matched': d['total_matched'],
+            'total_variance': d['total_variance'],
+            'checks_count': d['checks_count'],
+            'accuracy_pct': round(accuracy, 1),
+            'variance_value': round(d['variance_value'], 2),
+        })
+
+    # ===== Product-level variance analysis =====
+    # Find products with most recurring variances
+    item_query = db.session.query(
+        InventorySpotCheckItem.product_id,
+        func.count(InventorySpotCheckItem.id).label('check_count'),
+        func.sum(case(
+            (InventorySpotCheckItem.variance != 0, 1),
+            else_=0
+        )).label('variance_count'),
+        func.sum(func.abs(InventorySpotCheckItem.variance)).label('total_abs_variance'),
+        func.sum(func.abs(InventorySpotCheckItem.variance_value)).label('total_abs_value'),
+    ).join(InventorySpotCheck).filter(
+        InventorySpotCheck.check_date >= start_date.date(),
+        InventorySpotCheck.check_date <= end_date.date(),
+        InventorySpotCheck.status.in_(status_list),
+        InventorySpotCheckItem.product_id.isnot(None)
+    )
+
+    if effective_location_id:
+        item_query = item_query.filter(InventorySpotCheck.location_id == effective_location_id)
+    if check_type:
+        item_query = item_query.filter(InventorySpotCheck.check_type == check_type)
+
+    # Sort order for worst products
+    worst_sort_map = {
+        'value_desc': func.sum(func.abs(InventorySpotCheckItem.variance_value)).desc(),
+        'rate_desc': (func.sum(case((InventorySpotCheckItem.variance != 0, 1), else_=0)) * 100 / func.count(InventorySpotCheckItem.id)).desc(),
+        'count_desc': func.sum(case((InventorySpotCheckItem.variance != 0, 1), else_=0)).desc(),
+        'variance_desc': func.sum(func.abs(InventorySpotCheckItem.variance)).desc(),
+    }
+    worst_order = worst_sort_map.get(sort_worst, worst_sort_map['value_desc'])
+
+    worst_products = []
+    for row in item_query.group_by(InventorySpotCheckItem.product_id).having(
+        func.sum(case((InventorySpotCheckItem.variance != 0, 1), else_=0)) > 0
+    ).order_by(worst_order).limit(20).all():
+        product = Product.query.get(row.product_id)
+        if product:
+            checks_with_variance = int(row.variance_count or 0)
+            total_checks = int(row.check_count or 0)
+            worst_products.append({
+                'product': product,
+                'check_count': total_checks,
+                'variance_count': checks_with_variance,
+                'variance_rate': round(checks_with_variance / total_checks * 100, 1) if total_checks > 0 else 0,
+                'total_abs_variance': float(row.total_abs_variance or 0),
+                'total_abs_value': float(row.total_abs_value or 0),
+            })
+
+    # ===== Variance reason breakdown =====
+    reason_query = db.session.query(
+        InventorySpotCheckItem.variance_reason,
+        func.count(InventorySpotCheckItem.id).label('count'),
+        func.sum(func.abs(InventorySpotCheckItem.variance_value)).label('total_value'),
+    ).join(InventorySpotCheck).filter(
+        InventorySpotCheck.check_date >= start_date.date(),
+        InventorySpotCheck.check_date <= end_date.date(),
+        InventorySpotCheck.status.in_(status_list),
+        InventorySpotCheckItem.variance != 0
+    )
+
+    if effective_location_id:
+        reason_query = reason_query.filter(InventorySpotCheck.location_id == effective_location_id)
+    if check_type:
+        reason_query = reason_query.filter(InventorySpotCheck.check_type == check_type)
+
+    reason_breakdown = []
+    for row in reason_query.group_by(InventorySpotCheckItem.variance_reason).all():
+        reason_breakdown.append({
+            'reason': row.variance_reason or 'Not specified',
+            'count': int(row.count or 0),
+            'total_value': float(row.total_value or 0),
+        })
+    reason_breakdown.sort(key=lambda x: -x['total_value'])
+
+    # ===== Location comparison =====
+    location_accuracy = []
+    if current_user.is_global_admin and not effective_location_id:
+        loc_query = db.session.query(
+            InventorySpotCheck.location_id,
+            func.sum(InventorySpotCheck.total_items_checked).label('checked'),
+            func.sum(InventorySpotCheck.items_matched).label('matched'),
+            func.sum(InventorySpotCheck.items_variance).label('variance'),
+            func.sum(InventorySpotCheck.total_variance_value).label('variance_value'),
+            func.count(InventorySpotCheck.id).label('checks_count'),
+        ).filter(
+            InventorySpotCheck.check_date >= start_date.date(),
+            InventorySpotCheck.check_date <= end_date.date(),
+            InventorySpotCheck.status.in_(status_list)
+        )
+        if check_type:
+            loc_query = loc_query.filter(InventorySpotCheck.check_type == check_type)
+        loc_query = loc_query.group_by(InventorySpotCheck.location_id).all()
+
+        for row in loc_query:
+            loc = Location.query.get(row.location_id)
+            if loc:
+                checked = int(row.checked or 0)
+                matched = int(row.matched or 0)
+                accuracy = (matched / checked * 100) if checked > 0 else 100
+                location_accuracy.append({
+                    'location': loc,
+                    'checks_count': int(row.checks_count or 0),
+                    'total_checked': checked,
+                    'total_matched': matched,
+                    'accuracy_pct': round(accuracy, 1),
+                    'variance_value': float(row.variance_value or 0),
+                })
+
+    # Overall stats
+    overall_checked = sum(c.total_items_checked or 0 for c in checks)
+    overall_matched = sum(c.items_matched or 0 for c in checks)
+    overall_accuracy = (overall_matched / overall_checked * 100) if overall_checked > 0 else 100
+    overall_variance_value = sum(float(c.total_variance_value or 0) for c in checks)
+
+    return render_template('reports/stock_accuracy_trend.html',
+                         locations=locations,
+                         selected_location_id=location_id,
+                         user_location=user_location,
+                         period_days=period_days,
+                         group_by=group_by,
+                         check_type=check_type,
+                         status_filter=status_filter,
+                         sort_worst=sort_worst,
+                         trend_list=trend_list,
+                         worst_products=worst_products,
+                         reason_breakdown=reason_breakdown,
+                         location_accuracy=location_accuracy,
+                         overall_checks=len(checks),
+                         overall_checked=overall_checked,
+                         overall_matched=overall_matched,
+                         overall_accuracy=round(overall_accuracy, 1),
+                         overall_variance_value=round(overall_variance_value, 2),
+                         start_date=start_date,
+                         end_date=end_date)

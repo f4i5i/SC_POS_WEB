@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, report_buttons, export_script %}
+
+{% block title %}ABC Analysis - {{ business_name }}{% endblock %}
+
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+<style>
+    .class-a { background: #D1FAE5; color: #059669; font-weight: 700; }
+    .class-b { background: #FEF3C7; color: #D97706; font-weight: 700; }
+    .class-c { background: #FEE2E2; color: #DC2626; font-weight: 700; }
+    .class-badge {
+        display: inline-block;
+        width: 28px; height: 28px;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 28px;
+        font-size: 0.85rem;
+    }
+    .summary-card { text-align: center; border-radius: 8px; padding: 15px; }
+    .summary-card h2 { margin: 0; font-size: 1.8rem; }
+    @media print {
+        .no-print { display: none !important; }
+        @page { size: A4 landscape; margin: 8mm; }
+        .table th, .table td { padding: 3px 5px !important; font-size: 10px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    {{ print_header('ABC ANALYSIS', '', user_location if user_location is defined else None) }}
+
+    <!-- Filters -->
+    <div class="card mb-3 no-print">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-layer-group text-primary"></i> ABC Analysis
+            </h5>
+            {{ report_buttons(url_for('reports.index'), 'abc_analysis') }}
+        </div>
+        <div class="card-body py-2">
+            <form method="GET">
+                <div class="row g-2 align-items-end">
+                    {% if current_user.is_global_admin %}
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1">Location</label>
+                        <select name="location_id" class="form-select form-select-sm">
+                            <option value="">All Locations</option>
+                            {% for loc in locations %}
+                            <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1">Category</label>
+                        <select name="category_id" class="form-select form-select-sm">
+                            <option value="">All Categories</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.id }}" {% if selected_category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1">Period</label>
+                        <select name="period" class="form-select form-select-sm">
+                            <option value="30" {% if period_days == 30 %}selected{% endif %}>30 Days</option>
+                            <option value="60" {% if period_days == 60 %}selected{% endif %}>60 Days</option>
+                            <option value="90" {% if period_days == 90 %}selected{% endif %}>90 Days</option>
+                            <option value="180" {% if period_days == 180 %}selected{% endif %}>6 Months</option>
+                            <option value="365" {% if period_days == 365 %}selected{% endif %}>1 Year</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1">Class</label>
+                        <select name="class_filter" class="form-select form-select-sm">
+                            <option value="">All Classes</option>
+                            <option value="A" {% if class_filter == 'A' %}selected{% endif %}>Class A (Top 80%)</option>
+                            <option value="B" {% if class_filter == 'B' %}selected{% endif %}>Class B (Next 15%)</option>
+                            <option value="C" {% if class_filter == 'C' %}selected{% endif %}>Class C (Bottom 5%)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label form-label-sm mb-1">Sort By</label>
+                        <select name="sort_by" class="form-select form-select-sm">
+                            <option value="revenue_desc" {% if sort_by == 'revenue_desc' %}selected{% endif %}>Revenue (High-Low)</option>
+                            <option value="revenue_asc" {% if sort_by == 'revenue_asc' %}selected{% endif %}>Revenue (Low-High)</option>
+                            <option value="units_desc" {% if sort_by == 'units_desc' %}selected{% endif %}>Units Sold (High-Low)</option>
+                            <option value="profit_desc" {% if sort_by == 'profit_desc' %}selected{% endif %}>Profit (High-Low)</option>
+                            <option value="stock_value_desc" {% if sort_by == 'stock_value_desc' %}selected{% endif %}>Stock Value (High-Low)</option>
+                            <option value="transactions_desc" {% if sort_by == 'transactions_desc' %}selected{% endif %}>Transactions (High-Low)</option>
+                            <option value="name_asc" {% if sort_by == 'name_asc' %}selected{% endif %}>Name (A-Z)</option>
+                            <option value="category_asc" {% if sort_by == 'category_asc' %}selected{% endif %}>Category (A-Z)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row g-2 align-items-end mt-1">
+                    <div class="col-md-4">
+                        <label class="form-label form-label-sm mb-1">Search Product</label>
+                        <input type="text" name="search" class="form-control form-control-sm"
+                               placeholder="Name or code..." value="{{ search }}">
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-check mt-3">
+                            <input class="form-check-input" type="checkbox" name="show_zero" value="1"
+                                   id="showZero" {% if show_zero %}checked{% endif %}>
+                            <label class="form-check-label small" for="showZero">Include zero-sale products</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary btn-sm w-100">
+                            <i class="fas fa-filter"></i> Apply
+                        </button>
+                    </div>
+                    <div class="col-md-2">
+                        <a href="{{ url_for('reports.abc_analysis') }}" class="btn btn-outline-secondary btn-sm w-100">
+                            <i class="fas fa-times"></i> Clear
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Class Summary -->
+    <div class="row mb-3">
+        {% for cls, label, color, icon in [('A', 'Class A (Top 80%)', '#D1FAE5', 'star'), ('B', 'Class B (Next 15%)', '#FEF3C7', 'minus-circle'), ('C', 'Class C (Bottom 5%)', '#FEE2E2', 'arrow-down')] %}
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body p-2">
+                    <div class="row align-items-center">
+                        <div class="col-3 text-center">
+                            <div class="summary-card" style="background: {{ color }};">
+                                <h2>{{ cls }}</h2>
+                            </div>
+                        </div>
+                        <div class="col-9">
+                            <table class="table table-sm table-borderless mb-0" style="font-size: 0.85rem;">
+                                <tr>
+                                    <td class="text-muted">Products</td>
+                                    <td class="text-end fw-bold">{{ class_summary[cls].count }} <small class="text-muted">({{ class_summary[cls].pct_items }}%)</small></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Revenue</td>
+                                    <td class="text-end fw-bold">Rs. {{ "{:,.0f}".format(class_summary[cls].revenue) }} <small class="text-muted">({{ class_summary[cls].pct_revenue }}%)</small></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Units Sold</td>
+                                    <td class="text-end">{{ "{:,}".format(class_summary[cls].units) }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Stock Value</td>
+                                    <td class="text-end">Rs. {{ "{:,.0f}".format(class_summary[cls].stock_value) }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Overall Stats -->
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body py-2">
+                    <div class="fs-3 fw-bold text-primary">Rs. {{ "{:,.0f}".format(total_revenue) }}</div>
+                    <small class="text-muted">Total Revenue ({{ period_days }}d)</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body py-2">
+                    <div class="fs-3 fw-bold text-success">{{ product_list|length }}</div>
+                    <small class="text-muted">Total Products</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body py-2">
+                    <div class="fs-3 fw-bold text-info">
+                        {{ start_date.strftime('%d %b') }} - {{ end_date.strftime('%d %b %Y') }}
+                    </div>
+                    <small class="text-muted">Analysis Period</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Filters & Count -->
+    <div class="d-flex justify-content-between align-items-center mb-2 no-print">
+        <div>
+            <span class="text-muted small">Showing <strong>{{ product_list|length }}</strong> products</span>
+            {% if search %}<span class="badge bg-info ms-1">Search: {{ search }}</span>{% endif %}
+            {% if class_filter %}<span class="badge bg-warning ms-1">Class: {{ class_filter }}</span>{% endif %}
+            {% if selected_category_id %}<span class="badge bg-primary ms-1">Category filtered</span>{% endif %}
+            {% if not show_zero %}<span class="badge bg-secondary ms-1">Zero-sale excluded</span>{% endif %}
+        </div>
+        <small class="text-muted">{{ start_date.strftime('%d %b') }} - {{ end_date.strftime('%d %b %Y') }}</small>
+    </div>
+
+    <!-- Products Table -->
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 40px;">#</th>
+                            <th style="width: 45px;">Class</th>
+                            <th>Product</th>
+                            <th>Category</th>
+                            <th class="text-end">Revenue</th>
+                            <th class="text-end">Rev %</th>
+                            <th class="text-end">Cumul %</th>
+                            <th class="text-end">Units</th>
+                            <th class="text-end">Txns</th>
+                            <th class="text-end">Stock</th>
+                            <th class="text-end">Stock Val</th>
+                            <th class="text-end">Profit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in product_list %}
+                        <tr>
+                            <td class="text-muted">{{ loop.index }}</td>
+                            <td class="text-center">
+                                <span class="class-badge class-{{ item.abc_class|lower }}">{{ item.abc_class }}</span>
+                            </td>
+                            <td>
+                                <strong>{{ item.product.name }}</strong>
+                                <br><small class="text-muted">{{ item.product.code }}</small>
+                            </td>
+                            <td><small>{{ item.category_name }}</small></td>
+                            <td class="text-end">{{ "{:,.0f}".format(item.revenue) }}</td>
+                            <td class="text-end">{{ item.revenue_pct }}%</td>
+                            <td class="text-end">
+                                <div class="progress" style="height: 18px; min-width: 60px;">
+                                    <div class="progress-bar {% if item.abc_class == 'A' %}bg-success{% elif item.abc_class == 'B' %}bg-warning{% else %}bg-danger{% endif %}"
+                                         style="width: {{ item.cumulative_pct }}%">
+                                        {{ item.cumulative_pct }}%
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-end">{{ item.units_sold }}</td>
+                            <td class="text-end">{{ item.transactions }}</td>
+                            <td class="text-end">{{ item.current_stock }}</td>
+                            <td class="text-end">{{ "{:,.0f}".format(item.stock_value) }}</td>
+                            <td class="text-end {% if item.profit > 0 %}text-success{% elif item.profit < 0 %}text-danger{% endif %}">
+                                {{ "{:,.0f}".format(item.profit) }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guide -->
+    <div class="card mt-3 no-print">
+        <div class="card-body py-2">
+            <h6 class="mb-1"><i class="fas fa-info-circle text-info"></i> ABC Analysis Guide</h6>
+            <div class="row small">
+                <div class="col-md-4">
+                    <strong class="text-success">Class A</strong> - Top revenue generators (80% of revenue). Count these frequently, never run out of stock, negotiate best supplier terms.
+                </div>
+                <div class="col-md-4">
+                    <strong class="text-warning">Class B</strong> - Moderate contributors (next 15%). Standard counting, maintain adequate stock.
+                </div>
+                <div class="col-md-4">
+                    <strong class="text-danger">Class C</strong> - Low revenue items (bottom 5%). Count less frequently, minimize stock, consider discontinuing zero-sellers.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{ print_footer() }}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ export_script() }}
+{% endblock %}

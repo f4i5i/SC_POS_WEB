@@ -1,26 +1,26 @@
 {% extends "base.html" %}
+{% from "reports/_print_styles.html" import print_header, print_footer, report_buttons, export_script %}
 
 {% block title %}Raw Material Stock Report - {{ business_name }}{% endblock %}
 
+{% block extra_css %}
+{% include "reports/_print_styles.html" %}
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    {{ print_header('RAW MATERIAL STOCK', '', user_location if user_location is defined else None) }}
+
+    <div class="d-flex justify-content-between align-items-center mb-4 page-header-regular no-print">
         <div>
             <h2><i class="fas fa-flask text-primary me-2"></i>Raw Material Stock Report</h2>
             <p class="text-muted mb-0">Track oils, ethanol, bottles and production materials</p>
         </div>
-        <div class="d-flex gap-2">
-            <button onclick="window.print()" class="btn btn-outline-secondary">
-                <i class="fas fa-print me-2"></i>Print
-            </button>
-            <a href="{{ url_for('reports.index') }}" class="btn btn-outline-primary">
-                <i class="fas fa-arrow-left me-2"></i>Back
-            </a>
-        </div>
+        {{ report_buttons(url_for('reports.index'), 'raw_material_stock') }}
     </div>
 
     <!-- Filters -->
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 no-print">
         <div class="card-body">
             <form method="GET" class="row g-3">
                 <div class="col-md-2">
@@ -53,10 +53,30 @@
                     <label class="form-label">To Date</label>
                     <input type="date" name="to_date" class="form-control" value="{{ to_date }}">
                 </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-filter me-2"></i>Apply
+                <div class="col-md-2">
+                    <label class="form-label">Search</label>
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Material name..." value="{{ search }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Sort By</label>
+                    <select name="sort_by" class="form-select form-select-sm">
+                        <option value="">Default</option>
+                        <option value="name_asc" {% if sort_by == 'name_asc' %}selected{% endif %}>Name (A-Z)</option>
+                        <option value="name_desc" {% if sort_by == 'name_desc' %}selected{% endif %}>Name (Z-A)</option>
+                        <option value="stock_value_desc" {% if sort_by == 'stock_value_desc' %}selected{% endif %}>Stock Value (High-Low)</option>
+                        <option value="stock_desc" {% if sort_by == 'stock_desc' %}selected{% endif %}>Stock Qty (High-Low)</option>
+                        <option value="consumed_desc" {% if sort_by == 'consumed_desc' %}selected{% endif %}>Consumed (High-Low)</option>
+                        <option value="purchased_desc" {% if sort_by == 'purchased_desc' %}selected{% endif %}>Purchased (High-Low)</option>
+                        <option value="category_asc" {% if sort_by == 'category_asc' %}selected{% endif %}>Category (A-Z)</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-filter me-1"></i>Apply
                     </button>
+                    <a href="{{ url_for('reports.raw_material_stock') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-times me-1"></i>Clear
+                    </a>
                 </div>
             </form>
         </div>
@@ -276,6 +296,8 @@
             </div>
         </div>
     </div>
+
+    {{ print_footer() }}
 </div>
 
 <style>
@@ -286,4 +308,8 @@
     .main-content { margin-left: 0 !important; padding: 0 !important; }
 }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+{{ export_script() }}
 {% endblock %}

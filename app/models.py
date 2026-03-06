@@ -289,6 +289,11 @@ class Product(db.Model):
     stock_movements = db.relationship('StockMovement', backref='product', lazy='dynamic')
 
     @property
+    def sku(self):
+        """Alias for code — backward compatibility"""
+        return self.code
+
+    @property
     def landed_cost(self):
         """Calculate total landed cost from all cost components"""
         from decimal import Decimal
@@ -1684,6 +1689,11 @@ class RawMaterial(db.Model):
 
     # Relationships
     supplier = db.relationship('Supplier', backref='raw_materials')
+
+    @property
+    def sku(self):
+        """Alias for code — backward compatibility"""
+        return self.code
 
     @property
     def is_low_stock(self):
