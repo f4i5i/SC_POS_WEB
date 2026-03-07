@@ -214,7 +214,7 @@ def create_app(config_name='default'):
                 # Global admin sees all data
                 products = Product.query.filter_by(is_active=True).all()
                 today_sales = Sale.query.filter(
-                    db.func.date(Sale.created_at) == today
+                    db.func.date(Sale.sale_date) == today
                 ).all()
             elif user_location:
                 # Store manager/user sees only their location's data
@@ -228,7 +228,7 @@ def create_app(config_name='default'):
                 ).all()
                 # Sales for this location today
                 today_sales = Sale.query.filter(
-                    db.func.date(Sale.created_at) == today,
+                    db.func.date(Sale.sale_date) == today,
                     Sale.location_id == user_location.id
                 ).all()
             else:
@@ -239,16 +239,31 @@ def create_app(config_name='default'):
             today_total = sum((s.total or 0) for s in today_sales)
             today_count = len(today_sales)
 
-            # Get low stock alerts for user's location
+            # Get low stock alerts
             low_stock_alerts = []
             stock_summary = None
             if user_location:
                 try:
                     from app.utils.inventory_forecast import get_low_stock_alerts, get_location_stock_summary
-                    low_stock_alerts = get_low_stock_alerts(user_location.id, include_forecasting=True)[:10]  # Top 10 alerts
+                    low_stock_alerts = get_low_stock_alerts(user_location.id, include_forecasting=True)[:10]
                     stock_summary = get_location_stock_summary(user_location.id)
                 except Exception as e:
                     app.logger.error(f"Error getting stock alerts: {e}")
+            elif current_user.is_global_admin:
+                # Global admin: get alerts across all locations
+                try:
+                    from app.utils.inventory_forecast import get_low_stock_alerts
+                    all_locations = Location.query.filter_by(is_active=True).all()
+                    seen_product_ids = set()
+                    for loc in all_locations:
+                        loc_alerts = get_low_stock_alerts(loc.id, include_forecasting=True)
+                        for alert in loc_alerts:
+                            if alert.product.id not in seen_product_ids:
+                                seen_product_ids.add(alert.product.id)
+                                low_stock_alerts.append(alert)
+                    low_stock_alerts = low_stock_alerts[:10]
+                except Exception as e:
+                    app.logger.error(f"Error getting global stock alerts: {e}")
 
             return render_template('dashboard.html',
                                    now=datetime.now(),
@@ -281,18 +296,18 @@ def create_app(config_name='default'):
 
         # Build base query
         sales_query = db.session.query(
-            func.date(Sale.created_at).label('date'),
+            func.date(Sale.sale_date).label('date'),
             func.sum(Sale.total).label('total'),
             func.count(Sale.id).label('count')
         ).filter(
-            func.date(Sale.created_at) >= start_date,
-            func.date(Sale.created_at) <= end_date
+            func.date(Sale.sale_date) >= start_date,
+            func.date(Sale.sale_date) <= end_date
         )
 
         if location_id and not current_user.is_global_admin:
             sales_query = sales_query.filter(Sale.location_id == location_id)
 
-        sales_by_day = sales_query.group_by(func.date(Sale.created_at)).all()
+        sales_by_day = sales_query.group_by(func.date(Sale.sale_date)).all()
 
         # Build daily data - convert query results to dict for easier lookup
         sales_dict = {}
@@ -320,8 +335,8 @@ def create_app(config_name='default'):
             Sale.payment_method,
             func.sum(Sale.total).label('total')
         ).filter(
-            func.date(Sale.created_at) >= start_date,
-            func.date(Sale.created_at) <= end_date
+            func.date(Sale.sale_date) >= start_date,
+            func.date(Sale.sale_date) <= end_date
         )
 
         if location_id and not current_user.is_global_admin:
@@ -346,7 +361,7 @@ def create_app(config_name='default'):
             Product.name,
             func.sum(SaleItem.quantity).label('qty')
         ).join(SaleItem.product).join(SaleItem.sale).filter(
-            func.date(Sale.created_at) >= start_date
+            func.date(Sale.sale_date) >= start_date
         )
 
         if location_id and not current_user.is_global_admin:

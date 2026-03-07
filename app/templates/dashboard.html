@@ -394,7 +394,7 @@
                 <i class="fas fa-coins"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-value">Rs. 0</div>
+                <div class="stat-value">Rs. {{ "{:,.0f}".format(today_sales_amount|default(0)) }}</div>
                 <div class="stat-label">Today's Sales</div>
             </div>
         </div>
@@ -405,7 +405,7 @@
                 <i class="fas fa-receipt"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-value">0</div>
+                <div class="stat-value">{{ today_sales_count|default(0) }}</div>
                 <div class="stat-label">Transactions</div>
             </div>
         </div>
@@ -416,7 +416,7 @@
                 <i class="fas fa-exclamation-triangle"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-value">0</div>
+                <div class="stat-value">{{ low_stock_alerts|default([])|length }}</div>
                 <div class="stat-label">Low Stock</div>
             </div>
         </div>
@@ -427,7 +427,7 @@
                 <i class="fas fa-boxes"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-value">0</div>
+                <div class="stat-value">{{ products|default([])|length }}</div>
                 <div class="stat-label">Products</div>
             </div>
         </div>

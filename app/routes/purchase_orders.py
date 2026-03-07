@@ -265,11 +265,14 @@ def edit(id):
             db.session.rollback()
             flash(f'Error: {str(e)}', 'danger')
 
-    # Get products from this supplier
+    # Get products from this supplier, fall back to all products if none linked
     products = Product.query.filter_by(
         supplier_id=po.supplier_id,
         is_active=True
     ).order_by(Product.name).all()
+
+    if not products:
+        products = Product.query.filter_by(is_active=True).order_by(Product.name).all()
 
     return render_template('purchase_orders/edit.html', po=po, products=products)
 

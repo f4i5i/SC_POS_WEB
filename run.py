@@ -4,6 +4,10 @@ Initializes and runs the Flask application with background services
 """
 
 import os
+os.environ['TZ'] = 'Asia/Karachi'
+import time
+time.tzset()
+
 import logging
 from app import create_app, db
 from app.services.sync_service import SyncService
