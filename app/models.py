@@ -928,7 +928,8 @@ class PurchaseOrderItem(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     po_id = db.Column(db.Integer, db.ForeignKey('purchase_orders.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True)
+    raw_material_id = db.Column(db.Integer, db.ForeignKey('raw_materials.id'), nullable=True)
 
     quantity_ordered = db.Column(db.Integer, nullable=False)
     quantity_received = db.Column(db.Integer, default=0)
@@ -951,7 +952,24 @@ class PurchaseOrderItem(db.Model):
 
     # Relationships
     product = db.relationship('Product')
+    raw_material = db.relationship('RawMaterial')
     receiver = db.relationship('User', foreign_keys=[received_by])
+
+    @property
+    def item_name(self):
+        if self.product:
+            return self.product.name
+        elif self.raw_material:
+            return self.raw_material.name
+        return 'N/A'
+
+    @property
+    def item_code(self):
+        if self.product:
+            return self.product.code
+        elif self.raw_material:
+            return self.raw_material.code
+        return ''
 
     def calculate_landed_cost(self):
         """Calculate landed cost from components"""

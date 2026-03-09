@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, flash, redirect,
 from flask_login import login_required, current_user
 from decimal import Decimal
 from datetime import datetime
-from app.models import db, Supplier, Product, PurchaseOrder, PurchaseOrderItem, Location, LocationStock
+from app.models import db, Supplier, Product, PurchaseOrder, PurchaseOrderItem, Location, LocationStock, RawMaterial
 from app.services.reorder_service import (
     generate_draft_pos_from_low_stock,
     get_draft_pos_for_review,
@@ -183,46 +183,71 @@ def edit(id):
             action = request.form.get('action')
 
             if action == 'add_item':
-                product_id = request.form.get('product_id', type=int)
+                item_type = request.form.get('item_type', 'product')
+                item_id = request.form.get('product_id', type=int)
                 quantity = request.form.get('quantity', type=int)
 
-                if not product_id or not quantity or quantity <= 0:
-                    flash('Invalid product or quantity', 'danger')
+                if not item_id or not quantity or quantity <= 0:
+                    flash('Invalid item or quantity', 'danger')
                     return redirect(url_for('purchase_orders.edit', id=id))
 
-                product = Product.query.get(product_id)
-                if not product:
-                    flash('Product not found', 'danger')
-                    return redirect(url_for('purchase_orders.edit', id=id))
+                if item_type == 'raw_material':
+                    rm = RawMaterial.query.get(item_id)
+                    if not rm:
+                        flash('Raw material not found', 'danger')
+                        return redirect(url_for('purchase_orders.edit', id=id))
 
-                # Check if item already exists
-                existing_item = PurchaseOrderItem.query.filter_by(
-                    po_id=po.id, product_id=product_id
-                ).first()
+                    existing_item = PurchaseOrderItem.query.filter_by(
+                        po_id=po.id, raw_material_id=item_id
+                    ).first()
 
-                if existing_item:
-                    existing_item.quantity_ordered = quantity
-                    existing_item.unit_cost = product.base_cost or Decimal('0')
-                    existing_item.subtotal = existing_item.unit_cost * quantity
-                    existing_item.base_cost = product.base_cost or Decimal('0')
-                    existing_item.packaging_cost = product.packaging_cost or Decimal('0')
-                    existing_item.delivery_cost = product.delivery_cost or Decimal('0')
-                    existing_item.bottle_cost = product.bottle_cost or Decimal('0')
-                    existing_item.calculate_landed_cost()
+                    unit_cost = rm.cost_per_unit or Decimal('0')
+                    if existing_item:
+                        existing_item.quantity_ordered = quantity
+                        existing_item.unit_cost = unit_cost
+                        existing_item.subtotal = unit_cost * quantity
+                    else:
+                        item = PurchaseOrderItem(
+                            po_id=po.id,
+                            raw_material_id=item_id,
+                            quantity_ordered=quantity,
+                            unit_cost=unit_cost,
+                            subtotal=unit_cost * quantity
+                        )
+                        db.session.add(item)
                 else:
-                    item = PurchaseOrderItem(
-                        po_id=po.id,
-                        product_id=product_id,
-                        quantity_ordered=quantity,
-                        unit_cost=product.base_cost or Decimal('0'),
-                        subtotal=(product.base_cost or Decimal('0')) * quantity,
-                        base_cost=product.base_cost or Decimal('0'),
-                        packaging_cost=product.packaging_cost or Decimal('0'),
-                        delivery_cost=product.delivery_cost or Decimal('0'),
-                        bottle_cost=product.bottle_cost or Decimal('0')
-                    )
-                    item.calculate_landed_cost()
-                    db.session.add(item)
+                    product = Product.query.get(item_id)
+                    if not product:
+                        flash('Product not found', 'danger')
+                        return redirect(url_for('purchase_orders.edit', id=id))
+
+                    existing_item = PurchaseOrderItem.query.filter_by(
+                        po_id=po.id, product_id=item_id
+                    ).first()
+
+                    if existing_item:
+                        existing_item.quantity_ordered = quantity
+                        existing_item.unit_cost = product.base_cost or Decimal('0')
+                        existing_item.subtotal = existing_item.unit_cost * quantity
+                        existing_item.base_cost = product.base_cost or Decimal('0')
+                        existing_item.packaging_cost = product.packaging_cost or Decimal('0')
+                        existing_item.delivery_cost = product.delivery_cost or Decimal('0')
+                        existing_item.bottle_cost = product.bottle_cost or Decimal('0')
+                        existing_item.calculate_landed_cost()
+                    else:
+                        item = PurchaseOrderItem(
+                            po_id=po.id,
+                            product_id=item_id,
+                            quantity_ordered=quantity,
+                            unit_cost=product.base_cost or Decimal('0'),
+                            subtotal=(product.base_cost or Decimal('0')) * quantity,
+                            base_cost=product.base_cost or Decimal('0'),
+                            packaging_cost=product.packaging_cost or Decimal('0'),
+                            delivery_cost=product.delivery_cost or Decimal('0'),
+                            bottle_cost=product.bottle_cost or Decimal('0')
+                        )
+                        item.calculate_landed_cost()
+                        db.session.add(item)
 
                 po.calculate_totals()
                 db.session.commit()
@@ -266,15 +291,26 @@ def edit(id):
             flash(f'Error: {str(e)}', 'danger')
 
     # Get products from this supplier, fall back to all products if none linked
+    # Exclude Perfumes and Attars (they are produced from raw oils, not purchased)
+    from app.models import Category
+    excluded_cats = [c.id for c in Category.query.filter(Category.name.in_(['Perfumes', 'Attars'])).all()]
+
     products = Product.query.filter_by(
         supplier_id=po.supplier_id,
         is_active=True
+    ).filter(
+        ~Product.category_id.in_(excluded_cats) if excluded_cats else True
     ).order_by(Product.name).all()
 
     if not products:
-        products = Product.query.filter_by(is_active=True).order_by(Product.name).all()
+        products = Product.query.filter_by(is_active=True).filter(
+            ~Product.category_id.in_(excluded_cats) if excluded_cats else True
+        ).order_by(Product.name).all()
 
-    return render_template('purchase_orders/edit.html', po=po, products=products)
+    # Get raw materials (oils, ethanol, bottles)
+    raw_materials = RawMaterial.query.filter_by(is_active=True).order_by(RawMaterial.name).all()
+
+    return render_template('purchase_orders/edit.html', po=po, products=products, raw_materials=raw_materials)
 
 
 @bp.route('/<int:id>/submit', methods=['POST'])

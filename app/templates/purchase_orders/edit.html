@@ -69,8 +69,9 @@
                                 {% for item in po.items %}
                                 <tr class="item-row">
                                     <td>
-                                        <strong>{{ item.product.name if item.product else 'N/A' }}</strong>
-                                        <br><small class="text-muted">{{ item.product.code if item.product else '' }}</small>
+                                        <strong>{{ item.item_name }}</strong>
+                                        {% if item.raw_material %}<span class="badge bg-info ms-1" style="font-size:0.6rem;">Raw Material</span>{% endif %}
+                                        <br><small class="text-muted">{{ item.item_code }}</small>
                                     </td>
                                     <td class="text-center">
                                         <form method="POST" class="d-flex align-items-center gap-1">
@@ -151,20 +152,40 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="action" value="add_item">
 
+                        <input type="hidden" name="item_type" id="itemType" value="product">
                         <div class="mb-3">
-                            <label class="form-label">Select Product</label>
+                            <label class="form-label">Select Item</label>
                             <select name="product_id" class="form-select" id="productSelect" required>
-                                <option value="">Choose product...</option>
-                                {% for product in products %}
-                                <option value="{{ product.id }}"
-                                        data-cost="{{ product.base_cost or 0 }}"
-                                        data-reorder-qty="{{ product.reorder_quantity or 50 }}"
-                                        data-stock="{{ product.quantity }}"
-                                        data-reorder-level="{{ product.reorder_level }}">
-                                    {{ product.name }} ({{ product.code }})
-                                    {% if product.quantity <= product.reorder_level %} - LOW STOCK{% endif %}
-                                </option>
-                                {% endfor %}
+                                <option value="">Choose item...</option>
+                                {% if raw_materials %}
+                                <optgroup label="Raw Materials (Oils, Ethanol, Bottles)">
+                                    {% for rm in raw_materials %}
+                                    <option value="{{ rm.id }}"
+                                            data-type="raw_material"
+                                            data-cost="{{ rm.cost_per_unit or 0 }}"
+                                            data-reorder-qty="10"
+                                            data-stock="{{ rm.quantity or 0 }}"
+                                            data-reorder-level="0">
+                                        {{ rm.name }} ({{ rm.code }})
+                                    </option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
+                                {% if products %}
+                                <optgroup label="Products (Accessories, Bakhoor, etc.)">
+                                    {% for product in products %}
+                                    <option value="{{ product.id }}"
+                                            data-type="product"
+                                            data-cost="{{ product.base_cost or 0 }}"
+                                            data-reorder-qty="{{ product.reorder_quantity or 50 }}"
+                                            data-stock="{{ product.quantity }}"
+                                            data-reorder-level="{{ product.reorder_level }}">
+                                        {{ product.name }} ({{ product.code }})
+                                        {% if product.quantity <= product.reorder_level %} - LOW STOCK{% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
                             </select>
                         </div>
 
@@ -235,6 +256,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const unitCost = document.getElementById('unitCost');
     const quantityInput = document.getElementById('quantityInput');
 
+    const itemTypeInput = document.getElementById('itemType');
+
     productSelect.addEventListener('change', function() {
         const option = this.options[this.selectedIndex];
 
@@ -244,8 +267,10 @@ document.addEventListener('DOMContentLoaded', function() {
             reorderLevel.textContent = option.dataset.reorderLevel;
             unitCost.textContent = parseFloat(option.dataset.cost).toFixed(2);
             quantityInput.value = option.dataset.reorderQty || 50;
+            itemTypeInput.value = option.dataset.type || 'product';
         } else {
             productInfo.classList.add('d-none');
+            itemTypeInput.value = 'product';
         }
     });
 });
