@@ -933,6 +933,7 @@ class PurchaseOrderItem(db.Model):
 
     quantity_ordered = db.Column(db.Integer, nullable=False)
     quantity_received = db.Column(db.Integer, default=0)
+    unit = db.Column(db.String(20), default='pcs')  # pcs, grams, kg, ml, liters, bottles
     unit_cost = db.Column(db.Numeric(10, 2), nullable=False)
     subtotal = db.Column(db.Numeric(10, 2), nullable=False)
 

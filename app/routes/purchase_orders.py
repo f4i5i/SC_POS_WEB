@@ -186,6 +186,7 @@ def edit(id):
                 item_type = request.form.get('item_type', 'product')
                 item_id = request.form.get('product_id', type=int)
                 quantity = request.form.get('quantity', type=int)
+                unit = request.form.get('unit', 'pcs')
 
                 if not item_id or not quantity or quantity <= 0:
                     flash('Invalid item or quantity', 'danger')
@@ -206,11 +207,13 @@ def edit(id):
                         existing_item.quantity_ordered = quantity
                         existing_item.unit_cost = unit_cost
                         existing_item.subtotal = unit_cost * quantity
+                        existing_item.unit = unit
                     else:
                         item = PurchaseOrderItem(
                             po_id=po.id,
                             raw_material_id=item_id,
                             quantity_ordered=quantity,
+                            unit=unit,
                             unit_cost=unit_cost,
                             subtotal=unit_cost * quantity
                         )
@@ -229,6 +232,7 @@ def edit(id):
                         existing_item.quantity_ordered = quantity
                         existing_item.unit_cost = product.base_cost or Decimal('0')
                         existing_item.subtotal = existing_item.unit_cost * quantity
+                        existing_item.unit = unit
                         existing_item.base_cost = product.base_cost or Decimal('0')
                         existing_item.packaging_cost = product.packaging_cost or Decimal('0')
                         existing_item.delivery_cost = product.delivery_cost or Decimal('0')
@@ -239,6 +243,7 @@ def edit(id):
                             po_id=po.id,
                             product_id=item_id,
                             quantity_ordered=quantity,
+                            unit=unit,
                             unit_cost=product.base_cost or Decimal('0'),
                             subtotal=(product.base_cost or Decimal('0')) * quantity,
                             base_cost=product.base_cost or Decimal('0'),

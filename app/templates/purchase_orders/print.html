@@ -250,8 +250,9 @@
             <tr>
                 <th style="width: 5%;">#</th>
                 <th style="width: 10%;">Code</th>
-                <th style="width: 35%;">Product</th>
-                <th class="text-end" style="width: 10%;">Qty</th>
+                <th style="width: 30%;">Product</th>
+                <th class="text-end" style="width: 8%;">Qty</th>
+                <th style="width: 7%;">Unit</th>
                 <th class="text-end" style="width: 15%;">Unit Cost</th>
                 <th class="text-end" style="width: 10%;">Landed</th>
                 <th class="text-end" style="width: 15%;">Total</th>
@@ -261,9 +262,10 @@
             {% for item in po.items %}
             <tr>
                 <td>{{ loop.index }}</td>
-                <td>{{ item.product.code if item.product else '-' }}</td>
-                <td>{{ item.product.name if item.product else 'Unknown' }}</td>
+                <td>{{ item.item_code }}</td>
+                <td>{{ item.item_name }}</td>
                 <td class="text-end">{{ item.quantity_ordered }}</td>
+                <td>{{ item.unit or 'pcs' }}</td>
                 <td class="text-end">{{ "{:,.2f}".format(item.unit_cost or 0) }}</td>
                 <td class="text-end">{{ "{:,.2f}".format(item.landed_cost or 0) }}</td>
                 <td class="text-end">{{ "{:,.2f}".format(item.subtotal or 0) }}</td>
@@ -274,6 +276,7 @@
             <tr>
                 <th colspan="3">Total Items: {{ po.items.count() }}</th>
                 <th class="text-end">{{ po.items|sum(attribute='quantity_ordered') }}</th>
+                <th></th>
                 <th colspan="2"></th>
                 <th class="text-end">{{ "{:,.2f}".format(po.subtotal or 0) }}</th>
             </tr>
