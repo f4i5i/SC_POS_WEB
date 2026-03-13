@@ -904,18 +904,25 @@ class PurchaseOrder(db.Model):
         total_bottle = Decimal('0')
 
         for item in self.items:
-            qty = item.quantity_received or item.quantity_ordered
-            total_base += (item.base_cost or Decimal('0')) * qty
-            total_packaging += (item.packaging_cost or Decimal('0')) * qty
-            total_delivery += (item.delivery_cost or Decimal('0')) * qty
-            total_bottle += (item.bottle_cost or Decimal('0')) * qty
+            qty = item.quantity_ordered
+
+            if item.product_id:
+                # Product: sum individual cost components
+                total_base += (item.base_cost or Decimal('0')) * qty
+                total_packaging += (item.packaging_cost or Decimal('0')) * qty
+                total_delivery += (item.delivery_cost or Decimal('0')) * qty
+                total_bottle += (item.bottle_cost or Decimal('0')) * qty
+            else:
+                # Raw material: only has unit_cost, count it as base cost
+                total_base += (item.unit_cost or Decimal('0')) * qty
 
         self.subtotal = total_base
         self.total_packaging_cost = total_packaging
         self.total_delivery_cost = total_delivery
         self.total_bottle_cost = total_bottle
         self.grand_total_landed = total_base + total_packaging + total_delivery + total_bottle
-        self.total = self.grand_total_landed + (self.tax or Decimal('0'))
+        # PO total = only what we pay the supplier (base cost + tax)
+        self.total = total_base + (self.tax or Decimal('0'))
         self.amount_due = self.total - (self.amount_paid or Decimal('0'))
 
     def __repr__(self):

@@ -230,14 +230,9 @@ def edit(id):
 
                     if existing_item:
                         existing_item.quantity_ordered = quantity
+                        existing_item.unit = unit
                         existing_item.unit_cost = product.base_cost or Decimal('0')
                         existing_item.subtotal = existing_item.unit_cost * quantity
-                        existing_item.unit = unit
-                        existing_item.base_cost = product.base_cost or Decimal('0')
-                        existing_item.packaging_cost = product.packaging_cost or Decimal('0')
-                        existing_item.delivery_cost = product.delivery_cost or Decimal('0')
-                        existing_item.bottle_cost = product.bottle_cost or Decimal('0')
-                        existing_item.calculate_landed_cost()
                     else:
                         item = PurchaseOrderItem(
                             po_id=po.id,
@@ -245,13 +240,8 @@ def edit(id):
                             quantity_ordered=quantity,
                             unit=unit,
                             unit_cost=product.base_cost or Decimal('0'),
-                            subtotal=(product.base_cost or Decimal('0')) * quantity,
-                            base_cost=product.base_cost or Decimal('0'),
-                            packaging_cost=product.packaging_cost or Decimal('0'),
-                            delivery_cost=product.delivery_cost or Decimal('0'),
-                            bottle_cost=product.bottle_cost or Decimal('0')
+                            subtotal=(product.base_cost or Decimal('0')) * quantity
                         )
-                        item.calculate_landed_cost()
                         db.session.add(item)
 
                 po.calculate_totals()
@@ -383,51 +373,49 @@ def receive(id):
                     item.received_at = datetime.utcnow()
                     item.received_by = current_user.id
 
-                    # Update cost breakdown from form if provided
-                    base_cost = request.form.get(f'base_cost_{item.id}', type=float)
-                    packaging_cost = request.form.get(f'packaging_cost_{item.id}', type=float)
-                    delivery_cost = request.form.get(f'delivery_cost_{item.id}', type=float)
-                    bottle_cost = request.form.get(f'bottle_cost_{item.id}', type=float)
+                    if item.product:
+                        # Product: update unit cost from receiving
+                        base_cost = request.form.get(f'base_cost_{item.id}', type=float)
 
-                    if base_cost is not None:
-                        item.base_cost = Decimal(str(base_cost))
-                    if packaging_cost is not None:
-                        item.packaging_cost = Decimal(str(packaging_cost))
-                    if delivery_cost is not None:
-                        item.delivery_cost = Decimal(str(delivery_cost))
-                    if bottle_cost is not None:
-                        item.bottle_cost = Decimal(str(bottle_cost))
+                        if base_cost is not None:
+                            item.unit_cost = Decimal(str(base_cost))
+                            item.base_cost = Decimal(str(base_cost))
+                            item.subtotal = item.unit_cost * item.quantity_ordered
 
-                    item.calculate_landed_cost()
-
-                    # Update product cost breakdown
-                    product = item.product
-                    if product:
-                        product.base_cost = item.base_cost
-                        product.packaging_cost = item.packaging_cost
-                        product.delivery_cost = item.delivery_cost
-                        product.bottle_cost = item.bottle_cost
+                        product = item.product
+                        product.base_cost = item.base_cost or product.base_cost
                         product.update_cost_price()
 
-                    # Add to warehouse/receiving location stock
-                    if receiving_location_id:
-                        location_stock = LocationStock.query.filter_by(
-                            location_id=receiving_location_id,
-                            product_id=item.product_id
-                        ).first()
-
-                        if location_stock:
-                            location_stock.quantity += qty_received
-                        else:
-                            location_stock = LocationStock(
+                        # Add to warehouse/receiving location stock
+                        if receiving_location_id:
+                            location_stock = LocationStock.query.filter_by(
                                 location_id=receiving_location_id,
-                                product_id=item.product_id,
-                                quantity=qty_received
-                            )
-                            db.session.add(location_stock)
+                                product_id=item.product_id
+                            ).first()
+
+                            if location_stock:
+                                location_stock.quantity += qty_received
+                            else:
+                                location_stock = LocationStock(
+                                    location_id=receiving_location_id,
+                                    product_id=item.product_id,
+                                    quantity=qty_received
+                                )
+                                db.session.add(location_stock)
 
                         # Update product's main quantity
                         product.quantity = (product.quantity or 0) + qty_received
+
+                    elif item.raw_material:
+                        # Raw material: update unit cost and quantity
+                        base_cost = request.form.get(f'base_cost_{item.id}', type=float)
+                        if base_cost is not None:
+                            item.raw_material.cost_per_unit = Decimal(str(base_cost))
+                            item.unit_cost = Decimal(str(base_cost))
+                            item.subtotal = item.unit_cost * item.quantity_ordered
+
+                        # Add received quantity to raw material stock
+                        item.raw_material.quantity = (item.raw_material.quantity or 0) + qty_received
 
                 if item.quantity_received < item.quantity_ordered:
                     all_received = False
@@ -582,7 +570,9 @@ def duplicate(id):
         new_item = PurchaseOrderItem(
             po_id=new_po.id,
             product_id=item.product_id,
+            raw_material_id=item.raw_material_id,
             quantity_ordered=item.quantity_ordered,
+            unit=item.unit,
             unit_cost=item.unit_cost,
             subtotal=item.subtotal,
             base_cost=item.base_cost,

@@ -89,8 +89,12 @@
         <div class="item-card">
             <div class="row align-items-start">
                 <div class="col-md-4">
-                    <h6 class="mb-1">{{ item.product.name if item.product else 'N/A' }}</h6>
-                    <small class="text-muted">{{ item.product.code if item.product else '' }}</small>
+                    <h6 class="mb-1">
+                        {{ item.item_name }}
+                        {% if item.raw_material %}<span class="badge bg-info ms-1" style="font-size:0.6rem;">Raw Material</span>{% endif %}
+                    </h6>
+                    <small class="text-muted">{{ item.item_code }}</small>
+                    {% if item.unit %}<span class="badge bg-light text-dark ms-1">{{ item.unit }}</span>{% endif %}
                     <div class="mt-2">
                         <span class="qty-status {% if remaining == item.quantity_ordered %}pending{% elif remaining > 0 %}partial{% else %}complete{% endif %}">
                             Ordered: {{ item.quantity_ordered }} |
@@ -109,27 +113,12 @@
 
                 <div class="col-md-6">
                     <div class="cost-breakdown">
-                        <small class="text-muted d-block mb-2">Cost Breakdown (per unit)</small>
+                        <small class="text-muted d-block mb-2">Unit Cost</small>
                         <div class="row g-2">
-                            <div class="col-3">
-                                <label class="form-label small">Base Cost</label>
+                            <div class="col-4">
+                                <label class="form-label small">Cost per {{ item.unit or 'unit' }}</label>
                                 <input type="number" name="base_cost_{{ item.id }}" class="form-control form-control-sm"
-                                       step="0.01" value="{{ item.base_cost or item.product.base_cost or 0 }}">
-                            </div>
-                            <div class="col-3">
-                                <label class="form-label small">Packaging</label>
-                                <input type="number" name="packaging_cost_{{ item.id }}" class="form-control form-control-sm"
-                                       step="0.01" value="{{ item.packaging_cost or item.product.packaging_cost or 0 }}">
-                            </div>
-                            <div class="col-3">
-                                <label class="form-label small">Delivery</label>
-                                <input type="number" name="delivery_cost_{{ item.id }}" class="form-control form-control-sm"
-                                       step="0.01" value="{{ item.delivery_cost or item.product.delivery_cost or 0 }}">
-                            </div>
-                            <div class="col-3">
-                                <label class="form-label small">Bottle</label>
-                                <input type="number" name="bottle_cost_{{ item.id }}" class="form-control form-control-sm"
-                                       step="0.01" value="{{ item.bottle_cost or item.product.bottle_cost or 0 }}">
+                                       step="0.01" value="{{ item.unit_cost or 0 }}">
                             </div>
                         </div>
                     </div>

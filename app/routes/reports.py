@@ -1164,12 +1164,19 @@ def profit_loss():
         daily_data[day_key]['revenue'] += float(sale.total or 0)
         daily_data[day_key]['transactions'] += 1
 
-    # ===== TOP PRODUCTS BY PROFIT =====
+    # ===== TOP PRODUCTS BY PROFIT (with cost breakdown) =====
     top_products_query = db.session.query(
         Product.name,
         Product.code,
+        Product.selling_price,
         func.sum(SaleItem.quantity).label('qty_sold'),
         func.sum(SaleItem.subtotal).label('revenue'),
+        func.sum(func.coalesce(Product.base_cost, 0) * SaleItem.quantity).label('oil_cost'),
+        func.sum(func.coalesce(Product.packaging_cost, 0) * SaleItem.quantity).label('packaging_cost'),
+        func.sum(func.coalesce(Product.delivery_cost, 0) * SaleItem.quantity).label('delivery_cost'),
+        func.sum(func.coalesce(Product.bottle_cost, 0) * SaleItem.quantity).label('bottle_cost'),
+        func.sum(func.coalesce(Product.kiosk_cost, 0) * SaleItem.quantity).label('kiosk_cost'),
+        func.sum(Product.cost_price * SaleItem.quantity).label('total_cost'),
         func.sum((SaleItem.unit_price - Product.cost_price) * SaleItem.quantity).label('profit')
     ).join(SaleItem).join(Sale).filter(
         and_(
@@ -1180,9 +1187,11 @@ def profit_loss():
     )
     if effective_location_id:
         top_products_query = top_products_query.filter(Sale.location_id == effective_location_id)
+    elif not current_user.is_global_admin and not current_user.location_id:
+        top_products_query = top_products_query.filter(False)
     top_products = top_products_query.group_by(Product.id).order_by(
-        func.sum((SaleItem.unit_price - Product.cost_price) * SaleItem.quantity).desc()
-    ).limit(10).all()
+        func.sum(SaleItem.subtotal).desc()
+    ).limit(15).all()
 
     # ===== CATEGORY BREAKDOWN =====
     category_breakdown = []

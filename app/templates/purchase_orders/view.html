@@ -98,7 +98,6 @@
                                     <th class="text-center">Unit</th>
                                     <th class="text-center">Received</th>
                                     <th class="text-end">Unit Cost</th>
-                                    <th class="text-end">Landed Cost</th>
                                     <th class="text-end">Subtotal</th>
                                 </tr>
                             </thead>
@@ -121,12 +120,11 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-end">{{ format_currency(item.unit_cost or 0) }}</td>
-                                    <td class="text-end">{{ format_currency(item.landed_cost or 0) }}</td>
                                     <td class="text-end fw-medium">{{ format_currency(item.subtotal or 0) }}</td>
                                 </tr>
                                 {% else %}
                                 <tr>
-                                    <td colspan="7" class="text-center py-4 text-muted">No items in this order</td>
+                                    <td colspan="6" class="text-center py-4 text-muted">No items in this order</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -156,28 +154,18 @@
                 </div>
                 <div class="card-body">
                     <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Subtotal (Base Cost)</span>
+                        <span class="text-muted">Subtotal</span>
                         <span>{{ format_currency(po.subtotal or 0) }}</span>
                     </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Packaging Cost</span>
-                        <span>{{ format_currency(po.total_packaging_cost or 0) }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Delivery Cost</span>
-                        <span>{{ format_currency(po.total_delivery_cost or 0) }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Bottle Cost</span>
-                        <span>{{ format_currency(po.total_bottle_cost or 0) }}</span>
-                    </div>
+                    {% if po.tax %}
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Tax</span>
                         <span>{{ format_currency(po.tax or 0) }}</span>
                     </div>
+                    {% endif %}
                     <hr>
                     <div class="d-flex justify-content-between mb-2">
-                        <strong>Grand Total</strong>
+                        <strong>Total</strong>
                         <strong class="text-primary fs-5">{{ format_currency(po.total or 0) }}</strong>
                     </div>
                     <hr>
