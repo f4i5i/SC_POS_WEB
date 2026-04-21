@@ -6,7 +6,8 @@ Initializes and runs the Flask application with background services
 import os
 os.environ['TZ'] = 'Asia/Karachi'
 import time
-time.tzset()
+if hasattr(time, 'tzset'):
+    time.tzset()  # Unix only. On Windows, set timezone via Settings > Time & language > Pakistan (UTC+05:00).
 
 import logging
 from app import create_app, db
