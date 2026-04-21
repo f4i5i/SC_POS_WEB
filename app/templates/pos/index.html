@@ -669,6 +669,135 @@
     [data-theme="clean"] #popularProducts .text-muted {
         color: #64748B !important;
     }
+
+    /* =============================================================
+       POS MOBILE / TABLET RESPONSIVENESS
+       ============================================================= */
+
+    /* Below lg (992px) — stack columns, auto-height cart */
+    @media (max-width: 991.98px) {
+        .pos-container {
+            height: auto !important;
+            flex-direction: column;
+        }
+        .pos-container > .col-lg-5,
+        .pos-container > .col-lg-4,
+        .pos-container > .col-lg-3 {
+            padding-left: 0;
+            padding-right: 0;
+            margin-bottom: 1rem;
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+        .pos-container .card[style*="height: calc"],
+        .pos-container .card[style*="100vh"] {
+            height: auto !important;
+            max-height: none !important;
+        }
+        /* Cart card — capped so it doesn't push everything off screen */
+        .pos-container .col-lg-4 .card {
+            max-height: 65vh !important;
+            overflow-y: auto;
+        }
+        /* Horizontal scrollable category filter */
+        .pos-container .btn-group.flex-wrap {
+            flex-wrap: nowrap !important;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 0.25rem;
+        }
+        .pos-container .btn-group.flex-wrap .btn {
+            flex-shrink: 0;
+            border-radius: 8px !important;
+            margin-right: 4px;
+        }
+        /* Touch-friendly sizes */
+        .pos-container .btn {
+            min-height: 44px;
+        }
+        .pos-container .btn-sm {
+            min-height: 36px;
+            padding: 0.4rem 0.7rem;
+        }
+        .pos-container input.form-control,
+        .pos-container select.form-select {
+            min-height: 44px;
+            font-size: 1rem;
+        }
+        /* Larger search field on mobile */
+        .pos-container #productSearch {
+            font-size: 1.05rem;
+            padding: 0.9rem 1rem;
+        }
+        /* Top action buttons in card-header — wrap on narrow */
+        .pos-container .card-header.d-flex {
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
+        .pos-container .card-header > div {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+        }
+    }
+
+    /* Below sm (576px) — tightest layout */
+    @media (max-width: 575.98px) {
+        .pos-container .card-body {
+            padding: 0.85rem;
+        }
+        .pos-container .card-header {
+            padding: 0.75rem 1rem;
+        }
+        .pos-container .card-header h5 {
+            font-size: 1rem;
+        }
+        /* Quantity +/- buttons stay square and usable */
+        .pos-container .quantity-control button {
+            min-width: 40px;
+            min-height: 40px;
+        }
+    }
+
+    /* Floating "Go to cart" FAB — visible only on mobile when cart has items */
+    .pos-cart-fab {
+        display: none;
+        position: fixed;
+        bottom: 1.2rem;
+        right: 1.2rem;
+        z-index: 1020;
+        padding: 0.9rem 1.3rem;
+        border-radius: 50px;
+        background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+        color: #fff;
+        font-weight: 600;
+        box-shadow: 0 6px 24px rgba(59, 130, 246, 0.45);
+        border: none;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        align-items: center;
+        gap: 0.6rem;
+    }
+    .pos-cart-fab:hover,
+    .pos-cart-fab:focus {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(59, 130, 246, 0.55);
+        outline: none;
+    }
+    .pos-cart-fab .fab-badge {
+        background: rgba(255, 255, 255, 0.25);
+        padding: 0.15rem 0.6rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+    }
+    @media (max-width: 991.98px) {
+        .pos-cart-fab.has-items {
+            display: inline-flex;
+        }
+    }
+    @media print {
+        .pos-cart-fab { display: none !important; }
+    }
 </style>
 {% endblock %}
 
@@ -1206,6 +1335,13 @@
     </div>
 </div>
 
+<!-- Mobile: Floating "Go to cart" button -->
+<button type="button" class="pos-cart-fab" id="posCartFab" onclick="scrollToCart()" aria-label="Jump to cart">
+    <i class="fas fa-shopping-cart"></i>
+    <span class="fab-badge" id="posCartFabCount">0</span>
+    <span id="posCartFabTotal">Rs. 0</span>
+</button>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -1479,9 +1615,26 @@ function addToCart(product) {
     updateCartDisplay();
 }
 
+function updateCartFab() {
+    const fab = document.getElementById('posCartFab');
+    if (!fab) return;
+    const count = cart.length;
+    document.getElementById('posCartFabCount').textContent = count;
+    const total = cart.reduce((s, i) => s + (i.price * i.quantity), 0);
+    document.getElementById('posCartFabTotal').textContent = 'Rs. ' + total.toLocaleString();
+    fab.classList.toggle('has-items', count > 0);
+}
+
+function scrollToCart() {
+    const cartCard = document.getElementById('cartItems');
+    if (!cartCard) return;
+    cartCard.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function updateCartDisplay() {
     const cartDiv = $('#cartItems');
     $('#cartCount').text(cart.length);
+    updateCartFab();
 
     if (cart.length === 0) {
         cartDiv.html(`

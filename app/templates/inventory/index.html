@@ -590,7 +590,7 @@
 <div class="card">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover table-mobile-cards mb-0">
                 <thead>
                     <tr>
                         <th>Image</th>
@@ -613,7 +613,7 @@
                     {% if products.items %}
                         {% for product in products.items %}
                         <tr class="product-row" style="animation-delay: {{ loop.index * 0.05 }}s;">
-                            <td>
+                            <td data-label="Image">
                                 {% if product.image_url %}
                                 <img src="{{ product.image_url }}" alt="{{ product.name }}" class="product-image" loading="lazy">
                                 {% else %}
@@ -622,27 +622,27 @@
                                 </div>
                                 {% endif %}
                             </td>
-                            <td><strong>{{ product.code }}</strong></td>
-                            <td>
+                            <td data-label="Code"><strong>{{ product.code }}</strong></td>
+                            <td data-label="Name">
                                 <div>{{ product.name }}</div>
                                 {% if product.barcode %}
                                 <small class="text-muted">Barcode: {{ product.barcode }}</small>
                                 {% endif %}
                             </td>
-                            <td>
+                            <td data-label="Category">
                                 {% if product.category %}
                                 <span class="badge bg-info">{{ product.category.name }}</span>
                                 {% else %}
                                 <span class="badge bg-secondary">Uncategorized</span>
                                 {% endif %}
                             </td>
-                            <td>{{ product.brand or '-' }}</td>
-                            <td>{{ product.size or '-' }}</td>
+                            <td data-label="Brand">{{ product.brand or '-' }}</td>
+                            <td data-label="Size">{{ product.size or '-' }}</td>
                             {% if current_user.role in ['admin', 'warehouse_manager', 'accountant', 'inventory_manager'] or current_user.is_global_admin %}
-                            <td>Rs. {{ "{:,.2f}".format(product.cost_price) }}</td>
+                            <td data-label="Cost">Rs. {{ "{:,.2f}".format(product.cost_price) }}</td>
                             {% endif %}
-                            <td><strong>Rs. {{ "{:,.2f}".format(product.selling_price) }}</strong></td>
-                            <td>
+                            <td data-label="Price"><strong>Rs. {{ "{:,.2f}".format(product.selling_price) }}</strong></td>
+                            <td data-label="Stock">
                                 <strong class="{% if product._loc_quantity == 0 %}text-danger{% elif product._loc_is_low_stock %}text-warning{% else %}text-success{% endif %}">
                                     {{ product._loc_quantity }}
                                 </strong>
@@ -659,7 +659,7 @@
                                 </div>
                                 {% endif %}
                             </td>
-                            <td>
+                            <td data-label="Expiry">
                                 {% if product.expiry_date %}
                                     {% if product.is_expired %}
                                     <span class="badge bg-danger">
@@ -682,7 +682,7 @@
                                 <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
-                            <td>
+                            <td data-label="Status">
                                 {% if product._loc_quantity == 0 %}
                                 <span class="stock-badge stock-out">
                                     <i class="fas fa-exclamation-circle"></i> Out of Stock
@@ -697,7 +697,7 @@
                                 </span>
                                 {% endif %}
                             </td>
-                            <td>
+                            <td class="actions-cell">
                                 <div class="action-btn-group">
                                     <button class="action-btn action-btn-view"
                                             onclick="viewProduct({{ product.id }})"

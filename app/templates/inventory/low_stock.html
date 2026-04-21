@@ -107,7 +107,7 @@
         <div class="card-body p-0">
             {% if products %}
             <div class="table-responsive">
-                <table class="table table-hover mb-0">
+                <table class="table table-hover table-mobile-cards mb-0">
                     <thead class="table-light">
                         <tr>
                             <th>Product</th>
@@ -121,7 +121,7 @@
                     <tbody>
                         {% for product in products %}
                         <tr class="{% if product.quantity == 0 %}table-danger{% endif %}">
-                            <td>
+                            <td data-label="Product">
                                 <div class="d-flex align-items-center">
                                     {% if product.image_url %}
                                     <img src="{{ product.image_url }}" alt="{{ product.name }}" class="product-image me-3" loading="lazy">
@@ -139,23 +139,23 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="text-center">
+                            <td data-label="Current" class="text-center">
                                 <span class="stock-level {% if product.quantity == 0 %}stock-critical{% else %}stock-warning{% endif %}">
                                     {{ product.quantity }}
                                 </span>
                             </td>
-                            <td class="text-center">{{ product.reorder_level }}</td>
-                            <td class="text-center">
+                            <td data-label="Reorder At" class="text-center">{{ product.reorder_level }}</td>
+                            <td data-label="Reorder Qty" class="text-center">
                                 <span class="badge bg-primary">{{ product.reorder_quantity }}</span>
                             </td>
-                            <td class="text-center">
+                            <td data-label="Status" class="text-center">
                                 {% if product.quantity == 0 %}
                                 <span class="badge bg-danger">Out of Stock</span>
                                 {% elif product.quantity <= product.reorder_level %}
                                 <span class="badge bg-warning">Low Stock</span>
                                 {% endif %}
                             </td>
-                            <td class="text-end">
+                            <td class="actions-cell text-end">
                                 <div class="btn-group btn-group-sm">
                                     <button class="btn btn-outline-primary"
                                             onclick="adjustStock({{ product.id }}, '{{ product.name }}', {{ product.reorder_quantity }})"

@@ -368,6 +368,60 @@
     [data-theme="clean"] .empty-state p {
         color: #64748B !important;
     }
+
+    /* ============================================================
+       DASHBOARD MOBILE / TABLET RESPONSIVENESS
+       ============================================================ */
+    @media (max-width: 991.98px) {
+        /* Activity cards: release fixed heights so content can breathe */
+        .activity-card[style*="max-height"] {
+            max-height: none !important;
+            overflow: visible !important;
+        }
+        .activity-card .card-body[style*="height"] {
+            height: auto !important;
+            min-height: 140px;
+        }
+        /* Chart canvas fills container + shrinks proportionally */
+        .activity-card canvas {
+            max-width: 100% !important;
+            height: auto !important;
+        }
+    }
+
+    @media (max-width: 767.98px) {
+        /* Dashboard header: stack title + date */
+        .page-header .d-flex.align-items-center.justify-content-between,
+        .dashboard-header {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 0.5rem;
+        }
+        .date-badge {
+            font-size: 0.85rem;
+        }
+        /* Stat cards tighter */
+        .stat-card {
+            padding: 0.65rem;
+        }
+        .stat-value {
+            font-size: 1.1rem;
+        }
+        /* Smart alerts: always stack (no 3-col) */
+        .col-md-4 {
+            margin-bottom: 0.75rem;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        h1 { font-size: 1.35rem; }
+        h2 { font-size: 1.2rem; }
+        .stat-icon {
+            width: 36px;
+            height: 36px;
+            font-size: 0.9rem;
+        }
+    }
 </style>
 {% endblock %}
 

@@ -6,7 +6,10 @@
     <title>{% block title %}{{ business_name }}{% endblock %}</title>
 
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/SC - Black.png') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='images/icon-32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='images/icon-16.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='images/icon-180.png') }}">
 
     <!-- CSRF Token for AJAX requests -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -1240,10 +1243,44 @@
             left: 0;
             top: 0;
             width: 270px;
-            z-index: 1000;
+            z-index: 1040;
             overflow-y: auto;
             border-right: 1px solid rgba(255, 255, 255, 0.3);
-            transition: background 0.3s ease;
+            transition: background 0.3s ease, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Sidebar backdrop — shown behind drawer on mobile */
+        .sidebar-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1030;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .sidebar-backdrop.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Hamburger toggle button in the top navbar */
+        .sidebar-toggle-btn {
+            display: none;
+            background: transparent;
+            border: none;
+            color: inherit;
+            font-size: 1.3rem;
+            padding: 0.4rem 0.75rem;
+            margin-right: 0.5rem;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background 0.2s ease;
+        }
+        .sidebar-toggle-btn:hover,
+        .sidebar-toggle-btn:focus {
+            background: rgba(255, 255, 255, 0.15);
+            outline: none;
         }
 
         .sidebar-menu {
@@ -1316,7 +1353,7 @@
         }
 
         .sidebar-logo {
-            padding: 1rem 1rem;
+            padding: 1.5rem 0.75rem 1.25rem;
             text-align: center;
             border-bottom: 2px solid rgba(59, 130, 246, 0.1);
             background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05));
@@ -1341,16 +1378,24 @@
         }
 
         .sidebar-logo img {
-            max-width: 140px;
+            max-width: 250px;
+            width: 100%;
             height: auto;
             position: relative;
             z-index: 1;
-            filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.1));
-            transition: transform 0.3s ease;
+            filter:
+                drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25))
+                drop-shadow(0 8px 16px rgba(0, 0, 0, 0.20))
+                drop-shadow(0 20px 40px rgba(59, 130, 246, 0.18));
+            transition: transform 0.3s ease, filter 0.3s ease;
         }
 
         .sidebar-logo img:hover {
             transform: scale(1.05);
+            filter:
+                drop-shadow(0 3px 6px rgba(0, 0, 0, 0.30))
+                drop-shadow(0 12px 24px rgba(0, 0, 0, 0.25))
+                drop-shadow(0 24px 48px rgba(139, 92, 246, 0.25));
         }
 
         .main-wrapper {
@@ -1359,15 +1404,76 @@
             z-index: 1;
         }
 
-        @media (max-width: 768px) {
+        /* Below lg (992px) — sidebar becomes a slide-in drawer */
+        @media (max-width: 991.98px) {
             .sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
+                width: 280px;
+                max-width: 85vw;
+                transform: translateX(-100%);
+            }
+            .sidebar.show {
+                transform: translateX(0);
+                box-shadow: 8px 0 40px rgba(0, 0, 0, 0.35);
             }
             .main-wrapper {
                 margin-left: 0;
             }
+            .sidebar-toggle-btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .main-content {
+                padding: 1rem !important;
+            }
+            .navbar-brand {
+                font-size: 1rem !important;
+                max-width: 60vw;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+        }
+
+        /* Below sm (576px) — tighter spacing, smaller logo */
+        @media (max-width: 575.98px) {
+            .main-content {
+                padding: 0.75rem !important;
+            }
+            .sidebar-logo {
+                padding: 1rem 0.5rem 0.75rem !important;
+            }
+            .sidebar-logo img {
+                max-width: 180px !important;
+            }
+            .navbar-brand {
+                max-width: 50vw;
+                font-size: 0.95rem !important;
+            }
+        }
+
+        /* Touch devices — ensure all interactive elements meet 44px minimum */
+        @media (hover: none) and (pointer: coarse) {
+            .btn, .nav-link, .dropdown-item, .form-control, .form-select {
+                min-height: 44px;
+            }
+            .btn-sm, .form-control-sm, .form-select-sm {
+                min-height: 36px;
+            }
+            .sidebar .nav-link {
+                padding-top: 0.85rem;
+                padding-bottom: 0.85rem;
+            }
+        }
+
+        /* Prevent body horizontal overflow on any screen */
+        body {
+            overflow-x: hidden;
+        }
+
+        /* Fluid base typography — 14px on phones, 16px on desktop */
+        html {
+            font-size: clamp(14px, 0.875rem + 0.15vw, 16px);
         }
 
         /* Modern Sidebar Links */
@@ -1417,6 +1523,141 @@
         .main-content {
             padding: 2rem;
             min-height: calc(100vh - 80px);
+        }
+
+        /* ============================================================
+           RESPONSIVE TABLE PATTERNS
+           Two opt-in patterns authors can apply to any <table>:
+
+           1. .table-scroll-mobile (wrapper) — horizontal scroll inside box
+              Use when a table has < 6 cols and scroll is acceptable.
+
+           2. .table-mobile-cards (table) — rows stack as cards on mobile
+              Requires each <td> to have data-label="Column Name".
+              Use for wide tables (reports, sales history, inventory).
+           ============================================================ */
+
+        .table-scroll-mobile {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 8px;
+        }
+
+        @media (max-width: 767.98px) {
+            .table-mobile-cards thead {
+                display: none;
+            }
+            .table-mobile-cards,
+            .table-mobile-cards tbody,
+            .table-mobile-cards tr,
+            .table-mobile-cards td {
+                display: block;
+                width: 100%;
+            }
+            .table-mobile-cards tr {
+                margin-bottom: 0.85rem;
+                padding: 0.75rem 1rem;
+                background: var(--card-bg, #fff);
+                border-radius: 10px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+                border: 1px solid rgba(0, 0, 0, 0.06);
+            }
+            .table-mobile-cards td {
+                border: none;
+                padding: 0.35rem 0;
+                text-align: right;
+                position: relative;
+                padding-left: 45%;
+                min-height: 1.75rem;
+            }
+            .table-mobile-cards td::before {
+                content: attr(data-label);
+                position: absolute;
+                left: 0;
+                top: 0.35rem;
+                width: 42%;
+                font-weight: 600;
+                color: var(--text-secondary, #6b7280);
+                text-align: left;
+                font-size: 0.85rem;
+            }
+            .table-mobile-cards td:empty,
+            .table-mobile-cards td[data-label=""] {
+                display: none;
+            }
+            /* Action buttons row — let them wrap naturally, no label */
+            .table-mobile-cards td.actions-cell {
+                padding-left: 0;
+                text-align: left;
+                padding-top: 0.5rem;
+                border-top: 1px solid rgba(0, 0, 0, 0.06);
+                margin-top: 0.4rem;
+            }
+            .table-mobile-cards td.actions-cell::before {
+                display: none;
+            }
+        }
+
+        /* Stack card headers with action buttons on mobile */
+        @media (max-width: 767.98px) {
+            .card-header.d-flex {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+            .card-header .btn-toolbar,
+            .card-header .btn-group {
+                width: 100%;
+            }
+        }
+
+        /* ============================================================
+           RESPONSIVE FORMS
+           - Large forms (add/edit product, PO) get sticky action bar
+           - Input/select min-height for touch devices (set above)
+           ============================================================ */
+        @media (max-width: 991.98px) {
+            /* Label above input on narrow — stack instead of inline */
+            .form-label {
+                margin-bottom: 0.3rem;
+                font-size: 0.9rem;
+            }
+            /* Two-col form rows collapse */
+            .row.g-3 > [class^="col-md"],
+            .row.g-3 > [class*=" col-md"] {
+                margin-bottom: 0.5rem;
+            }
+            /* Sticky save bar for long forms opted in via .form-sticky-actions */
+            .form-sticky-actions {
+                position: sticky;
+                bottom: 0;
+                background: var(--card-bg, #fff);
+                border-top: 1px solid rgba(0, 0, 0, 0.08);
+                padding: 0.85rem 1rem;
+                margin: 1rem -1rem 0;
+                box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+                z-index: 100;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+            .form-sticky-actions .btn {
+                flex: 1 1 auto;
+                min-width: 120px;
+            }
+        }
+
+        /* Generic utility — h1/h2 scale down on phones */
+        @media (max-width: 575.98px) {
+            h1 { font-size: 1.5rem; }
+            h2 { font-size: 1.3rem; }
+            h3 { font-size: 1.15rem; }
+            .card-header h5 { font-size: 1rem; }
+            .card-header h6 { font-size: 0.9rem; }
+            .btn { font-size: 0.95rem; }
+            .container, .container-fluid {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
         }
 
         /* Glassmorphism Cards */
@@ -1684,6 +1925,8 @@
             .toast-container,
             .dropdown-menu,
             .sidebar-toggle,
+            .sidebar-toggle-btn,
+            .sidebar-backdrop,
             footer {
                 display: none !important;
             }
@@ -1722,7 +1965,7 @@
                 border-bottom: 1px solid #ddd !important;
             }
 
-            /* Tables for print */
+            /* Tables for print — always render as real tables, never as stacked cards */
             .table {
                 border-collapse: collapse !important;
             }
@@ -1736,6 +1979,36 @@
             .table-hover tbody tr:hover {
                 background: none !important;
             }
+
+            /* Force .table-mobile-cards back to normal table layout in print */
+            .table-mobile-cards,
+            .table-mobile-cards thead,
+            .table-mobile-cards tbody,
+            .table-mobile-cards tr,
+            .table-mobile-cards th,
+            .table-mobile-cards td {
+                display: revert !important;
+                width: auto !important;
+                padding: 8px !important;
+                text-align: left !important;
+                margin: 0 !important;
+                background: transparent !important;
+                box-shadow: none !important;
+                border: 1px solid #ddd !important;
+            }
+            .table-mobile-cards thead { display: table-header-group !important; }
+            .table-mobile-cards tbody { display: table-row-group !important; }
+            .table-mobile-cards tr    { display: table-row !important; }
+            .table-mobile-cards th,
+            .table-mobile-cards td    { display: table-cell !important; }
+            .table-mobile-cards td::before { display: none !important; content: none !important; }
+
+            /* Reset main-wrapper margin from sidebar offset */
+            .main-wrapper { margin-left: 0 !important; }
+
+            /* Ensure our responsive-only floating controls never print */
+            .pos-cart-fab,
+            .sidebar-backdrop { display: none !important; }
 
             /* Links for print */
             a {
@@ -1761,9 +2034,9 @@
 <body>
     {% if current_user.is_authenticated %}
     <!-- Sidebar -->
-    <nav class="sidebar">
+    <nav class="sidebar" id="sidebar">
         <div class="sidebar-logo">
-            <img src="{{ url_for('static', filename='images/SC - Main.png') }}" alt="{{ business_name }}">
+            <img src="{{ url_for('static', filename='images/logo.svg') }}" alt="{{ business_name }}">
         </div>
         <div class="sidebar-menu">
             <ul class="nav flex-column">
@@ -2064,11 +2337,18 @@
         </div>
     </nav>
 
+    <!-- Sidebar backdrop (mobile drawer overlay) -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+
     <!-- Main Wrapper -->
     <div class="main-wrapper">
         <!-- Navigation Bar -->
         <nav class="navbar navbar-expand-lg navbar-dark">
             <div class="container-fluid">
+                <button class="sidebar-toggle-btn" id="sidebarToggle" type="button"
+                        aria-label="Toggle navigation menu" aria-controls="sidebar" aria-expanded="false">
+                    <i class="fas fa-bars"></i>
+                </button>
                 <a class="navbar-brand" href="/">
                     <i class="fas fa-store"></i> {{ business_name }}
                 </a>
@@ -2511,6 +2791,62 @@
             }
         }
     });
+    </script>
+
+    <!-- Sidebar drawer toggle (mobile) -->
+    <script>
+    (function() {
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggle = document.getElementById('sidebarToggle');
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebarBackdrop');
+            if (!toggle || !sidebar || !backdrop) return;
+
+            const MOBILE_MAX = 991.98;
+            const isMobile = () => window.innerWidth <= MOBILE_MAX;
+
+            function openSidebar() {
+                sidebar.classList.add('show');
+                backdrop.classList.add('show');
+                toggle.setAttribute('aria-expanded', 'true');
+                document.body.style.overflow = 'hidden';
+            }
+            function closeSidebar() {
+                sidebar.classList.remove('show');
+                backdrop.classList.remove('show');
+                toggle.setAttribute('aria-expanded', 'false');
+                document.body.style.overflow = '';
+            }
+            function toggleSidebar() {
+                sidebar.classList.contains('show') ? closeSidebar() : openSidebar();
+            }
+
+            toggle.addEventListener('click', toggleSidebar);
+            backdrop.addEventListener('click', closeSidebar);
+
+            // Close when a leaf nav link is clicked on mobile
+            sidebar.querySelectorAll('.nav-link').forEach(function(link) {
+                if (link.classList.contains('nav-category-toggle')) return;
+                link.addEventListener('click', function() {
+                    if (isMobile()) closeSidebar();
+                });
+            });
+
+            // Close on Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && sidebar.classList.contains('show')) closeSidebar();
+            });
+
+            // Auto-close if resized up to desktop while open
+            let resizeTimer;
+            window.addEventListener('resize', function() {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(function() {
+                    if (!isMobile() && sidebar.classList.contains('show')) closeSidebar();
+                }, 150);
+            });
+        });
+    })();
     </script>
 
     <!-- Command Palette Overlay -->
