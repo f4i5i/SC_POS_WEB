@@ -182,7 +182,7 @@ def init_rbac(create_admin=False):
         create_admin (bool): Whether to create admin user if none exists
     """
     print("=" * 60)
-    print("Initializing RBAC System for Sunnat Collection POS")
+    print("Initializing RBAC System for Zaviyar Perfumes & Attars POS")
     print("=" * 60)
 
     try:

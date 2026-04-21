@@ -382,7 +382,7 @@ def send_birthday_message(customer):
     message = f"""
 🎉 Happy Birthday {customer.name}! 🎉
 
-Sunnat Collection wishes you a wonderful day filled with joy!
+Zaviyar Perfumes & Attars wishes you a wonderful day filled with joy!
 
 {gift['message']}
 Plus {gift['bonus_points']} bonus loyalty points!
@@ -390,7 +390,7 @@ Plus {gift['bonus_points']} bonus loyalty points!
 Visit us today to redeem your birthday gift.
 
 Best wishes,
-Sunnat Collection Team
+Zaviyar Perfumes & Attars Team
     """.strip()
 
     # TODO: Integrate with SMS/Email service

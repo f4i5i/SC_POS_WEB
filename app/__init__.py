@@ -471,7 +471,7 @@ def create_app(config_name='default'):
             format_currency=format_currency,
             format_datetime=format_datetime,
             format_date=format_date,
-            business_name=app.config.get('BUSINESS_NAME', 'Sunnat Collection'),
+            business_name=app.config.get('BUSINESS_NAME', 'Zaviyar Perfumes & Attars'),
             is_feature_enabled=is_feature_enabled,
             enabled_features=get_enabled_features(),
             # Multi-kiosk support

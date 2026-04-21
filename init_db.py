@@ -37,7 +37,7 @@ def init_database():
 
         # Initialize default business settings
         default_settings = {
-            'business_name': 'Sunnat Collection',
+            'business_name': 'Zaviyar Perfumes & Attars',
             'business_address': 'First Floor, Mall of Wah, G.T Road',
             'business_phone': '',
             'business_email': '',

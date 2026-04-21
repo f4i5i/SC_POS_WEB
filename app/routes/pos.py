@@ -832,7 +832,7 @@ def print_receipt(sale_id):
 
     return render_template('pos/receipt.html',
                          sale=sale,
-                         business_name=settings_dict.get('business_name', 'Sunnat Collection'),
+                         business_name=settings_dict.get('business_name', 'Zaviyar Perfumes & Attars'),
                          business_address=settings_dict.get('business_address', 'First Floor, Mall of Wah, G.T Road'),
                          business_phone=settings_dict.get('business_phone', ''),
                          business_email=settings_dict.get('business_email', ''),

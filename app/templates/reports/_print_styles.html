@@ -437,8 +437,8 @@
 {# Print Header Macro #}
 {% macro print_header(title, period='', location=None) %}
 <div class="print-header">
-    <div class="business-name">{{ business_name or 'Sunnat Collection' }}</div>
-    <div class="business-tagline">Premium Attars & Perfumes</div>
+    <div class="business-name">{{ business_name or 'Zaviyar Perfumes & Attars' }}</div>
+    <div class="business-tagline">Perfumes & Attars</div>
     <div class="report-title">{{ title }}</div>
     {% if period %}
     <div class="report-period">{{ period }}</div>
@@ -454,7 +454,7 @@
 {% macro print_footer() %}
 <div class="print-footer">
     <p style="margin: 0;">This is a computer-generated document. No signature required.</p>
-    <p style="margin: 5px 0 0 0; font-size: 7pt;">{{ business_name or 'Sunnat Collection' }} - Confidential</p>
+    <p style="margin: 5px 0 0 0; font-size: 7pt;">{{ business_name or 'Zaviyar Perfumes & Attars' }} - Confidential</p>
 </div>
 {% endmacro %}
 

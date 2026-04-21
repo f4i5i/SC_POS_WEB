@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: Sunnat Collection POS API
+  title: Zaviyar Perfumes & Attars POS API
   description: |
-    REST API documentation for the Sunnat Collection Point of Sale system.
+    REST API documentation for the Zaviyar Perfumes & Attars Point of Sale system.
 
     ## Authentication
     Most endpoints require authentication. Login via `/auth/login` to obtain a session cookie.

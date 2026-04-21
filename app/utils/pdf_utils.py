@@ -38,7 +38,7 @@ def generate_receipt_pdf(sale):
     width, height = letter
 
     # Business header
-    business_name = current_app.config.get('BUSINESS_NAME', 'Sunnat Collection')
+    business_name = current_app.config.get('BUSINESS_NAME', 'Zaviyar Perfumes & Attars')
     business_address = current_app.config.get('BUSINESS_ADDRESS', '')
     business_phone = current_app.config.get('BUSINESS_PHONE', '')
 

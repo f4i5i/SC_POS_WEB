@@ -40,7 +40,7 @@ def send_email_receipt(sale_id):
         receipt_html = render_template('receipts/email_receipt.html',
                                        sale=sale,
                                        settings=settings,
-                                       business_name=settings.get('business_name', 'Sunnat Collection'))
+                                       business_name=settings.get('business_name', 'Zaviyar Perfumes & Attars'))
 
         # Try to send email
         try:
@@ -262,13 +262,13 @@ def view_receipt(token):
     return render_template('receipts/public_receipt.html',
                            sale=sale,
                            settings=settings,
-                           business_name=settings.get('business_name', 'Sunnat Collection'))
+                           business_name=settings.get('business_name', 'Zaviyar Perfumes & Attars'))
 
 
 def generate_whatsapp_receipt_text(sale):
     """Generate formatted receipt text for WhatsApp"""
     settings = get_business_settings()
-    business_name = settings.get('business_name', 'SUNNAT COLLECTION')
+    business_name = settings.get('business_name', 'ZAVIYAR PERFUMES & ATTARS')
 
     lines = []
     lines.append(f"*{business_name}*")

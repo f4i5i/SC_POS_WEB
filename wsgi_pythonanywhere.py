@@ -32,7 +32,7 @@ os.environ['SECRET_KEY'] = 'sc-pos-2024-xK9mN3pQ7vR2wY5zA8bC1dE4fG6hJ0kL'
 os.environ['DATABASE_URL'] = f'sqlite:////home/{USERNAME}/SC_POS_WEB/instance/perfume_pos.db'
 
 # Business Configuration
-os.environ['BUSINESS_NAME'] = 'Sunnat Collection'
+os.environ['BUSINESS_NAME'] = 'Zaviyar Perfumes & Attars'
 os.environ['BUSINESS_ADDRESS'] = 'Mall of Wah, Pakistan'
 os.environ['CURRENCY_SYMBOL'] = 'Rs.'
 

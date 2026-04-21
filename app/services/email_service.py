@@ -130,7 +130,7 @@ class EmailService:
 
         # Build HTML email
         currency_symbol = self.app.config.get('CURRENCY_SYMBOL', 'Rs.')
-        business_name = self.app.config.get('BUSINESS_NAME', 'Sunnat Collection')
+        business_name = self.app.config.get('BUSINESS_NAME', 'Zaviyar Perfumes & Attars')
 
         html = f"""
         <!DOCTYPE html>

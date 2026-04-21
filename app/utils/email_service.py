@@ -27,7 +27,7 @@ def send_daily_report_email(day_close, report_path, recipient_email):
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = recipient_email
-    msg['Subject'] = f"Daily Sales Report - {day_close.close_date.strftime('%B %d, %Y')} - Sunnat Collection"
+    msg['Subject'] = f"Daily Sales Report - {day_close.close_date.strftime('%B %d, %Y')} - Zaviyar Perfumes & Attars"
 
     # Email body
     body = f"""
@@ -101,7 +101,7 @@ def send_daily_report_email(day_close, report_path, recipient_email):
         </div>
 
         <div class="footer">
-            <p>This is an automated email from Sunnat Collection POS System</p>
+            <p>This is an automated email from Zaviyar Perfumes & Attars POS System</p>
             <p>First Floor, Mall of Wah, G.T Road</p>
         </div>
     </body>
@@ -142,7 +142,7 @@ def send_low_stock_alert(products, recipient_email):
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = recipient_email
-    msg['Subject'] = f"Low Stock Alert - Sunnat Collection"
+    msg['Subject'] = f"Low Stock Alert - Zaviyar Perfumes & Attars"
 
     products_html = ""
     for product in products:

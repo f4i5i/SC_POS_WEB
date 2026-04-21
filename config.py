@@ -45,7 +45,7 @@ class Config:
     SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
 
     # Business Configuration
-    BUSINESS_NAME = os.environ.get('BUSINESS_NAME', 'Sunnat Collection')
+    BUSINESS_NAME = os.environ.get('BUSINESS_NAME', 'Zaviyar Perfumes & Attars')
     BUSINESS_ADDRESS = os.environ.get('BUSINESS_ADDRESS', 'Mall of Wah, Pakistan')
     BUSINESS_PHONE = os.environ.get('BUSINESS_PHONE', '')
     BUSINESS_EMAIL = os.environ.get('BUSINESS_EMAIL', '')

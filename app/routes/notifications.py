@@ -416,7 +416,7 @@ def send_due_reminder(due_id):
     if not customer.phone:
         return jsonify({'success': False, 'error': 'Customer has no phone number'}), 400
 
-    message = f"Dear {customer.name}, this is a friendly reminder that Rs. {due.due_amount} is due since {due.due_date}. Please visit Sunnat Collection to settle your account. Thank you!"
+    message = f"Dear {customer.name}, this is a friendly reminder that Rs. {due.due_amount} is due since {due.due_date}. Please visit Zaviyar Perfumes & Attars to settle your account. Thank you!"
 
     # Check which notification methods are available
     result = {'sms': False, 'whatsapp': False}

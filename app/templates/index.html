@@ -29,7 +29,8 @@
     }
 
     .landing-logo {
-        width: 180px;
+        width: 440px;
+        max-width: 90%;
         height: auto;
         margin-bottom: 1.5rem;
         filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
@@ -85,7 +86,7 @@
 {% block content %}
 <div class="landing-container">
     <div class="landing-card">
-        <img src="{{ url_for('static', filename='images/SC - Main.png') }}" alt="{{ business_name }}" class="landing-logo">
+        <img src="{{ url_for('static', filename='images/logo.svg') }}" alt="{{ business_name }}" class="landing-logo">
 
         <h1 class="landing-title">{{ business_name }}</h1>
         <p class="landing-subtitle">Point of Sale & Inventory Management System</p>

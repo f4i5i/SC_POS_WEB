@@ -202,9 +202,9 @@ class WhatsAppCloudAPI:
         # Get business settings
         try:
             settings = {s.key: s.value for s in Setting.query.all()}
-            business_name = settings.get('business_name', 'Sunnat Collection')
+            business_name = settings.get('business_name', 'Zaviyar Perfumes & Attars')
         except:
-            business_name = 'Sunnat Collection'
+            business_name = 'Zaviyar Perfumes & Attars'
 
         lines = [
             f"*{business_name}*",
